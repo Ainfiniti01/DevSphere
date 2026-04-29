@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle, Send } from 'lucide-react';
+import { Heart, Share2, MessageCircle, PlayCircle, Send, User } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
-  const { toggleLike, addComment, currentUser } = useApp();
+  const { toggleLike, addComment } = useApp();
   const [commentText, setCommentText] = useState('');
 
   const handleAddComment = () => {
@@ -22,6 +22,8 @@ const ProjectCard = ({ project }: { project: any }) => {
     addComment(project.id, commentText);
     setCommentText('');
   };
+
+  const hasMedia = project.thumbnail || project.videoUrl;
 
   return (
     <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
@@ -37,16 +39,38 @@ const ProjectCard = ({ project }: { project: any }) => {
       </CardHeader>
       
       <div 
-        className="relative aspect-video bg-muted cursor-pointer group"
+        className={cn(
+          "relative aspect-video cursor-pointer group overflow-hidden",
+          !hasMedia ? "bg-gradient-to-br from-primary/20 via-violet-500/10 to-background flex flex-col items-center justify-center p-8 text-center" : "bg-muted"
+        )}
         onClick={() => navigate(`/project/${project.id}`)}
       >
-        <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-          <PlayCircle className="text-white opacity-80 group-hover:opacity-100 transition-opacity" size={48} />
-        </div>
-        <div className="absolute bottom-3 left-3 right-3">
-          <h3 className="text-white font-bold text-lg drop-shadow-md">{project.title}</h3>
-        </div>
+        {hasMedia ? (
+          <>
+            <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              <PlayCircle className="text-white opacity-80 group-hover:opacity-100 transition-opacity" size={48} />
+            </div>
+            <div className="absolute bottom-3 left-3 right-3">
+              <h3 className="text-white font-bold text-lg drop-shadow-md">{project.title}</h3>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="absolute top-3 left-3">
+              <span className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded-full uppercase tracking-wider">
+                {project.stage}
+              </span>
+            </div>
+            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[80%]">
+              {project.title}
+            </h3>
+            <div className="mt-4 flex items-center gap-2 text-muted-foreground">
+              <User size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <CardContent className="p-4">
