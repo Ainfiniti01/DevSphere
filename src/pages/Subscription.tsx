@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 const Subscription = () => {
   return (
-    <MobileLayout title="Subscription">
+    <MobileLayout title="Subscription" showBack>
       <div className="px-6 py-6 space-y-8">
         <div className="bg-primary/10 border border-primary/20 p-6 rounded-3xl text-center">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2">Current Plan</h3>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from 'react';
-import { MOCK_PROJECTS, MOCK_CHATS, MOCK_NOTIFICATIONS } from '@/data/mockData';
+import { MOCK_PROJECTS, MOCK_CHATS, MOCK_NOTIFICATIONS, MOCK_JOIN_REQUESTS } from '@/data/mockData';
 
 interface AppContextType {
   currentUser: any;
@@ -32,7 +32,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       { id: 'c2', user: 'James Wilson', text: 'What tech stack are you using for the AI part?', time: '1h ago' }
     ]
   })));
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>(MOCK_JOIN_REQUESTS);
   const [chats, setChats] = useState(MOCK_CHATS);
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 

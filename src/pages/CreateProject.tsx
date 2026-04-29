@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, Plus, X, Rocket, Target, Lightbulb } from 'lucide-react';
+import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
@@ -24,7 +24,9 @@ const CreateProject = () => {
     solution: '',
     description: '',
     skills: '',
-    stage: 'Idea'
+    stage: 'Idea',
+    thumbnail: '',
+    videoUrl: ''
   });
 
   useEffect(() => {
@@ -37,7 +39,9 @@ const CreateProject = () => {
           solution: projectToEdit.solution,
           description: projectToEdit.description,
           skills: projectToEdit.skills.join(', '),
-          stage: projectToEdit.stage
+          stage: projectToEdit.stage,
+          thumbnail: projectToEdit.thumbnail || '',
+          videoUrl: projectToEdit.videoUrl || ''
         });
       }
     }
@@ -75,7 +79,7 @@ const CreateProject = () => {
           avatar: currentUser.avatar,
           role: currentUser.title
         },
-        thumbnail: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&q=80&w=800`,
+        thumbnail: formData.thumbnail || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&q=80&w=800`,
         members: [],
         timestamp: new Date().toISOString(),
         likes: 0,
@@ -86,6 +90,16 @@ const CreateProject = () => {
       toast.success("Project published successfully!");
     }
     navigate('/');
+  };
+
+  const simulateUpload = (type: 'image' | 'video') => {
+    if (type === 'image') {
+      setFormData({ ...formData, thumbnail: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800' });
+      toast.success("Image uploaded!");
+    } else {
+      setFormData({ ...formData, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' });
+      toast.success("Video uploaded!");
+    }
   };
 
   return (
@@ -159,6 +173,26 @@ const CreateProject = () => {
               value={formData.skills}
               onChange={e => setFormData({...formData, skills: e.target.value})}
             />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Label className="text-sm font-bold">Media (Optional)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div 
+              onClick={() => simulateUpload('image')}
+              className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.thumbnail ? 'border-primary' : 'border-border'}`}
+            >
+              <ImageIcon className={formData.thumbnail ? 'text-primary' : 'text-muted-foreground'} size={24} />
+              <p className="text-[10px] font-bold mt-2">{formData.thumbnail ? 'Image Added' : 'Add Image'}</p>
+            </div>
+            <div 
+              onClick={() => simulateUpload('video')}
+              className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.videoUrl ? 'border-primary' : 'border-border'}`}
+            >
+              <Video className={formData.videoUrl ? 'text-primary' : 'text-muted-foreground'} size={24} />
+              <p className="text-[10px] font-bold mt-2">{formData.videoUrl ? 'Video Added' : 'Add Video'}</p>
+            </div>
           </div>
         </div>
 

@@ -41,7 +41,7 @@ const EditProfile = () => {
   };
 
   return (
-    <MobileLayout title="Edit Profile">
+    <MobileLayout title="Edit Profile" showBack>
       <div className="px-6 py-6 space-y-8">
         <div className="flex flex-col items-center gap-4">
           <div className="relative group cursor-pointer" onClick={simulateAvatarChange}>

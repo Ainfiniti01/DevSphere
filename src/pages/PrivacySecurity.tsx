@@ -30,7 +30,7 @@ const PrivacySecurity = () => {
   };
 
   return (
-    <MobileLayout title="Privacy & Security">
+    <MobileLayout title="Privacy & Security" showBack>
       <div className="px-6 py-6 space-y-8">
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">

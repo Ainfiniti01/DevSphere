@@ -36,7 +36,7 @@ const Notifications = () => {
   };
 
   return (
-    <MobileLayout title="Notifications">
+    <MobileLayout title="Notifications" showBack>
       <div className="px-4 py-4 space-y-6">
         {myProjectRequests.length > 0 && (
           <section>
