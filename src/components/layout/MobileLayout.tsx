@@ -2,10 +2,20 @@
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Search, PlusSquare, MessageSquare, User, Bell } from 'lucide-react';
+import { Home, Search, PlusSquare, MessageSquare, User, Bell, ChevronLeft } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
-const MobileLayout = ({ children, showNav = true, title }: { children: React.ReactNode, showNav?: boolean, title?: string }) => {
+const MobileLayout = ({ 
+  children, 
+  showNav = true, 
+  title, 
+  showBack = false 
+}: { 
+  children: React.ReactNode, 
+  showNav?: boolean, 
+  title?: string,
+  showBack?: boolean
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,9 +30,16 @@ const MobileLayout = ({ children, showNav = true, title }: { children: React.Rea
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground max-w-md mx-auto border-x border-border shadow-2xl relative overflow-hidden">
       <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-violet-500 bg-clip-text text-transparent">
-          {title || "DevSphere"}
-        </h1>
+        <div className="flex items-center gap-2">
+          {showBack && (
+            <button onClick={() => navigate(-1)} className="p-1 -ml-1 hover:bg-accent rounded-full transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+          )}
+          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-violet-500 bg-clip-text text-transparent truncate max-w-[200px]">
+            {title || "DevSphere"}
+          </h1>
+        </div>
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/notifications')} className="relative p-2 hover:bg-accent rounded-full transition-colors">
             <Bell size={22} className="text-muted-foreground" />

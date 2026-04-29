@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Video, Plus, X, Rocket, Target, Lightbulb } from 'lucide-react';
 import { toast } from "sonner";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 
 const CreateProject = () => {
   const navigate = useNavigate();
-  const { setProjects, currentUser } = useApp();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const { projects, setProjects, currentUser } = useApp();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -25,41 +27,69 @@ const CreateProject = () => {
     stage: 'Idea'
   });
 
+  useEffect(() => {
+    if (editId) {
+      const projectToEdit = projects.find(p => p.id === editId);
+      if (projectToEdit) {
+        setFormData({
+          title: projectToEdit.title,
+          problem: projectToEdit.problem,
+          solution: projectToEdit.solution,
+          description: projectToEdit.description,
+          skills: projectToEdit.skills.join(', '),
+          stage: projectToEdit.stage
+        });
+      }
+    }
+  }, [editId, projects]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentUser) {
-      toast.error("Please sign in to create a project");
+      toast.error("Please sign in to continue");
       navigate('/auth');
       return;
     }
 
-    const newProject = {
-      id: 'p' + Date.now(),
-      title: formData.title,
-      problem: formData.problem,
-      solution: formData.solution,
-      description: formData.description,
-      stage: formData.stage,
-      skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
-      creator: {
-        id: currentUser.id,
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-        role: currentUser.title
-      },
-      thumbnail: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&q=80&w=800`,
-      members: [],
-      timestamp: new Date().toISOString()
-    };
-
-    setProjects(prev => [newProject, ...prev]);
-    toast.success("Project published successfully!");
+    if (editId) {
+      setProjects(prev => prev.map(p => {
+        if (p.id === editId) {
+          return {
+            ...p,
+            ...formData,
+            skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== "")
+          };
+        }
+        return p;
+      }));
+      toast.success("Project updated successfully!");
+    } else {
+      const newProject = {
+        id: 'p' + Date.now(),
+        ...formData,
+        skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+        creator: {
+          id: currentUser.id,
+          name: currentUser.name,
+          avatar: currentUser.avatar,
+          role: currentUser.title
+        },
+        thumbnail: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&q=80&w=800`,
+        members: [],
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        isLiked: false,
+        comments: []
+      };
+      setProjects(prev => [newProject, ...prev]);
+      toast.success("Project published successfully!");
+    }
     navigate('/');
   };
 
   return (
-    <MobileLayout title="New Project">
+    <MobileLayout title={editId ? "Edit Project" : "New Project"} showBack>
       <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6">
         <div className="space-y-2">
           <Label className="text-sm font-bold">Project Title</Label>
@@ -132,17 +162,9 @@ const CreateProject = () => {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-sm font-bold">Video Pitch (Optional)</Label>
-          <div className="border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer">
-            <Video className="text-muted-foreground mb-2" size={28} />
-            <p className="text-xs font-bold text-muted-foreground">Upload 60s pitch</p>
-          </div>
-        </div>
-
         <div className="pt-4">
           <Button type="submit" className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
-            Launch Project
+            {editId ? "Update Project" : "Launch Project"}
           </Button>
         </div>
       </form>

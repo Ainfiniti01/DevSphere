@@ -4,17 +4,18 @@ import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Briefcase, User } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
+import ProjectCard from '@/components/ProjectCard';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { currentUser } = useApp();
+  const { currentUser, projects } = useApp();
 
-  // Fallback to mock user if not logged in for preview purposes
   const user = currentUser || {
+    id: 'u1',
     name: 'Felix Zhang',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
     title: 'Senior Fullstack Developer',
@@ -23,6 +24,9 @@ const Profile = () => {
     portfolio: 'felix.dev'
   };
 
+  const myProjects = projects.filter(p => p.creator.id === user.id);
+  const joinedProjects = projects.filter(p => p.members?.includes(user.id));
+
   return (
     <MobileLayout title="Profile">
       <div className="relative">
@@ -30,7 +34,7 @@ const Profile = () => {
         
         <div className="px-6 -mt-12">
           <div className="flex items-end justify-between mb-6">
-            <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
+            <Avatar className="h-24 w-24 border-4 border-background shadow-xl cursor-pointer" onClick={() => navigate('/edit-profile')}>
               <AvatarImage src={user.avatar} />
               <AvatarFallback><User size={40} /></AvatarFallback>
             </Avatar>
@@ -56,9 +60,7 @@ const Profile = () => {
           </div>
 
           <section className="mb-8">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              Skills
-            </h3>
+            <h3 className="text-lg font-bold mb-4">Skills</h3>
             <div className="flex flex-wrap gap-2">
               {user.skills?.map((skill: string) => (
                 <SkillBadge key={skill} skill={skill} />
@@ -68,18 +70,21 @@ const Profile = () => {
 
           <section className="mb-8">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Briefcase size={20} className="text-primary" /> Experience
+              <Rocket size={20} className="text-primary" /> My Projects
             </h3>
             <div className="space-y-4">
-              <div className="flex gap-4 p-4 bg-card border border-border rounded-2xl shadow-sm">
-                <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center font-bold text-primary">
-                  {user.title?.[0] || 'D'}
-                </div>
-                <div>
-                  <h4 className="font-bold text-foreground">{user.title}</h4>
-                  <p className="text-sm text-muted-foreground">Current Role</p>
-                </div>
-              </div>
+              {myProjects.map(p => <ProjectCard key={p.id} project={p} />)}
+              {myProjects.length === 0 && <p className="text-sm text-muted-foreground italic">No projects created yet.</p>}
+            </div>
+          </section>
+
+          <section className="mb-8">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <LayoutGrid size={20} className="text-primary" /> Joined Projects
+            </h3>
+            <div className="space-y-4">
+              {joinedProjects.map(p => <ProjectCard key={p.id} project={p} />)}
+              {joinedProjects.length === 0 && <p className="text-sm text-muted-foreground italic">No projects joined yet.</p>}
             </div>
           </section>
         </div>

@@ -19,7 +19,6 @@ const ProjectDetail = () => {
   const navigate = useNavigate();
   const { projects, currentUser, requests, setRequests } = useApp();
   
-  // Fix: Use projects from context state instead of static mock data
   const project = projects.find(p => p.id === id);
   
   const [joinReason, setJoinReason] = useState('');
@@ -27,10 +26,9 @@ const ProjectDetail = () => {
 
   if (!project) {
     return (
-      <MobileLayout title="Error">
+      <MobileLayout title="Error" showBack>
         <div className="flex flex-col items-center justify-center h-[60vh] px-6 text-center">
           <h2 className="text-xl font-bold mb-2">Project Not Found</h2>
-          <p className="text-muted-foreground mb-6">The project you're looking for doesn't exist or has been removed.</p>
           <Button onClick={() => navigate('/')}>Return Home</Button>
         </div>
       </MobileLayout>
@@ -38,7 +36,7 @@ const ProjectDetail = () => {
   }
 
   const isOwner = currentUser?.id === project.creator.id;
-  const hasRequested = requests.some(r => r.projectId === project.id && r.userId === currentUser?.id);
+  const hasRequested = requests.some(r => r.projectId === project.id && r.userId === currentUser?.id && r.status === 'pending');
   const isMember = project.members?.includes(currentUser?.id);
 
   const handleJoin = () => {
@@ -66,15 +64,8 @@ const ProjectDetail = () => {
   };
 
   return (
-    <MobileLayout title="Project Details">
+    <MobileLayout title="Project Details" showBack>
       <div className="relative bg-background text-foreground">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="absolute top-4 left-4 z-10 p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        
         <div className="aspect-video relative bg-muted">
           <img src={project.thumbnail} className="w-full h-full object-cover" alt={project.title} />
           <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
@@ -145,7 +136,7 @@ const ProjectDetail = () => {
                   <Users size={14} className="text-primary" /> Team Members
                 </h3>
                 <div className="flex -space-x-2">
-                  {project.members.map((memberId: string, i: number) => (
+                  {project.members.map((memberId: string) => (
                     <Avatar key={memberId} className="h-8 w-8 border-2 border-background">
                       <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${memberId}`} />
                       <AvatarFallback>M</AvatarFallback>
@@ -159,25 +150,30 @@ const ProjectDetail = () => {
           <div className="pt-6 sticky bottom-0 bg-background/80 backdrop-blur-sm pb-4">
             {isOwner ? (
               <div className="grid grid-cols-2 gap-3">
-                <Button className="h-12 rounded-xl gap-2 font-bold"><Edit size={18} /> Edit Project</Button>
+                <Button 
+                  className="h-12 rounded-xl gap-2 font-bold"
+                  onClick={() => navigate(`/create?edit=${project.id}`)}
+                >
+                  <Edit size={18} /> Edit Project
+                </Button>
                 <Button 
                   variant="outline" 
                   className="h-12 rounded-xl gap-2 font-bold" 
-                  onClick={() => navigate('/notifications')}
+                  onClick={() => navigate(`/manage-team/${project.id}`)}
                 >
-                  <Users size={18} /> View Requests
+                  <Users size={18} /> Manage Team
                 </Button>
               </div>
             ) : isMember ? (
               <Button 
                 className="w-full h-14 bg-primary text-lg font-bold rounded-2xl gap-2 shadow-lg shadow-primary/20" 
-                onClick={() => navigate('/messages')}
+                onClick={() => navigate(`/chat/${project.id}?group=true`)}
               >
                 <MessageSquare size={20} /> Open Group Chat
               </Button>
             ) : hasRequested ? (
               <Button disabled className="w-full h-14 text-lg font-bold rounded-2xl bg-muted text-muted-foreground">
-                Application Pending
+                Requested
               </Button>
             ) : (
               <Dialog>

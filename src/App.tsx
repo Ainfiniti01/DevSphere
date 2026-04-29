@@ -22,6 +22,7 @@ import EditProfile from "./pages/EditProfile";
 import PrivacySecurity from "./pages/PrivacySecurity";
 import NotificationSettings from "./pages/NotificationSettings";
 import Subscription from "./pages/Subscription";
+import ManageTeam from "./pages/ManageTeam";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/settings/privacy" element={<PrivacySecurity />} />
               <Route path="/settings/notifications" element={<NotificationSettings />} />
               <Route path="/settings/subscription" element={<Subscription />} />
+              <Route path="/manage-team/:id" element={<ManageTeam />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
