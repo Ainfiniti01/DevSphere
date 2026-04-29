@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from 'react';
-import { MOCK_PROJECTS, MOCK_USERS, MOCK_CHATS, MOCK_NOTIFICATIONS } from '@/data/mockData';
+import { MOCK_PROJECTS, MOCK_CHATS, MOCK_NOTIFICATIONS } from '@/data/mockData';
 
 interface AppContextType {
   currentUser: any;
@@ -15,25 +15,58 @@ interface AppContextType {
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   logout: () => void;
+  toggleLike: (projectId: string) => void;
+  addComment: (projectId: string, text: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
-  // Initialize projects with a members array if not present
-  const initialProjects = MOCK_PROJECTS.map(p => ({
-    ...p,
-    members: p.members || []
-  }));
-
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects, setProjects] = useState(MOCK_PROJECTS.map(p => ({
+    ...p,
+    likes: Math.floor(Math.random() * 50),
+    isLiked: false,
+    comments: [
+      { id: 'c1', user: 'Sarah Miller', text: 'This looks incredible! Would love to help.', time: '2h ago' },
+      { id: 'c2', user: 'James Wilson', text: 'What tech stack are you using for the AI part?', time: '1h ago' }
+    ]
+  })));
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState(MOCK_CHATS);
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
-  const logout = () => {
-    setCurrentUser(null);
+  const logout = () => setCurrentUser(null);
+
+  const toggleLike = (projectId: string) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          isLiked: !p.isLiked,
+          likes: p.isLiked ? p.likes - 1 : p.likes + 1
+        };
+      }
+      return p;
+    }));
+  };
+
+  const addComment = (projectId: string, text: string) => {
+    if (!currentUser) return;
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          comments: [...p.comments, {
+            id: 'c' + Date.now(),
+            user: currentUser.name,
+            text,
+            time: 'Just now'
+          }]
+        };
+      }
+      return p;
+    }));
   };
 
   return (
@@ -43,7 +76,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       requests, setRequests,
       chats, setChats,
       notifications, setNotifications,
-      logout 
+      logout, toggleLike, addComment
     }}>
       {children}
     </AppContext.Provider>

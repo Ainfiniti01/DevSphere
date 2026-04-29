@@ -3,7 +3,7 @@
 import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, ChevronLeft } from 'lucide-react';
+import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { useTheme } from 'next-themes';
@@ -30,9 +30,24 @@ const Settings = () => {
     <MobileLayout title="Settings">
       <div className="px-6 py-6 space-y-6">
         <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
+          {/* Edit Profile */}
+          <button 
+            onClick={() => navigate('/edit-profile')}
+            className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><UserCircle size={20} /></div>
+              <div className="text-left">
+                <h4 className="font-bold text-sm">Edit Profile</h4>
+                <p className="text-[11px] text-muted-foreground">Update your personal information</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+
           {/* Notifications */}
           <button 
-            onClick={() => toast.info("Notification settings coming soon")}
+            onClick={() => navigate('/settings/notifications')}
             className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
           >
             <div className="flex items-center gap-4">
@@ -47,7 +62,7 @@ const Settings = () => {
 
           {/* Privacy */}
           <button 
-            onClick={() => toast.info("Privacy settings coming soon")}
+            onClick={() => navigate('/settings/privacy')}
             className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
           >
             <div className="flex items-center gap-4">
@@ -60,7 +75,7 @@ const Settings = () => {
             <ChevronRight size={18} className="text-muted-foreground" />
           </button>
 
-          {/* Appearance / Theme Toggle */}
+          {/* Appearance */}
           <div className="w-full flex items-center justify-between p-5 border-b border-border">
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Eye size={20} /></div>
@@ -77,7 +92,7 @@ const Settings = () => {
 
           {/* Subscription */}
           <button 
-            onClick={() => toast.info("Pro features coming soon!")}
+            onClick={() => navigate('/settings/subscription')}
             className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-4">

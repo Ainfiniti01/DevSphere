@@ -18,6 +18,10 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import EditProfile from "./pages/EditProfile";
+import PrivacySecurity from "./pages/PrivacySecurity";
+import NotificationSettings from "./pages/NotificationSettings";
+import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,8 +46,12 @@ const App = () => (
               <Route path="/chat/:id" element={<ChatScreen />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/edit-profile" element={<EditProfile />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/privacy" element={<PrivacySecurity />} />
+              <Route path="/settings/notifications" element={<NotificationSettings />} />
+              <Route path="/settings/subscription" element={<Subscription />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

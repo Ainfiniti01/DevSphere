@@ -1,37 +1,43 @@
-import React from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle } from 'lucide-react';
+"use client";
+
+import React, { useState } from 'react';
+import { Heart, Share2, MessageCircle, PlayCircle, Send } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import SkillBadge from './SkillBadge';
 import { useNavigate } from 'react-router-dom';
+import { useApp } from '@/context/AppContext';
+import { cn } from '@/lib/utils';
 
-interface ProjectProps {
-  id: string;
-  title: string;
-  creator: { name: string; avatar: string; role: string };
-  thumbnail: string;
-  skills: string[];
-  description: string;
-}
-
-const ProjectCard = ({ project }: { project: ProjectProps }) => {
+const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
+  const { toggleLike, addComment, currentUser } = useApp();
+  const [commentText, setCommentText] = useState('');
+
+  const handleAddComment = () => {
+    if (!commentText.trim()) return;
+    addComment(project.id, commentText);
+    setCommentText('');
+  };
 
   return (
-    <Card className="overflow-hidden border-slate-100 shadow-sm hover:shadow-md transition-shadow mb-4">
+    <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
-        <Avatar className="h-10 w-10 border border-slate-100">
+        <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={project.creator.avatar} />
           <AvatarFallback>{project.creator.name[0]}</AvatarFallback>
         </Avatar>
-        <div>
-          <h4 className="text-sm font-bold text-slate-900">{project.creator.name}</h4>
-          <p className="text-[11px] text-slate-500">{project.creator.role}</p>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-bold text-foreground truncate">{project.creator.name}</h4>
+          <p className="text-[11px] text-muted-foreground truncate">{project.creator.role}</p>
         </div>
       </CardHeader>
       
       <div 
-        className="relative aspect-video bg-slate-200 cursor-pointer group"
+        className="relative aspect-video bg-muted cursor-pointer group"
         onClick={() => navigate(`/project/${project.id}`)}
       >
         <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
@@ -44,26 +50,73 @@ const ProjectCard = ({ project }: { project: ProjectProps }) => {
       </div>
 
       <CardContent className="p-4">
-        <p className="text-sm text-slate-600 line-clamp-2 mb-3">
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
           {project.description}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {project.skills.map(skill => <SkillBadge key={skill} skill={skill} />)}
+          {project.skills.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-slate-50 mt-2">
+      <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-border/50 mt-2">
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors">
-            <Heart size={20} />
-            <span className="text-xs font-medium">24</span>
+          <button 
+            onClick={() => toggleLike(project.id)}
+            className={cn(
+              "flex items-center gap-1.5 transition-colors",
+              project.isLiked ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+            )}
+          >
+            <Heart size={20} fill={project.isLiked ? "currentColor" : "none"} />
+            <span className="text-xs font-bold">{project.likes}</span>
           </button>
-          <button className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors">
-            <MessageCircle size={20} />
-            <span className="text-xs font-medium">8</span>
-          </button>
+          
+          <Drawer>
+            <DrawerTrigger asChild>
+              <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors">
+                <MessageCircle size={20} />
+                <span className="text-xs font-bold">{project.comments.length}</span>
+              </button>
+            </DrawerTrigger>
+            <DrawerContent className="bg-background border-border h-[80vh]">
+              <DrawerHeader className="border-b border-border">
+                <DrawerTitle>Comments</DrawerTitle>
+              </DrawerHeader>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {project.comments.map((c: any) => (
+                  <div key={c.id} className="flex gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user}`} />
+                      <AvatarFallback>{c.user[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
+                      <div className="flex justify-between items-center mb-1">
+                        <h5 className="text-xs font-bold">{c.user}</h5>
+                        <span className="text-[10px] text-muted-foreground">{c.time}</span>
+                      </div>
+                      <p className="text-sm">{c.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-border bg-background sticky bottom-0">
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Add a comment..." 
+                    className="rounded-xl bg-accent/20" 
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                  />
+                  <Button size="icon" className="rounded-xl" onClick={handleAddComment}>
+                    <Send size={18} />
+                  </Button>
+                </div>
+              </div>
+            </DrawerContent>
+          </Drawer>
         </div>
-        <button className="text-slate-500 hover:text-slate-900 transition-colors">
+        <button className="text-muted-foreground hover:text-foreground transition-colors">
           <Share2 size={20} />
         </button>
       </CardFooter>
