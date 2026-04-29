@@ -1,27 +1,33 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { MOCK_PROJECTS, MOCK_USERS, MOCK_CHATS, MOCK_NOTIFICATIONS } from '@/data/mockData';
 
 interface AppContextType {
   currentUser: any;
   setCurrentUser: (user: any) => void;
   projects: any[];
-  setProjects: (projects: any[]) => void;
+  setProjects: React.Dispatch<React.SetStateAction<any[]>>;
   requests: any[];
-  setRequests: (requests: any[]) => void;
+  setRequests: React.Dispatch<React.SetStateAction<any[]>>;
   chats: any[];
-  setChats: (chats: any[]) => void;
+  setChats: React.Dispatch<React.SetStateAction<any[]>>;
   notifications: any[];
-  setNotifications: (notifs: any[]) => void;
+  setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
+  // Initialize projects with a members array if not present
+  const initialProjects = MOCK_PROJECTS.map(p => ({
+    ...p,
+    members: p.members || []
+  }));
+
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [projects, setProjects] = useState(MOCK_PROJECTS);
+  const [projects, setProjects] = useState(initialProjects);
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState(MOCK_CHATS);
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
