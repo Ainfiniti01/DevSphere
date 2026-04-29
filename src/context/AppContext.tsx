@@ -32,6 +32,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Fetch initial data and handle auth state
   useEffect(() => {
+    if (!supabase) return;
+
     const initApp = async () => {
       // 1. Check Auth Session
       const { data: { session } } = await supabase.auth.getSession();
@@ -71,6 +73,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const refreshProjects = async () => {
+    if (!supabase) return;
+
     const { data, error } = await supabase
       .from('projects')
       .select(`
@@ -100,12 +104,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
     setCurrentUser(null);
     toast.success("Logged out successfully");
   };
 
   const toggleLike = async (projectId: string) => {
+    if (!supabase) return;
     if (!currentUser) {
       toast.error("Please sign in to like projects");
       return;
@@ -129,6 +135,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addComment = async (projectId: string, text: string) => {
+    if (!supabase) return;
     if (!currentUser) {
       toast.error("Please sign in to comment");
       return;
