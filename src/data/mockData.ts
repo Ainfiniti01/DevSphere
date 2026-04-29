@@ -42,7 +42,7 @@ export const MOCK_PROJECTS = [
     problem: 'Small businesses lack affordable tools to measure their environmental impact.',
     solution: 'An automated dashboard using AI to analyze utility bills and supply chain data.',
     stage: 'Prototype',
-    members: ['u2'], // Sarah is a member
+    members: ['u2'],
     videoUrl: '#'
   },
   {
@@ -55,26 +55,26 @@ export const MOCK_PROJECTS = [
     problem: 'Data privacy concerns in centralized social media.',
     solution: 'Blockchain-based identity and storage.',
     stage: 'Idea',
-    members: ['u1'], // Current User (Felix) is a member
+    members: ['u1'],
     videoUrl: '#'
   },
   {
     id: 'p3',
     title: 'HealthSync: Patient Portal',
     creator: MOCK_USERS[2],
-    thumbnail: '', // No media
+    thumbnail: '', // NO IMAGE
     skills: ['Next.js', 'HIPAA', 'GraphQL'],
-    description: 'A secure portal for patients to manage their records and appointments.',
+    description: 'A secure portal for patients to manage their records and appointments without any media upload.',
     problem: 'Fragmented healthcare data makes it hard for patients to track history.',
     solution: 'Unified dashboard with encrypted storage.',
     stage: 'Building',
     members: [],
-    videoUrl: ''
+    videoUrl: '' // NO VIDEO
   },
   {
     id: 'p4',
     title: 'CodeMentor: Peer Learning',
-    creator: MOCK_USERS[0], // Current User (Felix)
+    creator: MOCK_USERS[0],
     thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
     skills: ['WebRTC', 'Socket.io', 'React'],
     description: 'Real-time pair programming platform for students.',
@@ -82,7 +82,7 @@ export const MOCK_PROJECTS = [
     solution: 'Instant matching with peers for live coding sessions.',
     stage: 'MVP',
     members: [],
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' // Video example
+    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
   },
   {
     id: 'p5',
@@ -130,7 +130,6 @@ export const MOCK_NOTIFICATIONS = [
   { id: 'n2', type: 'message', user: 'James Wilson', content: 'sent you a message', time: '1h ago' }
 ];
 
-// Simulation of a join request for Felix's project (EcoTrack)
 export const MOCK_JOIN_REQUESTS = [
   {
     id: 'req_sim_1',

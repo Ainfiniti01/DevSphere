@@ -8,7 +8,7 @@ import { Bell, MessageSquare, Rocket, Volume2 } from 'lucide-react';
 
 const NotificationSettings = () => {
   return (
-    <MobileLayout title="Notifications">
+    <MobileLayout title="Notifications" showBack>
       <div className="px-6 py-6 space-y-6">
         <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
           <div className="p-5 border-b border-border flex items-center justify-between">

@@ -27,7 +27,7 @@ const Settings = () => {
   if (!mounted) return null;
 
   return (
-    <MobileLayout title="Settings">
+    <MobileLayout title="Settings" showBack>
       <div className="px-6 py-6 space-y-6">
         <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
           {/* Edit Profile */}

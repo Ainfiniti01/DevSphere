@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Filter } from 'lucide-react';
 import ProjectCard from '@/components/ProjectCard';
 import { useApp } from '@/context/AppContext';
+import { toast } from 'sonner';
 
 const Explore = () => {
   const { projects } = useApp();
@@ -13,8 +14,13 @@ const Explore = () => {
 
   const filteredProjects = projects.filter(p => 
     p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.skills.some((s: string) => s.toLowerCase().includes(search.toLowerCase()))
+    p.skills.some((s: string) => s.toLowerCase().includes(search.toLowerCase())) ||
+    p.creator.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleFilterClick = () => {
+    toast.info("Advanced filters coming soon! Use the search bar for projects, skills, or people.");
+  };
 
   return (
     <MobileLayout title="Explore">
@@ -23,11 +29,14 @@ const Explore = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
           <Input 
             className="pl-10 h-12 bg-accent/20 border-border rounded-xl" 
-            placeholder="Search projects or skills..." 
+            placeholder="Search projects, skills, or people..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-accent rounded-lg">
+          <button 
+            onClick={handleFilterClick}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-accent rounded-lg hover:bg-accent/80 transition-colors"
+          >
             <Filter size={16} className="text-foreground" />
           </button>
         </div>
