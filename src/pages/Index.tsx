@@ -34,7 +34,9 @@ const Index = () => {
     <MobileLayout title="DevSphere">
       <div className="px-4 py-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-foreground">New Projects</h2>
+          <h2 className="text-xl font-bold text-foreground">
+            {activeTab === 'newest' ? 'New Projects' : 'Trending Projects'}
+          </h2>
         </div>
 
         <Tabs defaultValue="newest" className="mb-6" onValueChange={setActiveTab}>

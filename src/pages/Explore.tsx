@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const SKILLS = ["React", "Python", "UI/UX", "Backend", "Mobile Development", "AI / ML", "Web3", "TypeScript", "Node.js"];
 const STAGES = ["Idea", "MVP", "Building", "Scaling", "Completed"];
