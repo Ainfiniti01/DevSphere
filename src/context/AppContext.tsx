@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState } from 'react';
-import { MOCK_PROJECTS, MOCK_CHATS, MOCK_NOTIFICATIONS, MOCK_JOIN_REQUESTS } from '@/data/mockData';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface AppContextType {
   currentUser: any;
@@ -15,58 +16,139 @@ interface AppContextType {
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   logout: () => void;
-  toggleLike: (projectId: string) => void;
-  addComment: (projectId: string, text: string) => void;
+  toggleLike: (projectId: string) => Promise<void>;
+  addComment: (projectId: string, text: string) => Promise<void>;
+  refreshProjects: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [projects, setProjects] = useState(MOCK_PROJECTS.map(p => ({
-    ...p,
-    likes: Math.floor(Math.random() * 50),
-    isLiked: false,
-    comments: [
-      { id: 'c1', user: 'Sarah Miller', text: 'This looks incredible! Would love to help.', time: '2h ago' },
-      { id: 'c2', user: 'James Wilson', text: 'What tech stack are you using for the AI part?', time: '1h ago' }
-    ]
-  })));
-  const [requests, setRequests] = useState<any[]>(MOCK_JOIN_REQUESTS);
-  const [chats, setChats] = useState(MOCK_CHATS);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [chats, setChats] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  const logout = () => setCurrentUser(null);
-
-  const toggleLike = (projectId: string) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          isLiked: !p.isLiked,
-          likes: p.isLiked ? p.likes - 1 : p.likes + 1
-        };
+  // Fetch initial data and handle auth state
+  useEffect(() => {
+    const initApp = async () => {
+      // 1. Check Auth Session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser({ ...session.user, ...profile });
+        }
       }
-      return p;
+
+      // 2. Fetch Projects
+      await refreshProjects();
+
+      // 3. Listen for Auth Changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          setCurrentUser({ ...session.user, ...profile });
+        } else {
+          setCurrentUser(null);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    initApp();
+  }, []);
+
+  const refreshProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        creator:profiles(*),
+        comments(*, user:profiles(name, avatar_url)),
+        likes(user_id)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching projects:", error);
+      return;
+    }
+
+    // Transform data to match app structure
+    const transformed = data.map(p => ({
+      ...p,
+      likes: p.likes?.length || 0,
+      isLiked: p.likes?.some((l: any) => l.user_id === currentUser?.id),
+      skills: p.skills_required || [],
+      thumbnail: p.thumbnail_url,
+      timestamp: p.created_at
     }));
+
+    setProjects(transformed);
   };
 
-  const addComment = (projectId: string, text: string) => {
-    if (!currentUser) return;
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          comments: [...p.comments, {
-            id: 'c' + Date.now(),
-            user: currentUser.name,
-            text,
-            time: 'Just now'
-          }]
-        };
-      }
-      return p;
-    }));
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    toast.success("Logged out successfully");
+  };
+
+  const toggleLike = async (projectId: string) => {
+    if (!currentUser) {
+      toast.error("Please sign in to like projects");
+      return;
+    }
+
+    const project = projects.find(p => p.id === projectId);
+    const isLiked = project?.isLiked;
+
+    if (isLiked) {
+      await supabase
+        .from('likes')
+        .delete()
+        .match({ project_id: projectId, user_id: currentUser.id });
+    } else {
+      await supabase
+        .from('likes')
+        .insert({ project_id: projectId, user_id: currentUser.id });
+    }
+
+    await refreshProjects();
+  };
+
+  const addComment = async (projectId: string, text: string) => {
+    if (!currentUser) {
+      toast.error("Please sign in to comment");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('comments')
+      .insert({
+        project_id: projectId,
+        user_id: currentUser.id,
+        content: text
+      });
+
+    if (error) {
+      toast.error("Failed to add comment");
+      return;
+    }
+
+    await refreshProjects();
+    toast.success("Comment added!");
   };
 
   return (
@@ -76,7 +158,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       requests, setRequests,
       chats, setChats,
       notifications, setNotifications,
-      logout, toggleLike, addComment
+      logout, toggleLike, addComment,
+      refreshProjects
     }}>
       {children}
     </AppContext.Provider>

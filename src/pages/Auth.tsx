@@ -6,28 +6,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Github, Chrome } from 'lucide-react';
-import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { setCurrentUser } = useApp();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login
-    setCurrentUser({
-      id: 'u1',
-      name: 'Felix Zhang',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-      title: 'Senior Fullstack Developer',
-      skills: ['React', 'TypeScript', 'Node.js'],
-      location: 'San Francisco'
+    setLoading(true);
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    toast.success("Welcome back!");
-    navigate('/');
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Welcome back!");
+      navigate('/');
+    }
+    setLoading(false);
+  };
+
+  const handleOAuth = async (provider: 'google' | 'github') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) toast.error(error.message);
   };
 
   return (
@@ -44,13 +57,26 @@ const Auth = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="name@example.com" required value={email} onChange={e => setEmail(e.target.value)} />
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="name@example.com" 
+              required 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required />
+            <Input 
+              id="password" 
+              type="password" 
+              required 
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
           </div>
-          <Button type="submit" className="w-full h-12 text-lg">Sign In</Button>
+          <Button type="submit" className="w-full h-12 text-lg" loading={loading}>Sign In</Button>
 
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
@@ -58,8 +84,8 @@ const Auth = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" className="h-12 gap-2"><Chrome size={20} /> Google</Button>
-            <Button variant="outline" className="h-12 gap-2"><Github size={20} /> GitHub</Button>
+            <Button variant="outline" className="h-12 gap-2" onClick={() => handleOAuth('google')}><Chrome size={20} /> Google</Button>
+            <Button variant="outline" className="h-12 gap-2" onClick={() => handleOAuth('github')}><Github size={20} /> GitHub</Button>
           </div>
         </form>
       </div>
