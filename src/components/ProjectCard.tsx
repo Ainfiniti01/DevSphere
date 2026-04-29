@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle, Send } from 'lucide-react';
+import { Heart, Share2, MessageCircle, PlayCircle, Send, User } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -40,14 +40,12 @@ const ProjectCard = ({ project }: { project: any }) => {
       </CardHeader>
       
       {/* Media Section / Text Project Card */}
-      <div
-        onClick={() => navigate(`/project/${project.id}`)}
+      <div 
         className={cn(
-          "relative cursor-pointer group overflow-hidden",
-          hasMedia
-            ? "aspect-video bg-muted"
-            : "min-h-[180px] flex items-center justify-center px-6 py-10 bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50"
+          "relative aspect-video cursor-pointer group overflow-hidden flex flex-col items-center justify-center",
+          !hasMedia ? "bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50" : "bg-muted"
         )}
+        onClick={() => navigate(`/project/${project.id}`)}
       >
         {hasMedia ? (
           <>
@@ -60,21 +58,20 @@ const ProjectCard = ({ project }: { project: any }) => {
             </div>
           </>
         ) : (
-          <div className="text-center flex flex-col items-center justify-center w-full">
-            {/* Stage badge */}
-            <span className="mb-3 px-3 py-1 bg-primary/15 text-primary text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-primary/20">
-              {project.stage}
-            </span>
-
-            {/* Title */}
-            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%]">
+          <div className="p-8 text-center flex flex-col items-center justify-center h-full w-full">
+            <div className="absolute top-4 left-4">
+              <span className="px-2.5 py-1 bg-primary/15 text-primary text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-primary/20">
+                {project.stage}
+              </span>
+            </div>
+            
+            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%] mb-2">
               {project.title}
             </h3>
-
-            {/* Creator */}
-            <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              By {project.creator.name}
-            </p>
+            
+            <div className="flex items-center gap-1.5 text-muted-foreground/80">
+              <span className="text-[11px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
+            </div>
           </div>
         )}
       </div>
