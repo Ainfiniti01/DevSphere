@@ -5,19 +5,21 @@ import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Shield, Lock, LogOut } from 'lucide-react';
+import { Shield, Lock, LogOut, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
   const { logout } = useApp();
-  const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+  const [loading, setLoading] = useState(false);
+  const [passwords, setPasswords] = useState({ new: '', confirm: '' });
 
-  const handleUpdatePassword = () => {
-    if (!passwords.current || !passwords.new || !passwords.confirm) {
+  const handleUpdatePassword = async () => {
+    if (!supabase) return;
+    if (!passwords.new || !passwords.confirm) {
       toast.error("Please fill all fields");
       return;
     }
@@ -25,8 +27,17 @@ const PrivacySecurity = () => {
       toast.error("Passwords do not match");
       return;
     }
-    toast.success("Password updated successfully!");
-    setPasswords({ current: '', new: '', confirm: '' });
+
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: passwords.new });
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password updated successfully!");
+      setPasswords({ new: '', confirm: '' });
+    }
+    setLoading(false);
   };
 
   return (
@@ -38,10 +49,6 @@ const PrivacySecurity = () => {
           </h3>
           <div className="space-y-3 bg-card p-4 rounded-2xl border border-border">
             <div className="space-y-1.5">
-              <Label>Current Password or Email</Label>
-              <Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} className="rounded-xl" />
-            </div>
-            <div className="space-y-1.5">
               <Label>New Password</Label>
               <Input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} className="rounded-xl" />
             </div>
@@ -49,34 +56,20 @@ const PrivacySecurity = () => {
               <Label>Confirm New Password</Label>
               <Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="rounded-xl" />
             </div>
-            <Button onClick={handleUpdatePassword} className="w-full mt-2 rounded-xl">Update Password</Button>
+            <Button onClick={handleUpdatePassword} disabled={loading} className="w-full mt-2 rounded-xl">
+              {loading ? <Loader2 className="animate-spin" /> : "Update Password"}
+            </Button>
           </div>
         </section>
 
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-            <Shield size={16} /> Preferences
+            <Shield size={16} /> Data Privacy
           </h3>
           <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-            <div className="flex items-center justify-between">
-              <Label>Auto Logout</Label>
-              <Select defaultValue="never">
-                <SelectTrigger className="w-[120px] rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="never">Never</SelectItem>
-                  <SelectItem value="5">5 min</SelectItem>
-                  <SelectItem value="15">15 min</SelectItem>
-                  <SelectItem value="30">30 min</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="pt-2 border-t border-border">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
+            </p>
           </div>
         </section>
 

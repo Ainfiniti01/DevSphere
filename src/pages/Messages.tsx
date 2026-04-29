@@ -1,35 +1,49 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Plus, Users, MessageSquare } from 'lucide-react';
-import { MOCK_CHATS } from '@/data/mockData';
 import { useNavigate } from 'react-router-dom';
 import { ListSkeleton } from '@/components/SkeletonLoader';
 import EmptyState from '@/components/EmptyState';
+import { useApp } from '@/context/AppContext';
 
 const Messages = () => {
   const navigate = useNavigate();
+  const { chats, refreshChats } = useApp();
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(timer);
+    const init = async () => {
+      await refreshChats();
+      setIsLoading(false);
+    };
+    init();
   }, []);
+
+  const filteredChats = useMemo(() => {
+    return chats.filter(chat => 
+      chat.name.toLowerCase().includes(search.toLowerCase()) ||
+      chat.lastMsg.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [chats, search]);
 
   return (
     <MobileLayout title="Messages">
       <div className="px-4 py-4">
         <div className="flex items-center justify-between mb-6">
           <div className="relative flex-1 mr-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <input 
-              className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-200 focus:ring-2 ring-indigo-500 outline-none" 
+              className="w-full pl-9 pr-4 py-2 bg-accent/20 border border-border rounded-xl text-sm outline-none focus:ring-2 ring-primary/50" 
               placeholder="Search chats..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <button className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-900/20">
+          <button className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/20">
             <Plus size={20} />
           </button>
         </div>
@@ -37,35 +51,35 @@ const Messages = () => {
         <div className="space-y-1">
           {isLoading ? (
             <ListSkeleton count={6} />
-          ) : MOCK_CHATS.length > 0 ? (
-            MOCK_CHATS.map(chat => (
+          ) : filteredChats.length > 0 ? (
+            filteredChats.map(chat => (
               <div 
                 key={chat.id} 
                 onClick={() => navigate(`/chat/${chat.id}`)}
-                className="flex items-center gap-4 p-3 hover:bg-slate-900/50 rounded-2xl cursor-pointer transition-colors"
+                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors"
               >
                 <div className="relative">
-                  <Avatar className="h-14 w-14 border-2 border-slate-800 shadow-sm">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.name}`} />
+                  <Avatar className="h-14 w-14 border-2 border-border shadow-sm">
+                    <AvatarImage src={chat.avatar} />
                     <AvatarFallback>{chat.name[0]}</AvatarFallback>
                   </Avatar>
                   {chat.isGroup && (
-                    <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1 rounded-lg border-2 border-[#0f172a]">
+                    <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-lg border-2 border-background">
                       <Users size={10} />
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="font-bold text-slate-200 truncate">{chat.name}</h4>
-                    <span className="text-[10px] text-slate-500 font-medium">{chat.time}</span>
+                    <h4 className="font-bold truncate">{chat.name}</h4>
+                    <span className="text-[10px] text-muted-foreground font-medium">{chat.time}</span>
                   </div>
-                  <p className={`text-sm truncate ${chat.unread > 0 ? 'text-slate-100 font-semibold' : 'text-slate-500'}`}>
+                  <p className={`text-sm truncate ${chat.unread > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                     {chat.lastMsg}
                   </p>
                 </div>
                 {chat.unread > 0 && (
-                  <div className="w-5 h-5 bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                  <div className="w-5 h-5 bg-primary text-white text-[10px] font-bold flex items-center justify-center rounded-full">
                     {chat.unread}
                   </div>
                 )}
@@ -75,9 +89,9 @@ const Messages = () => {
             <EmptyState 
               icon={MessageSquare}
               title="No messages yet"
-              description="Start a conversation with other developers!"
-              actionLabel="Explore Projects"
-              actionPath="/explore"
+              description={search ? "No chats match your search." : "Start a conversation with other developers!"}
+              actionLabel={search ? "Clear Search" : "Explore Projects"}
+              actionPath={search ? undefined : "/explore"}
             />
           )}
         </div>

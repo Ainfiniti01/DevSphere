@@ -11,10 +11,11 @@ import SkillBadge from './SkillBadge';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
-  const { toggleLike, addComment } = useApp();
+  const { toggleLike, addComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
 
   const handleAddComment = () => {
@@ -23,23 +24,39 @@ const ProjectCard = ({ project }: { project: any }) => {
     setCommentText('');
   };
 
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/project/${project.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: project.title,
+          text: project.description,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied to clipboard!");
+    }
+  };
+
   const hasMedia = project.thumbnail && project.thumbnail !== '';
 
   return (
     <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
-      {/* Header */}
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
         <Avatar className="h-10 w-10 border border-border">
-          <AvatarImage src={project.creator.avatar} />
-          <AvatarFallback>{project.creator.name[0]}</AvatarFallback>
+          <AvatarImage src={project.creator?.avatar_url} />
+          <AvatarFallback>{project.creator?.name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-bold text-foreground truncate">{project.creator.name}</h4>
-          <p className="text-[11px] text-muted-foreground truncate">{project.creator.role}</p>
+          <h4 className="text-sm font-bold text-foreground truncate">{project.creator?.name}</h4>
+          <p className="text-[11px] text-muted-foreground truncate">{project.creator?.title}</p>
         </div>
       </CardHeader>
       
-      {/* Media Section / Text Project Card */}
       <div 
         className={cn(
           "relative aspect-video cursor-pointer group overflow-hidden flex flex-col items-center justify-center",
@@ -64,29 +81,25 @@ const ProjectCard = ({ project }: { project: any }) => {
                 {project.stage}
               </span>
             </div>
-            
             <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%] mb-2">
               {project.title}
             </h3>
-            
             <div className="flex items-center gap-1.5 text-muted-foreground/80">
-              <span className="text-[11px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest">By {project.creator?.name}</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Content */}
       <CardContent className="p-4">
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
           {project.description}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {project.skills.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
+          {project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
         </div>
       </CardContent>
 
-      {/* Footer */}
       <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-border/50 mt-2">
         <div className="flex items-center gap-4">
           <button 
@@ -104,7 +117,7 @@ const ProjectCard = ({ project }: { project: any }) => {
             <DrawerTrigger asChild>
               <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors py-2">
                 <MessageCircle size={20} />
-                <span className="text-xs font-bold">{project.comments.length}</span>
+                <span className="text-xs font-bold">{project.comments?.length || 0}</span>
               </button>
             </DrawerTrigger>
             <DrawerContent className="bg-background border-border h-[80vh]">
@@ -112,21 +125,24 @@ const ProjectCard = ({ project }: { project: any }) => {
                 <DrawerTitle>Comments</DrawerTitle>
               </DrawerHeader>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {project.comments.map((c: any) => (
+                {project.comments?.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user}`} />
-                      <AvatarFallback>{c.user[0]}</AvatarFallback>
+                      <AvatarImage src={c.user?.avatar_url} />
+                      <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
                       <div className="flex justify-between items-center mb-1">
-                        <h5 className="text-xs font-bold">{c.user}</h5>
-                        <span className="text-[10px] text-muted-foreground">{c.time}</span>
+                        <h5 className="text-xs font-bold">{c.user?.name}</h5>
+                        <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
                       </div>
-                      <p className="text-sm">{c.text}</p>
+                      <p className="text-sm">{c.content}</p>
                     </div>
                   </div>
                 ))}
+                {(!project.comments || project.comments.length === 0) && (
+                  <p className="text-center text-muted-foreground py-10">No comments yet. Be the first!</p>
+                )}
               </div>
               <div className="p-4 border-t border-border bg-background sticky bottom-0">
                 <div className="flex gap-2">
@@ -145,7 +161,7 @@ const ProjectCard = ({ project }: { project: any }) => {
             </DrawerContent>
           </Drawer>
         </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors p-2">
+        <button onClick={handleShare} className="text-muted-foreground hover:text-foreground transition-colors p-2">
           <Share2 size={20} />
         </button>
       </CardFooter>

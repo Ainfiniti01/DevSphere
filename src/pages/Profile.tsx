@@ -14,18 +14,19 @@ const Profile = () => {
   const navigate = useNavigate();
   const { currentUser, projects } = useApp();
 
-  const user = currentUser || {
-    id: 'u1',
-    name: 'Felix Zhang',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-    title: 'Senior Fullstack Developer',
-    skills: ['React', 'TypeScript', 'Node.js', 'GraphQL'],
-    location: 'San Francisco',
-    portfolio: 'felix.dev'
-  };
+  if (!currentUser) {
+    return (
+      <MobileLayout title="Profile">
+        <div className="flex flex-col items-center justify-center h-[60vh] px-6 text-center">
+          <h2 className="text-xl font-bold mb-4">Please sign in to view your profile</h2>
+          <Button onClick={() => navigate('/auth')}>Sign In</Button>
+        </div>
+      </MobileLayout>
+    );
+  }
 
-  const myProjects = projects.filter(p => p.creator.id === user.id);
-  const joinedProjects = projects.filter(p => p.members?.includes(user.id));
+  const myProjects = projects.filter(p => p.creator_id === currentUser.id);
+  const joinedProjects = projects.filter(p => p.members?.includes(currentUser.id));
 
   return (
     <MobileLayout title="Profile">
@@ -35,7 +36,7 @@ const Profile = () => {
         <div className="px-6 -mt-12">
           <div className="flex items-end justify-between mb-6">
             <Avatar className="h-24 w-24 border-4 border-background shadow-xl cursor-pointer" onClick={() => navigate('/edit-profile')}>
-              <AvatarImage src={user.avatar} />
+              <AvatarImage src={currentUser.avatar_url} />
               <AvatarFallback><User size={40} /></AvatarFallback>
             </Avatar>
             <div className="flex gap-2 pb-2">
@@ -49,12 +50,21 @@ const Profile = () => {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground">{user.name}</h2>
-            <p className="text-primary font-semibold text-lg">{user.title}</p>
+            <h2 className="text-2xl font-bold text-foreground">{currentUser.name}</h2>
+            <p className="text-primary font-semibold text-lg">{currentUser.title}</p>
             <div className="flex flex-col gap-2 mt-3 text-muted-foreground text-sm">
-              <span className="flex items-center gap-2"><MapPin size={16} className="text-primary" /> {user.location}</span>
-              {user.portfolio && (
-                <span className="flex items-center gap-2"><LinkIcon size={16} className="text-primary" /> {user.portfolio}</span>
+              {currentUser.location && (
+                <span className="flex items-center gap-2"><MapPin size={16} className="text-primary" /> {currentUser.location}</span>
+              )}
+              {currentUser.portfolio_url && (
+                <a 
+                  href={currentUser.portfolio_url.startsWith('http') ? currentUser.portfolio_url : `https://${currentUser.portfolio_url}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-primary hover:underline"
+                >
+                  <LinkIcon size={16} /> {currentUser.portfolio_url}
+                </a>
               )}
             </div>
           </div>
@@ -62,9 +72,12 @@ const Profile = () => {
           <section className="mb-8">
             <h3 className="text-lg font-bold mb-4">Skills</h3>
             <div className="flex flex-wrap gap-2">
-              {user.skills?.map((skill: string) => (
+              {currentUser.skills?.map((skill: string) => (
                 <SkillBadge key={skill} skill={skill} />
               ))}
+              {(!currentUser.skills || currentUser.skills.length === 0) && (
+                <p className="text-sm text-muted-foreground italic">No skills added yet.</p>
+              )}
             </div>
           </section>
 

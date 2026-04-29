@@ -1,23 +1,29 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon } from 'lucide-react';
+import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 
 const CreateProject = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
-  const { projects, setProjects, currentUser } = useApp();
+  const { projects, refreshProjects, currentUser } = useApp();
   
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState<'image' | 'video' | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     title: '',
     problem: '',
@@ -47,64 +53,83 @@ const CreateProject = () => {
     }
   }, [editId, projects]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const file = e.target.files?.[0];
+    if (!file || !supabase || !currentUser) return;
+
+    setUploading(type);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`;
+    const filePath = `project-media/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('project-media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('project-media')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({
+        ...prev,
+        [type === 'image' ? 'thumbnail' : 'videoUrl']: publicUrl
+      }));
+      toast.success(`${type === 'image' ? 'Image' : 'Video'} uploaded!`);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!currentUser) {
+    if (!currentUser || !supabase) {
       toast.error("Please sign in to continue");
-      navigate('/auth');
       return;
     }
 
-    if (editId) {
-      setProjects(prev => prev.map(p => {
-        if (p.id === editId) {
-          return {
-            ...p,
-            ...formData,
-            skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== "")
-          };
-        }
-        return p;
-      }));
-      toast.success("Project updated successfully!");
-    } else {
-      const newProject = {
-        id: 'p' + Date.now(),
-        ...formData,
-        skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
-        creator: {
-          id: currentUser.id,
-          name: currentUser.name,
-          avatar: currentUser.avatar,
-          role: currentUser.title
-        },
-        thumbnail: formData.thumbnail || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&q=80&w=800`,
-        members: [],
-        timestamp: new Date().toISOString(),
-        likes: 0,
-        isLiked: false,
-        comments: []
-      };
-      setProjects(prev => [newProject, ...prev]);
-      toast.success("Project published successfully!");
-    }
-    navigate('/');
-  };
+    setLoading(true);
+    const projectData = {
+      title: formData.title,
+      problem: formData.problem,
+      solution: formData.solution,
+      description: formData.description,
+      stage: formData.stage,
+      skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+      thumbnail_url: formData.thumbnail,
+      video_url: formData.videoUrl,
+      creator_id: currentUser.id
+    };
 
-  const simulateUpload = (type: 'image' | 'video') => {
-    if (type === 'image') {
-      setFormData({ ...formData, thumbnail: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800' });
-      toast.success("Image uploaded!");
-    } else {
-      setFormData({ ...formData, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' });
-      toast.success("Video uploaded!");
+    try {
+      if (editId) {
+        const { error } = await supabase.from('projects').update(projectData).eq('id', editId);
+        if (error) throw error;
+        toast.success("Project updated!");
+      } else {
+        const { error } = await supabase.from('projects').insert(projectData);
+        if (error) throw error;
+        toast.success("Project published!");
+      }
+      await refreshProjects();
+      navigate('/');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <MobileLayout title={editId ? "Edit Project" : "New Project"} showBack>
       <form onSubmit={handleSubmit} className="px-4 py-6 space-y-6">
+        <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, 'image')} />
+        <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={e => handleFileUpload(e, 'video')} />
+
         <div className="space-y-2">
           <Label className="text-sm font-bold">Project Title</Label>
           <Input 
@@ -180,25 +205,25 @@ const CreateProject = () => {
           <Label className="text-sm font-bold">Media (Optional)</Label>
           <div className="grid grid-cols-2 gap-4">
             <div 
-              onClick={() => simulateUpload('image')}
+              onClick={() => imageInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.thumbnail ? 'border-primary' : 'border-border'}`}
             >
-              <ImageIcon className={formData.thumbnail ? 'text-primary' : 'text-muted-foreground'} size={24} />
+              {uploading === 'image' ? <Loader2 className="animate-spin text-primary" /> : <ImageIcon className={formData.thumbnail ? 'text-primary' : 'text-muted-foreground'} size={24} />}
               <p className="text-[10px] font-bold mt-2">{formData.thumbnail ? 'Image Added' : 'Add Image'}</p>
             </div>
             <div 
-              onClick={() => simulateUpload('video')}
+              onClick={() => videoInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.videoUrl ? 'border-primary' : 'border-border'}`}
             >
-              <Video className={formData.videoUrl ? 'text-primary' : 'text-muted-foreground'} size={24} />
+              {uploading === 'video' ? <Loader2 className="animate-spin text-primary" /> : <Video className={formData.videoUrl ? 'text-primary' : 'text-muted-foreground'} size={24} />}
               <p className="text-[10px] font-bold mt-2">{formData.videoUrl ? 'Video Added' : 'Add Video'}</p>
             </div>
           </div>
         </div>
 
         <div className="pt-4">
-          <Button type="submit" className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
-            {editId ? "Update Project" : "Launch Project"}
+          <Button type="submit" disabled={loading || !!uploading} className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
+            {loading ? "Processing..." : (editId ? "Update Project" : "Launch Project")}
           </Button>
         </div>
       </form>

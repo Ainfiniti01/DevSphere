@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
@@ -9,48 +9,96 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from '@/context/AppContext';
 import { toast } from "sonner";
-import { Camera, ChevronLeft } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const EditProfile = () => {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
     title: currentUser?.title || '',
     skills: currentUser?.skills?.join(', ') || '',
     location: currentUser?.location || '',
-    portfolio: currentUser?.portfolio || '',
-    avatar: currentUser?.avatar || ''
+    portfolio_url: currentUser?.portfolio_url || '',
+    avatar_url: currentUser?.avatar_url || ''
   });
 
-  const handleSave = () => {
-    setCurrentUser({
-      ...currentUser,
-      ...formData,
-      skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== "")
-    });
-    toast.success("Profile updated successfully!");
-    navigate('/profile');
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !supabase || !currentUser) return;
+
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+      toast.success("Avatar uploaded!");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const simulateAvatarChange = () => {
-    const newAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`;
-    setFormData({ ...formData, avatar: newAvatar });
-    toast.info("Avatar updated!");
+  const handleSave = async () => {
+    if (!supabase || !currentUser) return;
+    setLoading(true);
+
+    try {
+      const updates = {
+        id: currentUser.id,
+        name: formData.name,
+        title: formData.title,
+        skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+        location: formData.location,
+        portfolio_url: formData.portfolio_url,
+        avatar_url: formData.avatar_url,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase.from('profiles').upsert(updates);
+      if (error) throw error;
+
+      setCurrentUser({ ...currentUser, ...updates });
+      toast.success("Profile updated successfully!");
+      navigate('/profile');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <MobileLayout title="Edit Profile" showBack>
       <div className="px-6 py-6 space-y-8">
+        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+        
         <div className="flex flex-col items-center gap-4">
-          <div className="relative group cursor-pointer" onClick={simulateAvatarChange}>
+          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
-              <AvatarImage src={formData.avatar} />
-              <AvatarFallback>{formData.name[0]}</AvatarFallback>
+              <AvatarImage src={formData.avatar_url} />
+              <AvatarFallback>{formData.name?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera className="text-white" size={24} />
+              {uploading ? <Loader2 className="animate-spin text-white" /> : <Camera className="text-white" size={24} />}
             </div>
           </div>
           <p className="text-xs font-bold text-primary">Tap to change avatar</p>
@@ -60,10 +108,6 @@ const EditProfile = () => {
           <div className="space-y-1.5">
             <Label>Full Name</Label>
             <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="rounded-xl h-12" />
-          </div>
-          <div className="space-y-1.5 opacity-60">
-            <Label>Email (Not editable)</Label>
-            <Input value={currentUser?.email} disabled className="rounded-xl h-12 bg-accent/50" />
           </div>
           <div className="space-y-1.5">
             <Label>Professional Title</Label>
@@ -79,12 +123,12 @@ const EditProfile = () => {
           </div>
           <div className="space-y-1.5">
             <Label>Portfolio URL</Label>
-            <Input value={formData.portfolio} onChange={e => setFormData({...formData, portfolio: e.target.value})} className="rounded-xl h-12" />
+            <Input value={formData.portfolio_url} onChange={e => setFormData({...formData, portfolio_url: e.target.value})} className="rounded-xl h-12" />
           </div>
         </div>
 
-        <Button onClick={handleSave} className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg">
-          Save Changes
+        <Button onClick={handleSave} disabled={loading || uploading} className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg">
+          {loading ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </MobileLayout>
