@@ -18,16 +18,16 @@ const MobileLayout = ({ children, showNav = true, title }: { children: React.Rea
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 max-w-md mx-auto border-x border-slate-200 shadow-xl relative overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-[#0f172a] text-slate-200 max-w-md mx-auto border-x border-slate-800 shadow-2xl relative overflow-hidden">
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+      <header className="sticky top-0 z-40 w-full bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
           {title || "DevSphere"}
         </h1>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/notifications')} className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <Bell size={22} className="text-slate-600" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+          <button onClick={() => navigate('/notifications')} className="relative p-2 hover:bg-slate-800 rounded-full transition-colors">
+            <Bell size={22} className="text-slate-400" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#0f172a]"></span>
           </button>
         </div>
       </header>
@@ -39,7 +39,7 @@ const MobileLayout = ({ children, showNav = true, title }: { children: React.Rea
 
       {/* Bottom Navigation */}
       {showNav && (
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-slate-100 px-6 py-3 flex items-center justify-between z-50">
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#0f172a] border-t border-slate-800 px-6 py-3 flex items-center justify-between z-50">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -48,7 +48,7 @@ const MobileLayout = ({ children, showNav = true, title }: { children: React.Rea
                 onClick={() => navigate(item.path)}
                 className={cn(
                   "flex flex-col items-center gap-1 transition-all duration-200",
-                  isActive ? "text-indigo-600 scale-110" : "text-slate-400 hover:text-slate-600"
+                  isActive ? "text-indigo-400 scale-110" : "text-slate-500 hover:text-slate-300"
                 )}
               >
                 <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
