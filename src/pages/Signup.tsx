@@ -5,12 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { setCurrentUser } = useApp();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,17 +21,47 @@ const Signup = () => {
     portfolio: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser = {
-      id: 'u' + Date.now(),
-      ...formData,
-      skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name || 'default'}`
-    };
-    setCurrentUser(newUser);
-    toast.success("Welcome to DevSphere!");
-    navigate('/');
+    if (!supabase) {
+      toast.error("Server connection not established. Please rebuild.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: authData.user.id,
+          name: formData.name,
+          title: formData.title,
+          skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+          location: formData.location,
+          portfolio_url: formData.portfolio
+        });
+
+        if (profileError) throw profileError;
+        
+        toast.success("Account created! Please check your email for confirmation.");
+        navigate('/auth');
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,11 +86,11 @@ const Signup = () => {
         </div>
         <div className="space-y-1.5">
           <Label>Professional Title</Label>
-          <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Senior Developer, UI Engineer" className="rounded-xl h-12" />
+          <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Senior Developer" className="rounded-xl h-12" />
         </div>
         <div className="space-y-1.5">
           <Label>Skills (comma separated)</Label>
-          <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, TypeScript, Node.js" className="rounded-xl h-12" />
+          <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, TypeScript" className="rounded-xl h-12" />
         </div>
         <div className="space-y-1.5">
           <Label>Location</Label>
@@ -71,8 +101,8 @@ const Signup = () => {
           <Input value={formData.portfolio} onChange={e => setFormData({...formData, portfolio: e.target.value})} placeholder="https://myportfolio.com" className="rounded-xl h-12" />
         </div>
 
-        <Button type="submit" className="w-full h-14 mt-6 text-lg font-bold rounded-2xl shadow-lg">
-          Complete Profile
+        <Button type="submit" disabled={loading} className="w-full h-14 mt-6 text-lg font-bold rounded-2xl shadow-lg">
+          {loading ? "Creating Account..." : "Complete Profile"}
         </Button>
       </form>
 

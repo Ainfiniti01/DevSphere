@@ -32,37 +32,39 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  const fetchProfile = async (userId: string) => {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error("Error fetching profile:", error);
+      return null;
+    }
+    return data;
+  };
+
   useEffect(() => {
     if (!supabase) return;
 
     const initApp = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (profile) {
-          setCurrentUser({ ...session.user, ...profile });
-        }
+        const profile = await fetchProfile(session.user.id);
+        setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
+        refreshNotifications();
+        refreshChats();
       }
 
       await refreshProjects();
-      if (session?.user) {
-        await refreshNotifications();
-        await refreshChats();
-      }
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setCurrentUser({ ...session.user, ...profile });
+          const profile = await fetchProfile(session.user.id);
+          setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
           refreshNotifications();
           refreshChats();
         } else {
@@ -117,7 +119,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
-    // Simplified chat fetching: get unique conversations from messages
     const { data, error } = await supabase
       .from('messages')
       .select('*, sender:profiles(*), receiver:profiles(*)')
@@ -125,7 +126,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       .order('created_at', { ascending: false });
 
     if (!error) {
-      // Group by conversation partner
       const conversations = new Map();
       data.forEach(msg => {
         const partner = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
@@ -137,7 +137,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             avatar: partner.avatar_url,
             lastMsg: msg.content,
             time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            unread: 0 // Placeholder
+            unread: 0
           });
         }
       });

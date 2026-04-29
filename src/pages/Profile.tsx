@@ -28,6 +28,11 @@ const Profile = () => {
   const myProjects = projects.filter(p => p.creator_id === currentUser.id);
   const joinedProjects = projects.filter(p => p.members?.includes(currentUser.id));
 
+  const formatUrl = (url: string) => {
+    if (!url) return "";
+    return url.startsWith('http') ? url : `https://${url}`;
+  };
+
   return (
     <MobileLayout title="Profile">
       <div className="relative">
@@ -50,18 +55,18 @@ const Profile = () => {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground">{currentUser.name}</h2>
-            <p className="text-primary font-semibold text-lg">{currentUser.title}</p>
+            <h2 className="text-2xl font-bold text-foreground">{currentUser.name || "Developer"}</h2>
+            <p className="text-primary font-semibold text-lg">{currentUser.title || "Member"}</p>
             <div className="flex flex-col gap-2 mt-3 text-muted-foreground text-sm">
               {currentUser.location && (
                 <span className="flex items-center gap-2"><MapPin size={16} className="text-primary" /> {currentUser.location}</span>
               )}
               {currentUser.portfolio_url && (
                 <a 
-                  href={currentUser.portfolio_url.startsWith('http') ? currentUser.portfolio_url : `https://${currentUser.portfolio_url}`} 
+                  href={formatUrl(currentUser.portfolio_url)} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-primary hover:underline"
+                  className="flex items-center gap-2 text-primary hover:underline font-medium"
                 >
                   <LinkIcon size={16} /> {currentUser.portfolio_url}
                 </a>
