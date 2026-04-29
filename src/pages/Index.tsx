@@ -1,14 +1,23 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import ProjectCard from '@/components/ProjectCard';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from '@/context/AppContext';
+import { ProjectCardSkeleton } from '@/components/SkeletonLoader';
+import EmptyState from '@/components/EmptyState';
+import { Rocket } from 'lucide-react';
 
 const Index = () => {
   const { projects } = useApp();
   const [activeTab, setActiveTab] = useState('newest');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   const sortedProjects = useMemo(() => {
     const projectsCopy = [...projects];
@@ -39,7 +48,10 @@ const Index = () => {
           </h2>
         </div>
 
-        <Tabs defaultValue="newest" className="mb-6" onValueChange={setActiveTab}>
+        <Tabs defaultValue="newest" className="mb-6" onValueChange={(val) => {
+          setActiveTab(val);
+          setIsLoading(true);
+        }}>
           <TabsList className="grid w-full grid-cols-2 bg-muted/50 rounded-xl p-1">
             <TabsTrigger value="newest" className="rounded-lg font-bold">New Projects</TabsTrigger>
             <TabsTrigger value="trending" className="rounded-lg font-bold">Trending</TabsTrigger>
@@ -47,13 +59,20 @@ const Index = () => {
         </Tabs>
 
         <div className="space-y-4">
-          {sortedProjects.map(project => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-          {sortedProjects.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No projects found.</p>
-            </div>
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => <ProjectCardSkeleton key={i} />)
+          ) : sortedProjects.length > 0 ? (
+            sortedProjects.map(project => (
+              <ProjectCard key={project.id} project={project} />
+            ))
+          ) : (
+            <EmptyState 
+              icon={Rocket}
+              title="No projects yet"
+              description="Be the first to launch a project on DevSphere!"
+              actionLabel="Create Project"
+              actionPath="/create"
+            />
           )}
         </div>
       </div>
