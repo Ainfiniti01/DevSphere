@@ -1,143 +1,223 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle, Send, User } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import React, { useState } from "react";
+import {
+  Heart,
+  Share2,
+  MessageCircle,
+  PlayCircle,
+  Send,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import SkillBadge from './SkillBadge';
-import { useNavigate } from 'react-router-dom';
-import { useApp } from '@/context/AppContext';
-import { cn } from '@/lib/utils';
+import SkillBadge from "./SkillBadge";
+import { useNavigate } from "react-router-dom";
+import { useApp } from "@/context/AppContext";
+import { cn } from "@/lib/utils";
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
   const { toggleLike, addComment } = useApp();
-  const [commentText, setCommentText] = useState('');
+  const [commentText, setCommentText] = useState("");
 
   const handleAddComment = () => {
     if (!commentText.trim()) return;
     addComment(project.id, commentText);
-    setCommentText('');
+    setCommentText("");
   };
 
-  const hasMedia = project.thumbnail && project.thumbnail !== '';
+  const hasMedia =
+    project.thumbnail && project.thumbnail.trim() !== "";
 
   return (
     <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
-      {/* Header */}
+
+      {/* HEADER */}
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
         <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={project.creator.avatar} />
-          <AvatarFallback>{project.creator.name[0]}</AvatarFallback>
+          <AvatarFallback>
+            {project.creator.name[0]}
+          </AvatarFallback>
         </Avatar>
+
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-bold text-foreground truncate">{project.creator.name}</h4>
-          <p className="text-[11px] text-muted-foreground truncate">{project.creator.role}</p>
+          <h4 className="text-sm font-bold text-foreground truncate">
+            {project.creator.name}
+          </h4>
+          <p className="text-[11px] text-muted-foreground truncate">
+            {project.creator.role}
+          </p>
         </div>
       </CardHeader>
-      
-      {/* Media Section / Text Project Card */}
-      <div 
+
+      {/* MEDIA / TEXT CARD */}
+      <div
         className={cn(
-          "relative aspect-video cursor-pointer group overflow-hidden flex flex-col items-center justify-center",
-          !hasMedia ? "bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50" : "bg-muted"
+          "relative cursor-pointer group overflow-hidden flex flex-col",
+          hasMedia
+            ? "aspect-video bg-muted"
+            : "min-h-[220px] bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50"
         )}
         onClick={() => navigate(`/project/${project.id}`)}
       >
+        {/* MEDIA VERSION */}
         {hasMedia ? (
           <>
-            <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
+            <img
+              src={project.thumbnail}
+              alt={project.title}
+              className="w-full h-full object-cover"
+            />
+
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-              <PlayCircle className="text-white opacity-80 group-hover:opacity-100 transition-opacity" size={48} />
+              <PlayCircle
+                className="text-white opacity-80 group-hover:opacity-100 transition-opacity"
+                size={48}
+              />
             </div>
+
             <div className="absolute bottom-3 left-3 right-3">
-              <h3 className="text-white font-bold text-lg drop-shadow-md">{project.title}</h3>
+              <h3 className="text-white font-bold text-lg drop-shadow-md">
+                {project.title}
+              </h3>
             </div>
           </>
         ) : (
-          <div className="p-8 text-center flex flex-col items-center justify-center h-full w-full">
+          /* TEXT PROJECT CARD */
+          <div className="flex flex-col items-center justify-center flex-1 px-6 py-10 text-center relative">
+
+            {/* Stage badge */}
             <div className="absolute top-4 left-4">
               <span className="px-2.5 py-1 bg-primary/15 text-primary text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-primary/20">
                 {project.stage}
               </span>
             </div>
-            
-            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%] mb-2">
+
+            {/* Title */}
+            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%]">
               {project.title}
             </h3>
-            
-            <div className="flex items-center gap-1.5 text-muted-foreground/80">
-              <span className="text-[11px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
-            </div>
+
+            {/* Creator */}
+            <p className="mt-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+              By {project.creator.name}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Content */}
+      {/* CONTENT */}
       <CardContent className="p-4">
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
           {project.description}
         </p>
+
         <div className="flex flex-wrap gap-1.5">
-          {project.skills.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
+          {project.skills.map((skill: string) => (
+            <SkillBadge key={skill} skill={skill} />
+          ))}
         </div>
       </CardContent>
 
-      {/* Footer */}
+      {/* FOOTER */}
       <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-border/50 mt-2">
         <div className="flex items-center gap-4">
-          <button 
+
+          {/* LIKE */}
+          <button
             onClick={() => toggleLike(project.id)}
             className={cn(
               "flex items-center gap-1.5 transition-colors py-2",
-              project.isLiked ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+              project.isLiked
+                ? "text-red-500"
+                : "text-muted-foreground hover:text-red-500"
             )}
           >
-            <Heart size={20} fill={project.isLiked ? "currentColor" : "none"} />
-            <span className="text-xs font-bold">{project.likes}</span>
+            <Heart
+              size={20}
+              fill={project.isLiked ? "currentColor" : "none"}
+            />
+            <span className="text-xs font-bold">
+              {project.likes}
+            </span>
           </button>
-          
+
+          {/* COMMENTS */}
           <Drawer>
             <DrawerTrigger asChild>
               <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors py-2">
                 <MessageCircle size={20} />
-                <span className="text-xs font-bold">{project.comments.length}</span>
+                <span className="text-xs font-bold">
+                  {project.comments.length}
+                </span>
               </button>
             </DrawerTrigger>
+
             <DrawerContent className="bg-background border-border h-[80vh]">
               <DrawerHeader className="border-b border-border">
                 <DrawerTitle>Comments</DrawerTitle>
               </DrawerHeader>
+
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {project.comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user}`} />
-                      <AvatarFallback>{c.user[0]}</AvatarFallback>
+                      <AvatarImage
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user}`}
+                      />
+                      <AvatarFallback>
+                        {c.user[0]}
+                      </AvatarFallback>
                     </Avatar>
+
                     <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
                       <div className="flex justify-between items-center mb-1">
-                        <h5 className="text-xs font-bold">{c.user}</h5>
-                        <span className="text-[10px] text-muted-foreground">{c.time}</span>
+                        <h5 className="text-xs font-bold">
+                          {c.user}
+                        </h5>
+                        <span className="text-[10px] text-muted-foreground">
+                          {c.time}
+                        </span>
                       </div>
                       <p className="text-sm">{c.text}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
               <div className="p-4 border-t border-border bg-background sticky bottom-0">
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="Add a comment..." 
-                    className="rounded-xl bg-accent/20" 
+                  <Input
+                    placeholder="Add a comment..."
+                    className="rounded-xl bg-accent/20"
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                    onChange={(e) =>
+                      setCommentText(e.target.value)
+                    }
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleAddComment()
+                    }
                   />
-                  <Button size="icon" className="rounded-xl" onClick={handleAddComment}>
+                  <Button
+                    size="icon"
+                    className="rounded-xl"
+                    onClick={handleAddComment}
+                  >
                     <Send size={18} />
                   </Button>
                 </div>
@@ -145,6 +225,8 @@ const ProjectCard = ({ project }: { project: any }) => {
             </DrawerContent>
           </Drawer>
         </div>
+
+        {/* SHARE */}
         <button className="text-muted-foreground hover:text-foreground transition-colors p-2">
           <Share2 size={20} />
         </button>
