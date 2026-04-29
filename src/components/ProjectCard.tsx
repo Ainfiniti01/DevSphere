@@ -23,10 +23,11 @@ const ProjectCard = ({ project }: { project: any }) => {
     setCommentText('');
   };
 
-  const hasMedia = project.thumbnail || project.videoUrl;
+  const hasMedia = project.thumbnail && project.thumbnail !== '';
 
   return (
     <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
+      {/* Header */}
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
         <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={project.creator.avatar} />
@@ -38,10 +39,11 @@ const ProjectCard = ({ project }: { project: any }) => {
         </div>
       </CardHeader>
       
+      {/* Media Section / Text Project Card */}
       <div 
         className={cn(
-          "relative aspect-video cursor-pointer group overflow-hidden",
-          !hasMedia ? "bg-gradient-to-br from-primary/20 via-violet-500/10 to-background flex flex-col items-center justify-center p-8 text-center" : "bg-muted"
+          "relative aspect-video cursor-pointer group overflow-hidden flex flex-col items-center justify-center",
+          !hasMedia ? "bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50" : "bg-muted"
         )}
         onClick={() => navigate(`/project/${project.id}`)}
       >
@@ -56,25 +58,27 @@ const ProjectCard = ({ project }: { project: any }) => {
             </div>
           </>
         ) : (
-          <>
-            <div className="absolute top-3 left-3">
-              <span className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-bold rounded-full uppercase tracking-wider">
+          <div className="p-8 text-center flex flex-col items-center justify-center h-full w-full">
+            <div className="absolute top-4 left-4">
+              <span className="px-2.5 py-1 bg-primary/15 text-primary text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-primary/20">
                 {project.stage}
               </span>
             </div>
-            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[80%]">
+            
+            <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%] mb-2">
               {project.title}
             </h3>
-            <div className="mt-4 flex items-center gap-2 text-muted-foreground">
-              <User size={14} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
+            
+            <div className="flex items-center gap-1.5 text-muted-foreground/80">
+              <span className="text-[11px] font-bold uppercase tracking-widest">By {project.creator.name}</span>
             </div>
-          </>
+          </div>
         )}
       </div>
 
+      {/* Content */}
       <CardContent className="p-4">
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
           {project.description}
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -82,12 +86,13 @@ const ProjectCard = ({ project }: { project: any }) => {
         </div>
       </CardContent>
 
+      {/* Footer */}
       <CardFooter className="p-4 pt-0 flex items-center justify-between border-t border-border/50 mt-2">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => toggleLike(project.id)}
             className={cn(
-              "flex items-center gap-1.5 transition-colors",
+              "flex items-center gap-1.5 transition-colors py-2",
               project.isLiked ? "text-red-500" : "text-muted-foreground hover:text-red-500"
             )}
           >
@@ -97,7 +102,7 @@ const ProjectCard = ({ project }: { project: any }) => {
           
           <Drawer>
             <DrawerTrigger asChild>
-              <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors">
+              <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors py-2">
                 <MessageCircle size={20} />
                 <span className="text-xs font-bold">{project.comments.length}</span>
               </button>
@@ -140,7 +145,7 @@ const ProjectCard = ({ project }: { project: any }) => {
             </DrawerContent>
           </Drawer>
         </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">
+        <button className="text-muted-foreground hover:text-foreground transition-colors p-2">
           <Share2 size={20} />
         </button>
       </CardFooter>
