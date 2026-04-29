@@ -3,17 +3,20 @@
 import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut } from 'lucide-react';
+import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { logout } = useApp();
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => setMounted(true), []);
 
   const handleLogout = () => {
     logout();
@@ -21,24 +24,34 @@ const Settings = () => {
     navigate('/auth');
   };
 
+  if (!mounted) return null;
+
   return (
     <MobileLayout title="Settings">
-      <div className="px-4 py-6 space-y-6">
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <button className="w-full flex items-center justify-between p-4 hover:bg-accent transition-colors border-b border-border">
+      <div className="px-6 py-6 space-y-6">
+        <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
+          {/* Notifications */}
+          <button 
+            onClick={() => toast.info("Notification settings coming soon")}
+            className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
+          >
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-accent rounded-xl text-foreground"><Bell size={20} /></div>
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Bell size={20} /></div>
               <div className="text-left">
                 <h4 className="font-bold text-sm">Notifications</h4>
                 <p className="text-[11px] text-muted-foreground">Manage alerts and sounds</p>
               </div>
             </div>
-            <Switch defaultChecked />
+            <ChevronRight size={18} className="text-muted-foreground" />
           </button>
 
-          <button className="w-full flex items-center justify-between p-4 hover:bg-accent transition-colors border-b border-border">
+          {/* Privacy */}
+          <button 
+            onClick={() => toast.info("Privacy settings coming soon")}
+            className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
+          >
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-accent rounded-xl text-foreground"><Shield size={20} /></div>
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Shield size={20} /></div>
               <div className="text-left">
                 <h4 className="font-bold text-sm">Privacy & Security</h4>
                 <p className="text-[11px] text-muted-foreground">Password and data usage</p>
@@ -47,9 +60,10 @@ const Settings = () => {
             <ChevronRight size={18} className="text-muted-foreground" />
           </button>
 
-          <div className="w-full flex items-center justify-between p-4 border-b border-border">
+          {/* Appearance / Theme Toggle */}
+          <div className="w-full flex items-center justify-between p-5 border-b border-border">
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-accent rounded-xl text-foreground"><Eye size={20} /></div>
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Eye size={20} /></div>
               <div className="text-left">
                 <h4 className="font-bold text-sm">Appearance</h4>
                 <p className="text-[11px] text-muted-foreground">Dark mode / Light mode</p>
@@ -61,25 +75,30 @@ const Settings = () => {
             />
           </div>
 
-          <button className="w-full flex items-center justify-between p-4 hover:bg-accent transition-colors">
+          {/* Subscription */}
+          <button 
+            onClick={() => toast.info("Pro features coming soon!")}
+            className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors"
+          >
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-accent rounded-xl text-foreground"><CreditCard size={20} /></div>
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><CreditCard size={20} /></div>
               <div className="text-left">
                 <h4 className="font-bold text-sm">Subscription</h4>
                 <p className="text-[11px] text-muted-foreground">Manage your pro plan</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">COMING SOON</span>
+            <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full">PRO</span>
           </button>
         </div>
 
-        <button 
+        <Button 
+          variant="destructive"
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 p-4 text-destructive font-bold bg-destructive/10 rounded-2xl hover:bg-destructive/20 transition-colors"
+          className="w-full h-14 flex items-center justify-center gap-2 font-bold rounded-2xl shadow-sm"
         >
           <LogOut size={20} />
           Sign Out
-        </button>
+        </Button>
       </div>
     </MobileLayout>
   );
