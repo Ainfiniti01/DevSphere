@@ -3,8 +3,9 @@
 import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
-import { Check, Rocket, Zap, Star, ShieldCheck } from 'lucide-react';
+import { Rocket, Zap, Star, ShieldCheck, BellRing } from 'lucide-react';
 import { toast } from 'sonner';
+import WaitlistModal from '@/components/WaitlistModal';
 
 const Subscription = () => {
   return (
@@ -49,6 +50,28 @@ const Subscription = () => {
         >
           Upgrade to Pro
         </Button>
+
+        <div className="relative py-4">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-4 text-muted-foreground font-bold tracking-widest">Waitlist</span></div>
+        </div>
+
+        <section className="bg-accent/20 border border-border p-6 rounded-3xl space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl text-primary"><BellRing size={20} /></div>
+            <h3 className="text-lg font-bold">Get Early Access</h3>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Be the first to know when Pro launches. Join our waitlist and help us prioritize the features you need most.
+          </p>
+          <WaitlistModal 
+            trigger={
+              <Button variant="outline" className="w-full h-12 rounded-xl font-bold border-primary/20 hover:bg-primary/5">
+                Get Notified
+              </Button>
+            }
+          />
+        </section>
       </div>
     </MobileLayout>
   );
