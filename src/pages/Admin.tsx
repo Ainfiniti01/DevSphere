@@ -1,9 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Rocket, AlertCircle, TrendingUp, DollarSign, ShieldCheck } from 'lucide-react';
+import { Users, Rocket, AlertCircle, DollarSign, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { useApp } from '@/context/AppContext';
+import { useNavigate } from 'react-router-dom';
+import LoadingScreen from '@/components/LoadingScreen';
 
 const MOCK_DATA = [
   { name: 'Mon', users: 400, projects: 240 },
@@ -16,6 +19,20 @@ const MOCK_DATA = [
 ];
 
 const Admin = () => {
+  const { currentUser } = useApp();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Redirect if not admin
+    if (currentUser && !currentUser.is_admin) {
+      navigate('/');
+    }
+  }, [currentUser, navigate]);
+
+  if (!currentUser || !currentUser.is_admin) {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-7xl mx-auto">

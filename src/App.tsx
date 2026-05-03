@@ -27,6 +27,7 @@ import PrivacySecurity from "./pages/PrivacySecurity";
 import NotificationSettings from "./pages/NotificationSettings";
 import Subscription from "./pages/Subscription";
 import ManageTeam from "./pages/ManageTeam";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ const App = () => {
                 <Route path="/settings/notifications" element={<NotificationSettings />} />
                 <Route path="/settings/subscription" element={<Subscription />} />
                 <Route path="/manage-team/:id" element={<ManageTeam />} />
+                <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
