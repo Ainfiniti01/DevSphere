@@ -17,11 +17,17 @@ const ResetPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Check if we have a session (Supabase automatically handles the recovery token)
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Invalid or expired reset link.");
+      if (!supabase) return;
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error("Invalid or expired reset link.");
+          navigate('/auth');
+        }
+      } catch (err) {
+        console.error("Session check error:", err);
         navigate('/auth');
       }
     };
@@ -30,7 +36,10 @@ const ResetPassword = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
+    if (!supabase) {
+      toast.error("Connection error. Please try again.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast.error("Passwords do not match.");
