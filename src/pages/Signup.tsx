@@ -23,7 +23,7 @@ const Signup = () => {
     portfolio_url: ''
   });
 
-  const REDIRECT_URL = 'http://10.118.61.248:32105';
+  const REDIRECT_URL = 'https://dev-sphere-kappa.vercel.app';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
