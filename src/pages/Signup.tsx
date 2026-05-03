@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,8 +20,10 @@ const Signup = () => {
     title: '',
     skills: '',
     location: '',
-    portfolio: ''
+    portfolio_url: ''
   });
+
+  const REDIRECT_URL = 'http://10.118.61.248:32105';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,32 +34,39 @@ const Signup = () => {
 
     setLoading(true);
     try {
-      // We only perform the Auth signup. 
-      // The 'handle_new_user' database trigger will automatically create the profile 
-      // using the metadata provided here. This prevents duplicate insertion errors 
-      // and ensures the 'is_admin' flag cannot be spoofed from the client.
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            name: formData.name,
-            title: formData.title,
-            skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
-            location: formData.location,
-            portfolio_url: formData.portfolio
-          }
+            full_name: formData.name,
+          },
+          redirectTo: REDIRECT_URL
         }
       });
 
       if (authError) throw authError;
 
-      if (authData.user) {
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            name: formData.name,
+            title: formData.title,
+            skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+            location: formData.location,
+            portfolio_url: formData.portfolio_url,
+            updated_at: new Date().toISOString()
+          });
+
+        if (profileError) console.error("Profile update error:", profileError);
+
         toast.success("Account created! Please check your email for confirmation.");
         navigate('/auth');
       }
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "An error occurred during signup");
     } finally {
       setLoading(false);
     }
@@ -79,7 +90,22 @@ const Signup = () => {
         </div>
         <div className="space-y-1.5">
           <Label>Password</Label>
-          <Input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="rounded-xl h-12" />
+          <div className="relative">
+            <Input 
+              type={showPassword ? "text" : "password"} 
+              required 
+              value={formData.password} 
+              onChange={e => setFormData({...formData, password: e.target.value})} 
+              className="rounded-xl h-12 pr-10" 
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label>Professional Title</Label>
@@ -87,7 +113,7 @@ const Signup = () => {
         </div>
         <div className="space-y-1.5">
           <Label>Skills (comma separated)</Label>
-          <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, TypeScript" className="rounded-xl h-12" />
+          <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, Node.js" className="rounded-xl h-12" />
         </div>
         <div className="space-y-1.5">
           <Label>Location</Label>
@@ -95,11 +121,11 @@ const Signup = () => {
         </div>
         <div className="space-y-1.5">
           <Label>Portfolio URL (Optional)</Label>
-          <Input value={formData.portfolio} onChange={e => setFormData({...formData, portfolio: e.target.value})} placeholder="https://myportfolio.com" className="rounded-xl h-12" />
+          <Input value={formData.portfolio_url} onChange={e => setFormData({...formData, portfolio_url: e.target.value})} placeholder="https://yourportfolio.com" className="rounded-xl h-12" />
         </div>
 
         <Button type="submit" disabled={loading} className="w-full h-14 mt-6 text-lg font-bold rounded-2xl shadow-lg">
-          {loading ? "Creating Account..." : "Complete Profile"}
+          {loading ? <Loader2 className="animate-spin" /> : "Complete Profile"}
         </Button>
       </form>
 

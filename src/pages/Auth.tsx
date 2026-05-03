@@ -17,6 +17,8 @@ const Auth = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isResetMode, setIsResetMode] = useState(false);
 
+  const REDIRECT_URL = 'http://10.118.61.248:32105';
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) {
@@ -64,7 +66,7 @@ const Auth = () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${REDIRECT_URL}/reset-password`,
       });
 
       if (error) throw error;
@@ -82,7 +84,7 @@ const Auth = () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin }
+      options: { redirectTo: REDIRECT_URL }
     });
     if (error) toast.error(error.message);
   };
