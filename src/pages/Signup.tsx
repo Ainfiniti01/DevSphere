@@ -30,12 +30,20 @@ const Signup = () => {
 
     setLoading(true);
     try {
+      // We only perform the Auth signup. 
+      // The 'handle_new_user' database trigger will automatically create the profile 
+      // using the metadata provided here. This prevents duplicate insertion errors 
+      // and ensures the 'is_admin' flag cannot be spoofed from the client.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            full_name: formData.name
+            name: formData.name,
+            title: formData.title,
+            skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+            location: formData.location,
+            portfolio_url: formData.portfolio
           }
         }
       });
@@ -43,17 +51,6 @@ const Signup = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: authData.user.id,
-          name: formData.name,
-          title: formData.title,
-          skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
-          location: formData.location,
-          portfolio_url: formData.portfolio
-        });
-
-        if (profileError) throw profileError;
-        
         toast.success("Account created! Please check your email for confirmation.");
         navigate('/auth');
       }

@@ -62,6 +62,8 @@ const EditProfile = () => {
     setLoading(true);
 
     try {
+      // We explicitly define the fields to update. 
+      // This prevents any accidental or malicious modification of 'is_admin'.
       const updates = {
         id: currentUser.id,
         name: formData.name,
@@ -73,7 +75,7 @@ const EditProfile = () => {
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from('profiles').upsert(updates);
+      const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
       if (error) throw error;
 
       setCurrentUser({ ...currentUser, ...updates });
