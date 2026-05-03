@@ -62,8 +62,7 @@ const EditProfile = () => {
     setLoading(true);
 
     try {
-      // We explicitly define the fields to update. 
-      // This prevents any accidental or malicious modification of 'is_admin'.
+      // Explicitly define allowed fields to prevent accidental modification of sensitive columns
       const updates = {
         id: currentUser.id,
         name: formData.name,
