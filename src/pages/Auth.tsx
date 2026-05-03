@@ -36,9 +36,12 @@ const Auth = () => {
       });
 
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("rate limit") || msg.includes("too many requests")) {
+          setErrorMsg("Too many requests. Please wait a few minutes before trying again.");
+        } else if (msg.includes("invalid login credentials")) {
           setErrorMsg("Invalid email or password. Please try again.");
-        } else if (error.message.includes("Email not confirmed")) {
+        } else if (msg.includes("email not confirmed")) {
           setErrorMsg("Please confirm your email address.");
         } else {
           setErrorMsg(error.message);
@@ -69,12 +72,20 @@ const Auth = () => {
         redirectTo: `${REDIRECT_URL}/reset-password`,
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("rate limit") || msg.includes("too many requests")) {
+          toast.error("Too many requests. Please wait a few minutes before trying again.");
+        } else {
+          toast.error(error.message || "Failed to send reset link");
+        }
+        return;
+      }
       
       toast.success("Password reset link sent to your email!");
       setIsResetMode(false);
     } catch (error: any) {
-      toast.error(error.message || "Failed to send reset link");
+      toast.error("An unexpected error occurred.");
     } finally {
       setLoading(false);
     }

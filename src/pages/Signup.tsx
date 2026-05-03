@@ -45,7 +45,15 @@ const Signup = () => {
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        const msg = authError.message.toLowerCase();
+        if (msg.includes("rate limit") || msg.includes("too many requests")) {
+          toast.error("Too many requests. Please wait a few minutes before trying again.");
+        } else {
+          toast.error(authError.message || "An error occurred during signup");
+        }
+        return;
+      }
 
       if (data.user) {
         const { error: profileError } = await supabase
@@ -66,7 +74,7 @@ const Signup = () => {
         navigate('/auth');
       }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred during signup");
+      toast.error("An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
