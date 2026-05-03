@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { Analytics } from "@vercel/analytics/next";
 import { AppProvider } from "./context/AppContext";
 import LoadingScreen from "./components/LoadingScreen";
 import Splash from "./pages/Splash";
@@ -52,6 +53,7 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner position="top-center" />
+            <Analytics />
             <BrowserRouter>
               <Routes>
                 <Route path="/splash" element={<Splash />} />
