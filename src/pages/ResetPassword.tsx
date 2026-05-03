@@ -23,16 +23,13 @@ const ResetPassword = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Supabase automatically parses the hash from the URL
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) throw sessionError;
 
         if (session) {
-          console.log("[ResetPassword] Session established", session.user.email);
           setVerifying(false);
         } else {
-          // If no session, wait a bit for the hash to be processed
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
               setVerifying(false);
@@ -40,7 +37,6 @@ const ResetPassword = () => {
             }
           });
 
-          // Timeout after 5 seconds if no session is found
           setTimeout(() => {
             setVerifying(prev => {
               if (prev) {
@@ -79,16 +75,16 @@ const ResetPassword = () => {
 
       if (updateError) throw updateError;
 
-      // Success! Show the dialog
+      // Stop loading immediately on success
+      setLoading(false);
       setShowSuccessDialog(true);
       
-      // Sign out to ensure a clean state for the next login
-      await supabase.auth.signOut();
+      // Sign out in the background to ensure a clean state
+      supabase.auth.signOut().catch(console.error);
     } catch (err: any) {
+      setLoading(false);
       console.error("[ResetPassword] Update error:", err);
       toast.error(err.message || "Failed to update password. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -167,7 +163,6 @@ const ResetPassword = () => {
         </form>
       </div>
 
-      {/* Success Dialog */}
       <Dialog open={showSuccessDialog} onOpenChange={(open) => !open && navigate('/auth')}>
         <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
           <DialogHeader className="flex flex-col items-center text-center">
