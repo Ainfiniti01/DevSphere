@@ -13,16 +13,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { projects, currentUser, requests, setRequests } = useApp();
+  const { projects, currentUser, notifications, refreshNotifications } = useApp();
   
   const project = projects.find(p => p.id === id);
   
   const [joinReason, setJoinReason] = useState('');
   const [joinSkills, setJoinSkills] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!project) {
     return (
@@ -35,39 +37,56 @@ const ProjectDetail = () => {
     );
   }
 
-  const isOwner = currentUser?.id === project.creator.id;
-  const hasRequested = requests.some(r => r.projectId === project.id && r.userId === currentUser?.id && r.status === 'pending');
+  const isOwner = currentUser?.id === project.creator_id;
+  const hasRequested = notifications.some(n => n.project_id === project.id && n.actor_id === currentUser?.id && n.type === 'request');
   const isMember = project.members?.includes(currentUser?.id);
 
-  const handleJoin = () => {
-    if (!currentUser) {
+  const handleJoin = async () => {
+    if (!currentUser || !supabase) {
       toast.error("Please sign in to join projects");
       navigate('/auth');
       return;
     }
 
-    const newRequest = {
-      id: 'req_' + Date.now(),
-      projectId: project.id,
-      projectTitle: project.title,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatar,
-      reason: joinReason,
-      skills: joinSkills,
-      status: 'pending',
-      timestamp: new Date().toISOString()
-    };
+    setIsSubmitting(true);
     
-    setRequests(prev => [...prev, newRequest]);
-    toast.success("Application sent to founder!");
+    try {
+      const { error } = await supabase.from('notifications').insert({
+        user_id: project.creator_id,
+        actor_id: currentUser.id,
+        type: 'request',
+        content: `requested to join ${project.title}`,
+        project_id: project.id,
+        metadata: {
+          reason: joinReason,
+          skills: joinSkills
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Application sent to founder!");
+      await refreshNotifications();
+      setJoinReason('');
+      setJoinSkills('');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send application");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <MobileLayout title="Project Details" showBack>
       <div className="relative bg-background text-foreground">
         <div className="aspect-video relative bg-muted">
-          <img src={project.thumbnail} className="w-full h-full object-cover" alt={project.title} />
+          {project.thumbnail ? (
+            <img src={project.thumbnail} className="w-full h-full object-cover" alt={project.title} />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center">
+              <Rocket size={48} className="text-primary/40" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
             <PlayCircle size={64} className="text-white/80 hover:text-white cursor-pointer transition-colors" />
           </div>
@@ -89,19 +108,19 @@ const ProjectDetail = () => {
 
           <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-2xl border border-border">
             <Avatar className="h-10 w-10 border border-border">
-              <AvatarImage src={project.creator.avatar} />
-              <AvatarFallback>{project.creator.name[0]}</AvatarFallback>
+              <AvatarImage src={project.creator?.avatar_url} />
+              <AvatarFallback>{project.creator?.name?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-bold truncate">{project.creator.name}</h4>
-              <p className="text-xs text-muted-foreground truncate">{project.creator.role}</p>
+              <h4 className="text-sm font-bold truncate">{project.creator?.name}</h4>
+              <p className="text-xs text-muted-foreground truncate">{project.creator?.title}</p>
             </div>
             {!isOwner && (
               <Button 
                 variant="secondary" 
                 size="sm" 
                 className="rounded-xl h-8 text-xs font-bold"
-                onClick={() => navigate(`/chat/${project.creator.id}`)}
+                onClick={() => navigate(`/chat/${project.creator_id}`)}
               >
                 Message
               </Button>
@@ -126,7 +145,7 @@ const ProjectDetail = () => {
             <section>
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Required Skills</h3>
               <div className="flex flex-wrap gap-2">
-                {project.skills.map(skill => <SkillBadge key={skill} skill={skill} />)}
+                {project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
               </div>
             </section>
 
@@ -208,9 +227,9 @@ const ProjectDetail = () => {
                     <Button 
                       onClick={handleJoin} 
                       className="w-full h-12 rounded-xl font-bold text-lg"
-                      disabled={!joinReason || !joinSkills}
+                      disabled={!joinReason || !joinSkills || isSubmitting}
                     >
-                      Submit Application
+                      {isSubmitting ? "Sending..." : "Submit Application"}
                     </Button>
                   </div>
                 </DialogContent>
