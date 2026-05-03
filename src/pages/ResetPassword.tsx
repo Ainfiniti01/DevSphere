@@ -14,24 +14,54 @@ const ResetPassword = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
+    // Listen for the PASSWORD_RECOVERY event which is triggered when landing from a reset link
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setVerifying(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        // If we are already signed in (session established from hash), we can proceed
+        setVerifying(false);
+      }
+    });
+
+    // Fallback check: if session is already there after a short delay
     const checkSession = async () => {
-      if (!supabase) return;
-      
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          toast.error("Invalid or expired reset link.");
-          navigate('/auth');
-        }
-      } catch (err) {
-        console.error("Session check error:", err);
-        navigate('/auth');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setVerifying(false);
+      } else {
+        // Give it a moment for the hash to be parsed
+        setTimeout(async () => {
+          const { data: { session: delayedSession } } = await supabase.auth.getSession();
+          if (!delayedSession) {
+            // If still no session and not in recovery mode, the link might be invalid
+            // But we wait for the event listener primarily
+          }
+        }, 2000);
       }
     };
+
     checkSession();
+
+    // Safety timeout: if we're still "verifying" after 5 seconds, something is wrong
+    const timeout = setTimeout(() => {
+      setVerifying(prev => {
+        if (prev) {
+          toast.error("Session could not be established. The link may be expired.");
+          navigate('/auth');
+        }
+        return prev;
+      });
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [navigate]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -57,7 +87,8 @@ const ResetPassword = () => {
 
       if (error) throw error;
 
-      toast.success("Password updated successfully! You can now sign in.");
+      toast.success("Password updated successfully! Please sign in with your new password.");
+      // Sign out to ensure a clean state for the next login
       await supabase.auth.signOut();
       navigate('/auth');
     } catch (error: any) {
@@ -66,6 +97,15 @@ const ResetPassword = () => {
       setLoading(false);
     }
   };
+
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground font-medium">Verifying reset link...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground max-w-md mx-auto flex flex-col px-8 py-12">
@@ -112,8 +152,8 @@ const ResetPassword = () => {
               className="h-12 rounded-xl"
             />
           </div>
-          <Button type="submit" className="w-full h-12 text-lg rounded-xl font-bold" disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : "Update Password"}
+          <Button type="submit" className="w-full h-14 text-lg rounded-2xl font-bold shadow-lg shadow-primary/20" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin mr-2" /> : "Update Password"}
           </Button>
         </form>
       </div>
