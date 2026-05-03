@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
-import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -16,60 +17,51 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Listen for the PASSWORD_RECOVERY event which is triggered when landing from a reset link
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setVerifying(false);
-      } else if (event === 'SIGNED_IN' && session) {
-        // If we are already signed in (session established from hash), we can proceed
-        setVerifying(false);
-      }
-    });
-
-    // Fallback check: if session is already there after a short delay
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      try {
+        // Supabase automatically parses the hash from the URL
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+
+        if (session) {
+          console.log("[ResetPassword] Session established", session.user.email);
+          setVerifying(false);
+        } else {
+          // If no session, wait a bit for the hash to be processed
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+              setVerifying(false);
+              subscription.unsubscribe();
+            }
+          });
+
+          // Timeout after 5 seconds if no session is found
+          setTimeout(() => {
+            setVerifying(prev => {
+              if (prev) {
+                setError("Your reset link may have expired or is invalid. Please request a new one.");
+              }
+              return prev;
+            });
+          }, 5000);
+        }
+      } catch (err: any) {
+        setError(err.message || "An error occurred while verifying the link.");
         setVerifying(false);
-      } else {
-        // Give it a moment for the hash to be parsed
-        setTimeout(async () => {
-          const { data: { session: delayedSession } } = await supabase.auth.getSession();
-          if (!delayedSession) {
-            // If still no session and not in recovery mode, the link might be invalid
-            // But we wait for the event listener primarily
-          }
-        }, 2000);
       }
     };
 
     checkSession();
-
-    // Safety timeout: if we're still "verifying" after 5 seconds, something is wrong
-    const timeout = setTimeout(() => {
-      setVerifying(prev => {
-        if (prev) {
-          toast.error("Session could not be established. The link may be expired.");
-          navigate('/auth');
-        }
-        return prev;
-      });
-    }, 5000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, [navigate]);
+  }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
-      toast.error("Connection error. Please try again.");
-      return;
-    }
+    if (!supabase) return;
 
     if (password !== confirmPassword) {
       toast.error("Passwords do not match.");
@@ -83,26 +75,43 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = await supabase.auth.updateUser({ password });
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      toast.success("Password updated successfully! Please sign in with your new password.");
+      // Success! Show the dialog
+      setShowSuccessDialog(true);
+      
       // Sign out to ensure a clean state for the next login
       await supabase.auth.signOut();
-      navigate('/auth');
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update password");
+    } catch (err: any) {
+      console.error("[ResetPassword] Update error:", err);
+      toast.error(err.message || "Failed to update password. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="text-destructive" size={32} />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Invalid Reset Link</h2>
+        <p className="text-muted-foreground mb-6 max-w-xs">{error}</p>
+        <Button onClick={() => navigate('/auth')} className="rounded-xl px-8">
+          Back to Login
+        </Button>
+      </div>
+    );
+  }
+
   if (verifying) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground font-medium">Verifying reset link...</p>
+        <p className="text-muted-foreground font-medium">Verifying your secure link...</p>
       </div>
     );
   }
@@ -157,6 +166,26 @@ const ResetPassword = () => {
           </Button>
         </form>
       </div>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={(open) => !open && navigate('/auth')}>
+        <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
+          <DialogHeader className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={32} />
+            </div>
+            <DialogTitle className="text-2xl font-bold">Password Updated!</DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-2">
+              Your password has been successfully changed. You can now sign in with your new credentials.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pt-4">
+            <Button onClick={() => navigate('/auth')} className="w-full h-12 rounded-xl font-bold text-lg">
+              Go to Login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
