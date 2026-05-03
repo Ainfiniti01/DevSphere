@@ -36,20 +36,40 @@ const Notifications = () => {
   const handleRequest = async (notif: any, accept: boolean) => {
     if (!supabase) return;
     
+    const requestId = notif.metadata?.request_id;
+    if (!requestId) {
+      toast.error("Invalid request data");
+      return;
+    }
+
     try {
       if (accept) {
-        // Add to project_members
+        // SECURITY FIX: We update the status in the join_requests table.
+        // A database trigger or server-side logic should ideally handle the project_members insertion.
+        // For now, we perform both but ensure the request record is updated.
+        const { error: updateError } = await supabase
+          .from('join_requests')
+          .update({ status: 'accepted' })
+          .eq('id', requestId);
+
+        if (updateError) throw updateError;
+
         await supabase.from('project_members').insert({
           project_id: notif.project_id,
           user_id: notif.actor_id,
           role: 'Member'
         });
+        
         toast.success("Member accepted!");
       } else {
+        await supabase
+          .from('join_requests')
+          .update({ status: 'declined' })
+          .eq('id', requestId);
         toast.info("Request declined");
       }
 
-      // Update notification status or delete
+      // Delete the notification after processing
       await supabase.from('notifications').delete().eq('id', notif.id);
       await refreshNotifications();
     } catch (err: any) {

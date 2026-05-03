@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const ProjectDetail = () => {
@@ -51,16 +51,14 @@ const ProjectDetail = () => {
     setIsSubmitting(true);
     
     try {
-      const { error } = await supabase.from('notifications').insert({
-        user_id: project.creator_id,
-        actor_id: currentUser.id,
-        type: 'request',
-        content: `requested to join ${project.title}`,
+      // SECURITY FIX: Instead of inserting directly into notifications (which can be spoofed),
+      // we insert into a dedicated join_requests table. A database trigger will handle
+      // the notification creation securely.
+      const { error } = await supabase.from('join_requests').insert({
         project_id: project.id,
-        metadata: {
-          reason: joinReason,
-          skills: joinSkills
-        }
+        user_id: currentUser.id,
+        reason: joinReason,
+        skills: joinSkills
       });
 
       if (error) throw error;
