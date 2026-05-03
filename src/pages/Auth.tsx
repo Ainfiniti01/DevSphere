@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Github, Chrome, AlertCircle } from 'lucide-react';
+import { Github, Chrome, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isResetMode, setIsResetMode] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +53,31 @@ const Auth = () => {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) return;
+    if (!email) {
+      toast.error("Please enter your email address first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+      
+      toast.success("Password reset link sent to your email!");
+      setIsResetMode(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send reset link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOAuth = async (provider: 'google' | 'github') => {
     if (!supabase) return;
     const { error } = await supabase.auth.signInWithOAuth({
@@ -69,7 +95,9 @@ const Auth = () => {
             <span className="text-primary-foreground text-3xl font-bold">D</span>
           </div>
           <h1 className="text-3xl font-bold">DevSphere</h1>
-          <p className="text-muted-foreground mt-2">Sign in to continue</p>
+          <p className="text-muted-foreground mt-2">
+            {isResetMode ? "Reset your password" : "Sign in to continue"}
+          </p>
         </div>
 
         {errorMsg && (
@@ -79,49 +107,87 @@ const Auth = () => {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="name@example.com" 
-              required 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              className="h-12 rounded-xl"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
-              required 
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="h-12 rounded-xl"
-            />
-          </div>
-          <Button type="submit" className="w-full h-12 text-lg rounded-xl font-bold" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Button>
+        {isResetMode ? (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email Address</Label>
+              <Input 
+                id="reset-email" 
+                type="email" 
+                placeholder="name@example.com" 
+                required 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                className="h-12 rounded-xl"
+              />
+            </div>
+            <Button type="submit" className="w-full h-12 text-lg rounded-xl font-bold" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : "Send Reset Link"}
+            </Button>
+            <button 
+              type="button" 
+              onClick={() => setIsResetMode(false)}
+              className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+            >
+              <ArrowLeft size={16} /> Back to Login
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="name@example.com" 
+                required 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                className="h-12 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button 
+                  type="button" 
+                  onClick={() => setIsResetMode(true)}
+                  className="text-xs font-bold text-primary hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <Input 
+                id="password" 
+                type="password" 
+                required 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="h-12 rounded-xl"
+              />
+            </div>
+            <Button type="submit" className="w-full h-12 text-lg rounded-xl font-bold" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : "Sign In"}
+            </Button>
 
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
-          </div>
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" type="button" className="h-12 gap-2 rounded-xl" onClick={() => handleOAuth('google')}><Chrome size={20} /> Google</Button>
-            <Button variant="outline" type="button" className="h-12 gap-2 rounded-xl" onClick={() => handleOAuth('github')}><Github size={20} /> GitHub</Button>
-          </div>
-        </form>
+            <div className="grid grid-cols-2 gap-4">
+              <Button variant="outline" type="button" className="h-12 gap-2 rounded-xl" onClick={() => handleOAuth('google')}><Chrome size={20} /> Google</Button>
+              <Button variant="outline" type="button" className="h-12 gap-2 rounded-xl" onClick={() => handleOAuth('github')}><Github size={20} /> GitHub</Button>
+            </div>
+          </form>
+        )}
       </div>
       
-      <p className="text-center text-sm text-muted-foreground mt-8">
-        Don't have an account? <span onClick={() => navigate('/signup')} className="text-primary font-semibold cursor-pointer hover:underline">Sign up</span>
-      </p>
+      {!isResetMode && (
+        <p className="text-center text-sm text-muted-foreground mt-8">
+          Don't have an account? <span onClick={() => navigate('/signup')} className="text-primary font-semibold cursor-pointer hover:underline">Sign up</span>
+        </p>
+      )}
     </div>
   );
 };

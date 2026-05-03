@@ -28,6 +28,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import Subscription from "./pages/Subscription";
 import ManageTeam from "./pages/ManageTeam";
 import Admin from "./pages/Admin";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const App = () => {
                 <Route path="/settings/subscription" element={<Subscription />} />
                 <Route path="/manage-team/:id" element={<ManageTeam />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
