@@ -27,14 +27,9 @@ const Welcome = () => {
   const [current, setCurrent] = useState(0);
   const navigate = useNavigate();
 
-  const handleFinish = () => {
-    localStorage.setItem('hasSeenOnboarding', 'true');
-    navigate('/auth');
-  };
-
   const next = () => {
     if (current === SLIDES.length - 1) {
-      handleFinish();
+      navigate('/auth');
     } else {
       setCurrent(current + 1);
     }
@@ -70,7 +65,7 @@ const Welcome = () => {
         <Button onClick={next} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-lg font-bold rounded-2xl">
           {current === SLIDES.length - 1 ? "Get Started" : "Next"}
         </Button>
-        <button onClick={handleFinish} className="w-full text-slate-500 font-medium py-2">
+        <button onClick={() => navigate('/auth')} className="w-full text-slate-500 font-medium py-2">
           Skip
         </button>
       </div>

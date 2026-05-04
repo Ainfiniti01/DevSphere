@@ -3,34 +3,15 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
 
 const Splash = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkState = async () => {
-      // 1. Check for Supabase Session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Small delay for branding impact
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      if (session) {
-        // User is logged in
-        navigate('/home');
-      } else {
-        // 2. Check Onboarding Status
-        const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
-        if (hasSeenOnboarding === 'true') {
-          navigate('/auth');
-        } else {
-          navigate('/welcome');
-        }
-      }
-    };
-
-    checkState();
+    const timer = setTimeout(() => {
+      navigate('/welcome');
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   return (
