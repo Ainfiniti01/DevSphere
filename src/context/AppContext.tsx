@@ -16,6 +16,7 @@ interface AppContextType {
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   totalUnreadMessages: number;
+  unreadNotificationsCount: number;
   logout: () => void;
   toggleLike: (projectId: string) => Promise<void>;
   addComment: (projectId: string, text: string) => Promise<void>;
@@ -36,6 +37,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const resolveName = (user: any) => {
     if (!user) return "User";
@@ -116,6 +118,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) throw error;
       setNotifications(data || []);
+      setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
     }
@@ -124,7 +127,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // Fetch chat reads to determine unread status
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -175,11 +177,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             unread: isUnread ? 1 : 0,
             isGroup
           });
-          if (isUnread) totalUnread++;
         } else if (isUnread) {
           const chat = conversations.get(chatId);
           chat.unread++;
         }
+        
+        if (isUnread) totalUnread++;
       });
       
       setChats(Array.from(conversations.values()));
@@ -192,7 +195,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser) return;
     try {
-      // Update chat_reads table
       const now = new Date().toISOString();
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
@@ -200,7 +202,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      // Also update messages table for 1-on-1 compatibility
       if (!isGroup) {
         await supabase
           .from('messages')
@@ -209,16 +210,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('receiver_id', currentUser.id)
           .eq('is_read', false);
       }
-
-      // Update local state immediately
-      setChats(prev => prev.map(chat => 
-        chat.id === chatId ? { ...chat, unread: 0 } : chat
-      ));
-      
-      setTotalUnreadMessages(prev => {
-        const chat = chats.find(c => c.id === chatId);
-        return (chat && chat.unread > 0) ? Math.max(0, prev - 1) : prev;
-      });
 
       await refreshChats();
     } catch (error) {
@@ -247,6 +238,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           setNotifications([]);
           setChats([]);
           setTotalUnreadMessages(0);
+          setUnreadNotificationsCount(0);
         }
       });
 
@@ -269,23 +261,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       refreshNotifications();
       refreshChats();
       
-      // Real-time message subscription
       const channel = supabase
-        .channel('global-messages')
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages' 
-        }, (payload) => {
-          refreshChats();
-        })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public', 
-          table: 'messages'
-        }, (payload) => {
-          refreshChats();
-        })
+        .channel('global-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refreshChats())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refreshNotifications())
         .subscribe();
 
       return () => {
@@ -351,6 +330,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       chats, setChats,
       notifications, setNotifications,
       totalUnreadMessages,
+      unreadNotificationsCount,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
       markAsRead,

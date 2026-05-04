@@ -19,7 +19,7 @@ const MobileLayout = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { totalUnreadMessages } = useApp();
+  const { totalUnreadMessages, unreadNotificationsCount } = useApp();
 
   const formatBadge = (count: number) => {
     if (count <= 0) return null;
@@ -56,7 +56,9 @@ const MobileLayout = ({
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/notifications')} className="relative p-2 hover:bg-accent rounded-full transition-colors">
             <Bell size={22} className="text-muted-foreground" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+            )}
           </button>
         </div>
       </header>
