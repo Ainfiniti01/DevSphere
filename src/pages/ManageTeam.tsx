@@ -6,7 +6,7 @@ import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserMinus, Check, X, MessageSquare } from 'lucide-react';
+import { UserMinus, Check, X, MessageSquare, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ManageTeam = () => {
@@ -51,6 +51,21 @@ const ManageTeam = () => {
   return (
     <MobileLayout title="Manage Team" showBack>
       <div className="px-4 py-6 space-y-8">
+        <div className="flex items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/10">
+          <div>
+            <h3 className="font-bold text-sm">Project Settings</h3>
+            <p className="text-[10px] text-muted-foreground">Update project details and skills</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="rounded-xl gap-2 font-bold"
+            onClick={() => navigate(`/create?edit=${project.id}`)}
+          >
+            <Edit size={14} /> Edit Project
+          </Button>
+        </div>
+
         <section>
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">Pending Requests ({projectRequests.length})</h3>
           <div className="space-y-3">

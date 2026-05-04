@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
@@ -32,7 +32,8 @@ const CreateProject = () => {
     skills: '',
     stage: 'Idea',
     thumbnail: '',
-    videoUrl: ''
+    videoUrl: '',
+    projectUrl: ''
   });
 
   const userProjects = projects.filter(p => p.creator_id === currentUser?.id);
@@ -52,7 +53,8 @@ const CreateProject = () => {
           skills: projectToEdit.skills.join(', '),
           stage: projectToEdit.stage,
           thumbnail: projectToEdit.thumbnail || '',
-          videoUrl: projectToEdit.videoUrl || ''
+          videoUrl: projectToEdit.videoUrl || '',
+          projectUrl: projectToEdit.project_url || ''
         });
       }
     }
@@ -102,19 +104,31 @@ const CreateProject = () => {
       return;
     }
 
+    // URL Validation
+    if (formData.projectUrl && !formData.projectUrl.match(/^https?:\/\/.+/)) {
+      toast.error("Please enter a valid URL starting with http:// or https://");
+      return;
+    }
+
     setLoading(true);
-    const projectData = {
-      title: formData.title,
-      problem: formData.problem,
-      solution: formData.solution,
-      description: formData.description,
+    
+    // Define data based on whether it's an edit or new project
+    const projectData: any = {
       stage: formData.stage,
       skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+      description: formData.description,
+      project_url: formData.projectUrl,
       thumbnail_url: formData.thumbnail,
       video_url: formData.videoUrl,
-      creator_id: currentUser.id,
-      status: isAtActiveLimit ? 'PAUSED' : 'ACTIVE'
     };
+
+    if (!editId) {
+      projectData.title = formData.title;
+      projectData.problem = formData.problem;
+      projectData.solution = formData.solution;
+      projectData.creator_id = currentUser.id;
+      projectData.status = isAtActiveLimit ? 'PAUSED' : 'ACTIVE';
+    }
 
     try {
       if (editId) {
@@ -154,13 +168,6 @@ const CreateProject = () => {
           </div>
         )}
 
-        {isAtActiveLimit && !isAtTotalLimit && (
-          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex gap-3 text-amber-600 text-sm">
-            <AlertCircle className="shrink-0" size={20} />
-            <p>You have 3 active projects. This new project will be created as <strong>PAUSED</strong>.</p>
-          </div>
-        )}
-
         <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, 'image')} />
         <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={e => handleFileUpload(e, 'video')} />
 
@@ -172,8 +179,9 @@ const CreateProject = () => {
             required 
             value={formData.title}
             onChange={e => setFormData({...formData, title: e.target.value})}
-            disabled={isAtTotalLimit}
+            disabled={isAtTotalLimit || !!editId}
           />
+          {editId && <p className="text-[10px] text-muted-foreground px-1">Project title cannot be changed after creation.</p>}
         </div>
 
         <div className="space-y-2">
@@ -184,7 +192,7 @@ const CreateProject = () => {
             required 
             value={formData.problem}
             onChange={e => setFormData({...formData, problem: e.target.value})}
-            disabled={isAtTotalLimit}
+            disabled={isAtTotalLimit || !!editId}
           />
         </div>
 
@@ -196,7 +204,7 @@ const CreateProject = () => {
             required 
             value={formData.solution}
             onChange={e => setFormData({...formData, solution: e.target.value})}
-            disabled={isAtTotalLimit}
+            disabled={isAtTotalLimit || !!editId}
           />
         </div>
 
@@ -210,6 +218,20 @@ const CreateProject = () => {
             onChange={e => setFormData({...formData, description: e.target.value})}
             disabled={isAtTotalLimit}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-bold">Project URL (Optional)</Label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+            <Input 
+              placeholder="https://yourproject.com" 
+              className="h-12 rounded-xl bg-accent/20 pl-10" 
+              value={formData.projectUrl}
+              onChange={e => setFormData({...formData, projectUrl: e.target.value})}
+              disabled={isAtTotalLimit}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

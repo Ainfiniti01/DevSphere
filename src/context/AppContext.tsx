@@ -141,10 +141,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshNotifications = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // Simplified query to avoid potential join issues if schema isn't perfectly synced
+      // Specify the foreign key relationship explicitly to avoid ambiguity
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles(name, avatar_url)')
+        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -167,7 +167,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // 1. Get project IDs for group chats
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -175,7 +174,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
-      // 2. Fetch only the most recent 100 messages to keep it fast
       const orFilter = [
         `sender_id.eq.${currentUser.id}`,
         `receiver_id.eq.${currentUser.id}`
