@@ -21,11 +21,6 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
-      toast.error("Server connection not established. Please rebuild the app.");
-      return;
-    }
-
     setLoading(true);
     setErrorMsg(null);
     
@@ -36,33 +31,41 @@ const Auth = () => {
       });
 
       if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("rate limit") || msg.includes("too many requests")) {
-          setErrorMsg("Too many requests. Please wait a few minutes before trying again.");
-        } else if (msg.includes("invalid login credentials")) {
-          setErrorMsg("Invalid email or password. Please try again.");
-        } else if (msg.includes("email not confirmed")) {
-          setErrorMsg("Please confirm your email address.");
-        } else {
-          setErrorMsg(error.message);
-        }
+        setErrorMsg(error.message);
         toast.error("Login failed");
       } else {
         toast.success("Welcome back!");
-        navigate('/');
+        navigate('/home');
       }
     } catch (err) {
-      setErrorMsg("An unexpected error occurred. Please check your connection.");
+      setErrorMsg("An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleOAuth = async (provider: 'google' | 'github') => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { 
+          redirectTo: REDIRECT_URL,
+          queryParams: provider === 'google' ? {
+            access_type: 'offline',
+            prompt: 'consent',
+          } : undefined
+        }
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
     if (!email) {
-      toast.error("Please enter your email address first.");
+      toast.error("Please enter your email address.");
       return;
     }
 
@@ -72,32 +75,15 @@ const Auth = () => {
         redirectTo: `${REDIRECT_URL}/reset-password`,
       });
 
-      if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("rate limit") || msg.includes("too many requests")) {
-          toast.error("Too many requests. Please wait a few minutes before trying again.");
-        } else {
-          toast.error(error.message || "Failed to send reset link");
-        }
-        return;
-      }
+      if (error) throw error;
       
-      toast.success("Password reset link sent to your email!");
+      toast.success("Password reset link sent!");
       setIsResetMode(false);
     } catch (error: any) {
-      toast.error("An unexpected error occurred.");
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleOAuth = async (provider: 'google' | 'github') => {
-    if (!supabase) return;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: REDIRECT_URL }
-    });
-    if (error) toast.error(error.message);
   };
 
   return (
