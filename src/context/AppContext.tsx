@@ -22,6 +22,7 @@ interface AppContextType {
   refreshNotifications: () => Promise<void>;
   refreshChats: () => Promise<void>;
   updatePresence: () => Promise<void>;
+  resolveName: (user: any) => string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -32,6 +33,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+
+  const resolveName = (user: any) => {
+    if (!user) return "User";
+    return user.display_name || user.name || user.full_name || (user.email ? user.email.split('@')[0] : `User_${user.id?.slice(0, 4)}`);
+  };
 
   const fetchProfile = async (userId: string) => {
     if (!supabase) return null;
@@ -103,8 +109,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (currentUser) {
       refreshNotifications();
       refreshChats();
+      refreshRequests();
     }
   }, [currentUser?.id]);
+
+  const refreshRequests = async () => {
+    if (!supabase || !currentUser) return;
+    try {
+      const { data: myProjects } = await supabase.from('projects').select('id').eq('creator_id', currentUser.id);
+      const projectIds = myProjects?.map(p => p.id) || [];
+      
+      if (projectIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('join_requests')
+        .select('*, user:profiles(*), project:projects(title)')
+        .in('project_id', projectIds)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (error) {
+      console.error("Refresh requests error:", error);
+    }
+  };
 
   const refreshProjects = async () => {
     if (!supabase) return;
@@ -114,9 +142,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .select(`
           *,
           creator:profiles!projects_creator_id_fkey(*),
-          comments(*, user:profiles(name, avatar_url)),
+          comments(*, user:profiles(name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user_id)
+          project_members(user:profiles(*))
         `)
         .order('created_at', { ascending: false });
 
@@ -129,7 +157,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
-        members: p.project_members?.map((m: any) => m.user_id) || []
+        members: p.project_members?.map((m: any) => m.user?.id) || [],
+        memberProfiles: p.project_members?.map((m: any) => m.user) || []
       }));
 
       setProjects(transformed);
@@ -141,10 +170,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshNotifications = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // Specify the foreign key relationship explicitly to avoid ambiguity
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url)')
+        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -153,7 +181,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
-      // Fallback: fetch without join if join fails
       const { data } = await supabase
         .from('notifications')
         .select('*')
@@ -182,7 +209,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data, error } = await supabase
         .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url), receiver:profiles!messages_receiver_id_fkey(name, avatar_url), project:projects(title, thumbnail_url)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name), receiver:profiles!messages_receiver_id_fkey(name, avatar_url, display_name), project:projects(title, thumbnail_url)')
         .or(orFilter.join(','))
         .order('created_at', { ascending: false })
         .limit(100);
@@ -198,7 +225,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         conversations.set(chatId, {
           id: chatId,
-          name: isGroup ? msg.project?.title : (msg.sender_id === currentUser.id ? msg.receiver?.name : msg.sender?.name),
+          name: isGroup ? msg.project?.title : resolveName(msg.sender_id === currentUser.id ? msg.receiver : msg.sender),
           avatar: isGroup ? msg.project?.thumbnail_url : (msg.sender_id === currentUser.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url),
           lastMsg: msg.content,
           time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -271,7 +298,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       notifications, setNotifications,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
-      updatePresence
+      updatePresence, resolveName
     }}>
       {children}
     </AppContext.Provider>
