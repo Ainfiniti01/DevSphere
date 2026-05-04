@@ -146,7 +146,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       const conversations = new Map();
-      let totalUnread = 0;
+      let unreadChatsCount = 0;
 
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
@@ -155,7 +155,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!chatId) return;
 
         const isUnread = msg.is_read === false && msg.sender_id !== currentUser.id;
-        if (isUnread) totalUnread++;
 
         if (!conversations.has(chatId)) {
           conversations.set(chatId, {
@@ -167,6 +166,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             unread: isUnread ? 1 : 0,
             isGroup
           });
+          if (isUnread) unreadChatsCount++;
         } else if (isUnread) {
           const chat = conversations.get(chatId);
           chat.unread++;
@@ -174,7 +174,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       setChats(Array.from(conversations.values()));
-      setTotalUnreadMessages(totalUnread);
+      setTotalUnreadMessages(unreadChatsCount);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
@@ -183,6 +183,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser) return;
     try {
+      // Update local state immediately for responsiveness
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, unread: 0 } : chat
+      ));
+      
+      // Recalculate total unread chats locally
+      setTotalUnreadMessages(prev => {
+        const chat = chats.find(c => c.id === chatId);
+        return (chat && chat.unread > 0) ? Math.max(0, prev - 1) : prev;
+      });
+
       let query = supabase
         .from('messages')
         .update({ is_read: true, status: 'seen' })
@@ -198,12 +209,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await query;
       if (error) throw error;
       
-      // Immediately update local state to clear badges
-      setChats(prev => prev.map(chat => 
-        chat.id === chatId ? { ...chat, unread: 0 } : chat
-      ));
-      
-      // Recalculate total unread
+      // Sync with backend
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
@@ -262,13 +268,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           table: 'messages' 
         }, (payload) => {
           const newMsg = payload.new;
+          // Refresh if it's a DM for us or a group message
           if (newMsg.receiver_id === currentUser.id || newMsg.project_id) {
             refreshChats();
           }
         })
         .on('postgres_changes', {
           event: 'UPDATE',
-          schema: 'public',
+          schema: 'public', 
           table: 'messages'
         }, (payload) => {
           // Refresh if a message we sent was marked as read

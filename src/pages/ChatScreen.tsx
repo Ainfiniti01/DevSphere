@@ -66,9 +66,14 @@ const ChatScreen = () => {
     fetchChatInfo();
     fetchMessages();
 
+    // Specific channel for this chat to ensure real-time sync
     const channel = supabase
-      .channel(`chat:${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+      .channel(`chat_room_${id}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages' 
+      }, async (payload) => {
         const newMsg = payload.new;
         const isThisChat = isGroup 
           ? newMsg.project_id === id 
@@ -77,25 +82,29 @@ const ChatScreen = () => {
 
         if (!isThisChat) return;
 
+        // Fetch sender profile for the new message
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
+        
         setMessages(prev => {
-          if (prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content))) {
-            return prev.map(m => m.isOptimistic && m.content === newMsg.content ? { ...newMsg, sender } : m);
-          }
+          // Avoid duplicates if optimistic update already added it
+          if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, { ...newMsg, sender }];
         });
+        
         setPartnerTyping(false);
         
+        // If we are the recipient, mark as read immediately
         if (newMsg.sender_id !== currentUser.id) {
           markAsRead(id, isGroup);
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
-        // Update message status in real-time for the sender
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'messages' 
+      }, (payload) => {
+        // Update message status (sent/seen) in real-time
         setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
-      })
-      .on('broadcast', { event: 'typing' }, (payload) => {
-        if (payload.payload.user_id !== currentUser.id) setPartnerTyping(payload.payload.isTyping);
       })
       .subscribe();
 
@@ -117,7 +126,8 @@ const ChatScreen = () => {
       sender_id: currentUser.id,
       content: msg.trim(),
       type: 'text',
-      status: 'sent'
+      status: 'sent',
+      is_read: false
     };
 
     if (isGroup) {
@@ -126,6 +136,7 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
+    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,
@@ -196,7 +207,7 @@ const ChatScreen = () => {
                   isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
                 }`}>
                   {m.content}
-                  <div className="absolute bottom-1 right-2 flex items-center gap-1 opacity-70">
+                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 opacity-70">
                     <span className="text-[9px]">
                       {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
