@@ -20,7 +20,8 @@ const Index = () => {
   }, [activeTab]);
 
   const sortedProjects = useMemo(() => {
-    const projectsCopy = [...projects];
+    // Only show ACTIVE projects in the feed
+    const projectsCopy = projects.filter(p => p.status === 'ACTIVE');
     
     if (activeTab === 'newest') {
       return projectsCopy.sort((a, b) => 

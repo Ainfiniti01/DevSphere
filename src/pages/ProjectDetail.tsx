@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight } from 'lucide-react';
+import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -70,7 +70,6 @@ const ProjectDetail = () => {
 
       if (error) throw error;
 
-      // Notifications
       if (replyTo) {
         if (replyTo.user_id !== currentUser.id) {
           await supabase.from('notifications').insert({
@@ -118,6 +117,74 @@ const ProjectDetail = () => {
     }
   };
 
+  const handleStatusChange = async (newStatus: 'ACTIVE' | 'PAUSED') => {
+    if (!supabase || !currentUser) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: newStatus })
+        .eq('id', project.id);
+
+      if (error) {
+        if (error.message.includes('ACTIVE_LIMIT_REACHED')) {
+          toast.error("You already have 3 active projects. Please pause one before activating another.");
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success(newStatus === 'ACTIVE' ? "Project is now active!" : "Project paused.");
+        await refreshProjects();
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleJoin = async () => {
+    if (!currentUser || !supabase) {
+      toast.error("Please sign in to join projects");
+      navigate('/auth');
+      return;
+    }
+
+    if (!joinReason.trim() || !joinContribution.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('join_requests').insert({
+        project_id: project.id,
+        user_id: currentUser.id,
+        reason: joinReason,
+        skills: joinContribution,
+        status: 'pending'
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("Request already sent");
+          setRequestStatus('pending');
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success("Application sent to founder!");
+        setRequestStatus('pending');
+        await refreshNotifications();
+      }
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send application");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const rootComments = project.comments?.filter((c: any) => !c.parent_id) || [];
   const replies = project.comments?.filter((c: any) => c.parent_id) || [];
 
@@ -127,6 +194,11 @@ const ProjectDetail = () => {
         <div className="aspect-video relative bg-muted">
           {project.thumbnail ? <img src={project.thumbnail} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-primary/10 flex items-center justify-center"><Rocket size={48} className="text-primary/40" /></div>}
           <div className="absolute inset-0 bg-black/30 flex items-center justify-center"><PlayCircle size={64} className="text-white/80" /></div>
+          {project.status === 'PAUSED' && (
+            <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
+              Paused
+            </div>
+          )}
         </div>
 
         <div className="px-4 py-6 space-y-6">
@@ -160,7 +232,7 @@ const ProjectDetail = () => {
               {rootComments.map((comment: any) => (
                 <div key={comment.id} id={`comment-${comment.id}`} className="space-y-4 transition-all duration-500 rounded-xl p-2">
                   <div className="flex gap-3">
-                    <Avatar className="h-8 w-8 cursor-pointer" onClick={() => navigate(`/profile/${comment.user_id}`)}><AvatarImage src={comment.user?.avatar_url} /><AvatarFallback>U</AvatarFallback></Avatar>
+                    <Avatar className="h-8 w-8 cursor-pointer" onClick={() => navigate(`/profile/${comment.user_id}`)}><AvatarImage src={comment.user?.avatar_url} /><AvatarFallback><User size={14} /></AvatarFallback></Avatar>
                     <div className="flex-1">
                       <div className="bg-accent/30 p-3 rounded-2xl">
                         <div className="flex justify-between items-center mb-1"><h5 className="text-xs font-bold">{comment.user?.name}</h5><span className="text-[10px] text-muted-foreground">{new Date(comment.created_at).toLocaleDateString()}</span></div>
@@ -172,7 +244,7 @@ const ProjectDetail = () => {
                   {replies.filter((r: any) => r.parent_id === comment.id).map((reply: any) => (
                     <div key={reply.id} id={`comment-${reply.id}`} className="flex gap-3 ml-8">
                       <CornerDownRight size={16} className="text-muted-foreground mt-2" />
-                      <Avatar className="h-7 w-7 cursor-pointer" onClick={() => navigate(`/profile/${reply.user_id}`)}><AvatarImage src={reply.user?.avatar_url} /><AvatarFallback>U</AvatarFallback></Avatar>
+                      <Avatar className="h-7 w-7 cursor-pointer" onClick={() => navigate(`/profile/${reply.user_id}`)}><AvatarImage src={reply.user?.avatar_url} /><AvatarFallback><User size={12} /></AvatarFallback></Avatar>
                       <div className="flex-1 bg-accent/20 p-3 rounded-2xl">
                         <div className="flex justify-between items-center mb-1"><h5 className="text-xs font-bold">{reply.user?.name}</h5><span className="text-[10px] text-muted-foreground">{new Date(reply.created_at).toLocaleDateString()}</span></div>
                         <p className="text-sm">{reply.content}</p>
@@ -186,13 +258,69 @@ const ProjectDetail = () => {
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-background/80 backdrop-blur-md border-t border-border z-50">
-          {replyTo && (
-            <div className="flex items-center justify-between bg-primary/10 px-3 py-2 rounded-t-xl border-x border-t border-primary/20 mb-[-1px]">
-              <span className="text-[10px] font-bold text-primary">Replying to @{replyTo.user?.name}</span>
-              <button onClick={() => setReplyTo(null)}><X size={14} className="text-primary" /></button>
+          {isOwner ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                variant={project.status === 'ACTIVE' ? "outline" : "default"}
+                className="h-12 rounded-xl gap-2 font-bold"
+                onClick={() => handleStatusChange(project.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE')}
+                disabled={isSubmitting}
+              >
+                {project.status === 'ACTIVE' ? <><Pause size={18} /> Pause</> : <><Play size={18} /> Resume</>}
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-12 rounded-xl gap-2 font-bold" 
+                onClick={() => navigate(`/manage-team/${project.id}`)}
+              >
+                <Users size={18} /> Manage Team
+              </Button>
             </div>
+          ) : isMember ? (
+            <Button 
+              className="w-full h-14 bg-primary text-lg font-bold rounded-2xl gap-2 shadow-lg shadow-primary/20" 
+              onClick={() => navigate(`/chat/${project.id}?group=true`)}
+            >
+              <MessageSquare size={20} /> Open Group Chat
+            </Button>
+          ) : project.status === 'PAUSED' ? (
+            <Button disabled className="w-full h-14 text-lg font-bold rounded-2xl bg-muted text-muted-foreground">
+              Project Paused
+            </Button>
+          ) : requestStatus === 'pending' ? (
+            <Button disabled className="w-full h-14 text-lg font-bold rounded-2xl bg-muted text-muted-foreground">
+              Request Pending
+            </Button>
+          ) : (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full h-14 bg-primary text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
+                  Join Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Apply to Join</DialogTitle>
+                  <DialogDescription>Tell the project owner why you're a good fit.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-5 py-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">Why do you want to join?</Label>
+                    <Textarea placeholder="..." className="rounded-xl min-h-[100px] bg-accent/20" value={joinReason} onChange={e => setJoinReason(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">What can you contribute?</Label>
+                    <Input placeholder="..." className="h-12 rounded-xl bg-accent/20" value={joinContribution} onChange={e => setJoinContribution(e.target.value)} />
+                  </div>
+                  <Button onClick={handleJoin} className="w-full h-12 rounded-xl font-bold text-lg" disabled={!joinReason.trim() || !joinContribution.trim() || isSubmitting}>
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Submit Application"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
-          <div className="flex gap-2">
+          
+          <div className="mt-4 flex gap-2">
             <Input 
               placeholder={replyTo ? "Write a reply..." : "Add a comment..."} 
               className="rounded-xl bg-accent/20 h-12" 

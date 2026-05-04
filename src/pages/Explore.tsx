@@ -25,6 +25,9 @@ const Explore = () => {
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
+      // Only show ACTIVE projects
+      if (p.status !== 'ACTIVE') return false;
+
       // Search filter
       const matchesSearch = 
         p.title.toLowerCase().includes(search.toLowerCase()) ||

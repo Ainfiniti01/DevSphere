@@ -4,16 +4,28 @@ import React, { useEffect, useState } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, MessageSquare, Check, X, Rocket, Bell, Heart, MessageCircle } from 'lucide-react';
+import { UserPlus, MessageSquare, Check, X, Rocket, Bell, Heart, MessageCircle, CheckCheck, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Notifications = () => {
   const navigate = useNavigate();
   const { notifications, refreshNotifications, currentUser } = useApp();
   const [isLoading, setIsLoading] = useState(true);
+  const [isMarking, setIsMarking] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -24,7 +36,6 @@ const Notifications = () => {
   }, []);
 
   const handleNotificationClick = async (notif: any) => {
-    // Mark as read
     if (!notif.is_read && supabase) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
     }
@@ -35,8 +46,28 @@ const Notifications = () => {
       navigate(`/chat/${notif.actor_id}`);
     } else if (notif.type === 'reply') {
       navigate(`/project/${notif.project_id}?comment=${notif.comment_id}`);
-    } else if (notif.type === 'comment' || notif.type === 'like') {
+    } else if (notif.type === 'comment' || notif.type === 'like' || notif.type === 'pause' || notif.type === 'resume') {
       navigate(`/project/${notif.project_id}`);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!supabase || !currentUser) return;
+    setIsMarking(true);
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', currentUser.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      toast.success("All notifications marked as read");
+      await refreshNotifications();
+    } catch (err: any) {
+      toast.error("Failed to mark notifications as read");
+    } finally {
+      setIsMarking(false);
     }
   };
 
@@ -46,13 +77,44 @@ const Notifications = () => {
       case 'comment': return <MessageCircle size={12} className="text-blue-500" />;
       case 'reply': return <MessageSquare size={12} className="text-indigo-500" />;
       case 'request': return <UserPlus size={12} className="text-primary" />;
+      case 'pause': return <X size={12} className="text-amber-500" />;
+      case 'resume': return <Rocket size={12} className="text-emerald-500" />;
       default: return <Bell size={12} className="text-muted-foreground" />;
     }
   };
 
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
   return (
     <MobileLayout title="Notifications" showBack>
       <div className="px-4 py-4 space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Recent Activity</h3>
+          {unreadCount > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-primary font-bold gap-2 h-8 px-2">
+                  <CheckCheck size={16} /> Mark all as read
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Mark all as read?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will mark all your unread notifications as read.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={markAllAsRead} className="rounded-xl bg-primary">
+                    {isMarking ? <Loader2 className="animate-spin" /> : "Confirm"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+
         {notifications.length > 0 ? (
           <div className="space-y-3">
             {notifications.map(notif => (
