@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Github, Chrome, AlertCircle, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
+import appIcon from '../../assets/images/icon.jpeg';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -105,8 +106,8 @@ const Auth = () => {
     <div className="min-h-screen bg-background text-foreground max-w-md mx-auto flex flex-col px-8 py-12">
       <div className="flex-1 flex flex-col justify-center">
         <div className="mb-10 text-center">
-          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-            <span className="text-primary-foreground text-3xl font-bold">D</span>
+          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg overflow-hidden">
+            <img src={appIcon} alt="DevSphere" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-3xl font-bold">DevSphere</h1>
           <p className="text-muted-foreground mt-2">

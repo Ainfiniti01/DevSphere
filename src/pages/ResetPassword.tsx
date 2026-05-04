@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 import { Loader2, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import appIcon from '../../assets/images/icon.jpeg';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -116,8 +117,8 @@ const ResetPassword = () => {
     <div className="min-h-screen bg-background text-foreground max-w-md mx-auto flex flex-col px-8 py-12">
       <div className="flex-1 flex flex-col justify-center">
         <div className="mb-10 text-center">
-          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-            <Lock className="text-primary-foreground" size={32} />
+          <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg overflow-hidden">
+            <img src={appIcon} alt="DevSphere" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-3xl font-bold">New Password</h1>
           <p className="text-muted-foreground mt-2">Enter your new secure password</p>

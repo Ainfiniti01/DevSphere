@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import appIcon from '../../assets/images/icon.jpeg';
 
 const LoadingScreen = () => {
   return (
@@ -30,8 +31,8 @@ const LoadingScreen = () => {
           }}
           className="absolute inset-0 bg-primary/20 rounded-3xl blur-xl"
         />
-        <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl relative z-10">
-          <span className="text-white text-4xl font-bold">D</span>
+        <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl relative z-10 overflow-hidden">
+          <img src={appIcon} alt="Loading..." className="w-full h-full object-cover" />
         </div>
       </motion.div>
       
