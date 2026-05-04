@@ -87,8 +87,10 @@ const ChatScreen = () => {
           .single();
           
         setMessages(prev => {
-          // Prevent duplicate messages if the sender also added it locally
-          if (prev.some(m => m.id === newMsg.id)) return prev;
+          // Prevent duplicate messages if the sender also added it locally (optimistic update)
+          if (prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content))) {
+            return prev.map(m => m.isOptimistic && m.content === newMsg.content ? { ...newMsg, sender } : m);
+          }
           return [...prev, { ...newMsg, sender }];
         });
       })
@@ -121,13 +123,15 @@ const ChatScreen = () => {
     }
 
     // Optimistic update for better UX
-    const tempId = Math.random().toString();
+    const tempId = `temp-${Date.now()}`;
     const optimisticMsg = {
       id: tempId,
       ...messageData,
       created_at: new Date().toISOString(),
-      sender: { name: currentUser.name, avatar_url: currentUser.avatar_url }
+      sender: { name: currentUser.name, avatar_url: currentUser.avatar_url },
+      isOptimistic: true
     };
+    
     setMessages(prev => [...prev, optimisticMsg]);
     setMsg('');
 
@@ -172,7 +176,9 @@ const ChatScreen = () => {
                 {!isMe && isGroup && (
                   <span className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold">{m.sender?.name}</span>
                 )}
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
+                <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm transition-opacity ${
+                  m.isOptimistic ? 'opacity-70' : 'opacity-100'
+                } ${
                   isMe 
                     ? 'bg-primary text-primary-foreground rounded-tr-none' 
                     : 'bg-card text-foreground border border-border rounded-tl-none'
