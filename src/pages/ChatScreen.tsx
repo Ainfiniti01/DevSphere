@@ -36,7 +36,7 @@ const ChatScreen = () => {
     };
 
     const fetchMessages = async () => {
-      // Specify the explicit relationship 'messages_sender_id_fkey' to resolve ambiguity
+      // Explicitly use the relationship name to avoid ambiguity
       let query = supabase
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url)')
@@ -50,7 +50,8 @@ const ChatScreen = () => {
 
       const { data, error } = await query;
       if (error) {
-        console.error("Fetch messages error:", error);
+        console.error("[ChatScreen] Fetch error:", error);
+        toast.error("Failed to load messages");
       } else {
         setMessages(data || []);
       }
@@ -66,21 +67,30 @@ const ChatScreen = () => {
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'messages',
-        filter: isGroup ? `project_id=eq.${id}` : undefined
+        table: 'messages'
       }, async (payload) => {
         const newMsg = payload.new;
         
-        // For private chats, we need to filter manually since complex filters aren't supported in real-time yet
-        if (!isGroup) {
-          const isRelevant = (newMsg.sender_id === currentUser.id && newMsg.receiver_id === id) || 
-                             (newMsg.sender_id === id && newMsg.receiver_id === currentUser.id);
-          if (!isRelevant) return;
-        }
+        // Filter messages for this specific chat
+        const isThisChat = isGroup 
+          ? newMsg.project_id === id 
+          : (newMsg.sender_id === currentUser.id && newMsg.receiver_id === id) || 
+            (newMsg.sender_id === id && newMsg.receiver_id === currentUser.id);
+
+        if (!isThisChat) return;
 
         // Fetch sender info for the new message
-        const { data: sender } = await supabase.from('profiles').select('name, avatar_url').eq('id', newMsg.sender_id).single();
-        setMessages(prev => [...prev, { ...newMsg, sender }]);
+        const { data: sender } = await supabase
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('id', newMsg.sender_id)
+          .single();
+          
+        setMessages(prev => {
+          // Prevent duplicate messages if the sender also added it locally
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, { ...newMsg, sender }];
+        });
       })
       .subscribe();
 
@@ -110,12 +120,22 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
+    // Optimistic update for better UX
+    const tempId = Math.random().toString();
+    const optimisticMsg = {
+      id: tempId,
+      ...messageData,
+      created_at: new Date().toISOString(),
+      sender: { name: currentUser.name, avatar_url: currentUser.avatar_url }
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setMsg('');
+
     const { error } = await supabase.from('messages').insert(messageData);
     
     if (error) {
       toast.error("Failed to send message");
-    } else {
-      setMsg('');
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 

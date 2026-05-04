@@ -7,7 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SkillBadge from '@/components/SkillBadge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ const ProjectDetail = () => {
   const [joinReason, setJoinReason] = useState('');
   const [joinSkills, setJoinSkills] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (!project) {
     return (
@@ -51,9 +52,6 @@ const ProjectDetail = () => {
     setIsSubmitting(true);
     
     try {
-      // SECURITY FIX: Instead of inserting directly into notifications (which can be spoofed),
-      // we insert into a dedicated join_requests table. A database trigger will handle
-      // the notification creation securely.
       const { error } = await supabase.from('join_requests').insert({
         project_id: project.id,
         user_id: currentUser.id,
@@ -61,14 +59,21 @@ const ProjectDetail = () => {
         skills: joinSkills
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42P01') {
+          throw new Error("The join requests system is currently being set up. Please try again in a moment.");
+        }
+        throw error;
+      }
 
       toast.success("Application sent to founder!");
       await refreshNotifications();
       setJoinReason('');
       setJoinSkills('');
+      setIsDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || "Failed to send application");
+      console.error("[ProjectDetail] Join error:", error);
+      toast.error(error.message || "Failed to send application. Please ensure the database table exists.");
     } finally {
       setIsSubmitting(false);
     }
@@ -110,7 +115,7 @@ const ProjectDetail = () => {
               <AvatarFallback>{project.creator?.name?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-bold truncate">{project.creator?.name}</h4>
+              <h4 className="font-bold truncate">{project.creator?.name}</h4>
               <p className="text-xs text-muted-foreground truncate">{project.creator?.title}</p>
             </div>
             {!isOwner && (
@@ -193,7 +198,7 @@ const ProjectDetail = () => {
                 Requested
               </Button>
             ) : (
-              <Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="w-full h-14 bg-primary text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
                     Join Project
@@ -202,6 +207,9 @@ const ProjectDetail = () => {
                 <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-bold">Apply to Join</DialogTitle>
+                    <DialogDescription>
+                      Tell the project owner why you're a good fit for this team.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-5 py-4">
                     <div className="space-y-2">
