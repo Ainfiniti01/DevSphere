@@ -15,7 +15,7 @@ interface AppContextType {
   setChats: React.Dispatch<React.SetStateAction<any[]>>;
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
-  totalUnreadMessages: number;
+  unreadChatsCount: number;
   unreadNotificationsCount: number;
   logout: () => void;
   toggleLike: (projectId: string) => Promise<void>;
@@ -36,7 +36,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const resolveName = (user: any) => {
@@ -127,6 +127,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
+      // 1. Fetch last_read_at for all chats
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -134,6 +135,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]));
 
+      // 2. Fetch project memberships for group chats
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -141,6 +143,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
+      // 3. Fetch all relevant messages
       const orFilter = [
         `sender_id.eq.${currentUser.id}`,
         `receiver_id.eq.${currentUser.id}`
@@ -156,7 +159,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       const conversations = new Map();
-      let totalUnread = 0;
+      let unreadChats = 0;
 
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
@@ -175,18 +178,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             lastMsg: msg.content,
             time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             unread: isUnread ? 1 : 0,
-            isGroup
+            isGroup,
+            lastTimestamp: new Date(msg.created_at).getTime()
           });
-        } else if (isUnread) {
+          if (isUnread) unreadChats++;
+        } else {
           const chat = conversations.get(chatId);
-          chat.unread++;
+          if (isUnread) {
+            chat.unread++;
+          }
         }
-        
-        if (isUnread) totalUnread++;
       });
       
-      setChats(Array.from(conversations.values()));
-      setTotalUnreadMessages(totalUnread);
+      const sortedChats = Array.from(conversations.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+      setChats(sortedChats);
+      setUnreadChatsCount(unreadChats);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
@@ -196,12 +202,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser) return;
     try {
       const now = new Date().toISOString();
+      
+      // Optimistic UI update
+      setChats(prev => {
+        const chat = prev.find(c => c.id === chatId);
+        if (chat && chat.unread > 0) {
+          setUnreadChatsCount(count => Math.max(0, count - 1));
+        }
+        return prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
+      });
+
+      // Persist to DB
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
+      // Compatibility for 1-on-1 is_read flag
       if (!isGroup) {
         await supabase
           .from('messages')
@@ -211,6 +229,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('is_read', false);
       }
 
+      // Final refresh to sync
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
@@ -237,7 +256,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           setCurrentUser(null);
           setNotifications([]);
           setChats([]);
-          setTotalUnreadMessages(0);
+          setUnreadChatsCount(0);
           setUnreadNotificationsCount(0);
         }
       });
@@ -329,7 +348,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       requests, setRequests,
       chats, setChats,
       notifications, setNotifications,
-      totalUnreadMessages,
+      unreadChatsCount,
       unreadNotificationsCount,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,

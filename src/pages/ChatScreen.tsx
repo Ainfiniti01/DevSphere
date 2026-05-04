@@ -21,7 +21,6 @@ const ChatScreen = () => {
   const [chatPartner, setChatPartner] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
-  const [partnerTyping, setPartnerTyping] = useState(false);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -59,13 +58,13 @@ const ChatScreen = () => {
       if (!error) setMessages(data || []);
       setLoading(false);
       
+      // Mark as read on initial load
       markAsRead(id, isGroup);
     };
 
     fetchChatInfo();
     fetchMessages();
 
-    // Subscribe to all message changes and filter locally for reliability
     const channel = supabase
       .channel(`chat_room_${id}`)
       .on('postgres_changes', { 
@@ -81,19 +80,17 @@ const ChatScreen = () => {
 
         if (!isThisChat) return;
 
-        // Fetch sender profile for the new message
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
         
         setMessages(prev => {
-          // Check if message already exists (by ID or by content/sender for optimistic matches)
           const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
           if (exists) {
-            // Replace optimistic message with real one to get the correct ID and timestamp
             return prev.map(m => (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id) ? { ...newMsg, sender } : m);
           }
           return [...prev, { ...newMsg, sender }];
         });
         
+        // Mark as read for incoming messages while active in chat
         if (newMsg.sender_id !== currentUser.id) {
           markAsRead(id, isGroup);
         }
@@ -135,7 +132,6 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,

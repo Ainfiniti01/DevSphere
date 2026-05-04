@@ -19,7 +19,7 @@ const MobileLayout = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { totalUnreadMessages, unreadNotificationsCount } = useApp();
+  const { unreadChatsCount, unreadNotificationsCount } = useApp();
 
   const formatBadge = (count: number) => {
     if (count <= 0) return null;
@@ -35,7 +35,7 @@ const MobileLayout = ({
       icon: MessageSquare, 
       label: 'Messages', 
       path: '/messages',
-      badge: formatBadge(totalUnreadMessages)
+      badge: formatBadge(unreadChatsCount)
     },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
