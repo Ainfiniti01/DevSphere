@@ -93,7 +93,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .from('projects')
         .select(`
           *,
-          creator:profiles(*),
+          creator:profiles!projects_creator_id_fkey(*),
           comments(*, user:profiles(name, avatar_url)),
           likes(user_id),
           project_members(user_id)
@@ -148,7 +148,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       // 2. Fetch all relevant messages (private or group)
       let query = supabase
         .from('messages')
-        .select('*, sender:profiles(*), receiver:profiles(*), project:projects(title, thumbnail_url)')
+        .select('*, sender:profiles!messages_sender_id_fkey(*), receiver:profiles!messages_receiver_id_fkey(*), project:projects(title, thumbnail_url)')
         .order('created_at', { ascending: false });
 
       // Build the OR filter manually to handle both private and group messages
