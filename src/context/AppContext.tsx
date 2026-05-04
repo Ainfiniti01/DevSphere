@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -38,6 +38,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  
+  // Ref to track like operations to prevent 409 conflicts
+  const processingLikes = useRef<Set<string>>(new Set());
 
   const resolveName = (user: any) => {
     if (!user) return "User";
@@ -107,7 +110,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshNotifications = async () => {
-    if (!supabase || !currentUser) return;
+    if (!supabase || !currentUser?.id) return;
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -125,13 +128,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshChats = async () => {
-    if (!supabase || !currentUser) return;
+    if (!supabase || !currentUser?.id) return;
     try {
       // 1. Fetch last_read_at for all chats
-      const { data: readData } = await supabase
+      const { data: readData, error: readError } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
+      
+      if (readError) {
+        // If we get a 403, it might be a race condition with the session
+        if (readError.code === '42501') return; 
+        throw readError;
+      }
       
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]));
 
@@ -199,7 +208,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const markAsRead = async (chatId: string, isGroup: boolean) => {
-    if (!supabase || !currentUser) return;
+    if (!supabase || !currentUser?.id) return;
     try {
       const now = new Date().toISOString();
       
@@ -268,7 +277,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?.id) {
       updatePresence();
       const interval = setInterval(updatePresence, 30000);
       return () => clearInterval(interval);
@@ -276,7 +285,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser?.id, updatePresence]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?.id) {
       refreshNotifications();
       refreshChats();
       
@@ -301,10 +310,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const toggleLike = async (projectId: string) => {
-    if (!supabase || !currentUser) {
+    if (!supabase || !currentUser?.id) {
       toast.error("Please sign in to like projects");
       return;
     }
+
+    // Prevent concurrent like operations for the same project
+    if (processingLikes.current.has(projectId)) return;
+    processingLikes.current.add(projectId);
 
     const project = projects.find(p => p.id === projectId);
     const isLiked = project?.isLiked;
@@ -313,16 +326,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (isLiked) {
         await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
       } else {
-        await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+        const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+        // Handle 409 Conflict (already liked) gracefully
+        if (error && error.code !== '23505') throw error;
       }
       await refreshProjects();
     } catch (error) {
+      console.error("Like error:", error);
       toast.error("Failed to update like");
+    } finally {
+      processingLikes.current.delete(projectId);
     }
   };
 
   const addComment = async (projectId: string, text: string) => {
-    if (!supabase || !currentUser) {
+    if (!supabase || !currentUser?.id) {
       toast.error("Please sign in to comment");
       return;
     }
