@@ -52,10 +52,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const updatePresence = useCallback(async () => {
     if (!supabase || !currentUser) return;
-    await supabase
-      .from('profiles')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('id', currentUser.id);
+    try {
+      await supabase
+        .from('profiles')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', currentUser.id);
+    } catch (e) {
+      // Silent fail for presence
+    }
   }, [currentUser?.id]);
 
   useEffect(() => {
@@ -87,11 +91,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     initApp();
   }, []);
 
-  // Presence Heartbeat
   useEffect(() => {
     if (currentUser) {
       updatePresence();
-      const interval = setInterval(updatePresence, 30000); // Every 30s
+      const interval = setInterval(updatePresence, 30000);
       return () => clearInterval(interval);
     }
   }, [currentUser?.id, updatePresence]);
@@ -138,23 +141,33 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshNotifications = async () => {
     if (!supabase || !currentUser) return;
     try {
+      // Simplified query to avoid potential join issues if schema isn't perfectly synced
       const { data, error } = await supabase
         .from('notifications')
         .select('*, actor:profiles(name, avatar_url)')
         .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
-      setNotifications(data);
+      setNotifications(data || []);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
+      // Fallback: fetch without join if join fails
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data) setNotifications(data);
     }
   };
 
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // Optimized: Fetch only the latest message per conversation
+      // 1. Get project IDs for group chats
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -162,25 +175,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
+      // 2. Fetch only the most recent 100 messages to keep it fast
       const orFilter = [
         `sender_id.eq.${currentUser.id}`,
         `receiver_id.eq.${currentUser.id}`
       ];
-      
-      if (projectIds.length > 0) {
-        orFilter.push(`project_id.in.(${projectIds.join(',')})`);
-      }
+      if (projectIds.length > 0) orFilter.push(`project_id.in.(${projectIds.join(',')})`);
 
       const { data, error } = await supabase
         .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(*), receiver:profiles!messages_receiver_id_fkey(*), project:projects(title, thumbnail_url)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url), receiver:profiles!messages_receiver_id_fkey(name, avatar_url), project:projects(title, thumbnail_url)')
         .or(orFilter.join(','))
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
       const conversations = new Map();
-      data.forEach(msg => {
+      data?.forEach(msg => {
         const isGroup = !!msg.project_id;
         const chatId = isGroup ? msg.project_id : (msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id);
         
