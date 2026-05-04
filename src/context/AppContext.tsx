@@ -53,24 +53,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase) return;
 
     const initApp = async () => {
-      // Get initial session
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
         setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
-        refreshNotifications();
-        refreshChats();
       }
 
       await refreshProjects();
 
-      // Listen for auth changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
           setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
-          refreshNotifications();
-          refreshChats();
         } else {
           setCurrentUser(null);
           setNotifications([]);
@@ -84,6 +78,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     initApp();
   }, []);
 
+  // Refresh notifications and chats when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      refreshNotifications();
+      refreshChats();
+    }
+  }, [currentUser?.id]);
+
   const refreshProjects = async () => {
     if (!supabase) return;
     try {
@@ -93,7 +95,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           *,
           creator:profiles(*),
           comments(*, user:profiles(name, avatar_url)),
-          likes(user_id)
+          likes(user_id),
+          project_members(user_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -105,16 +108,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         isLiked: p.likes?.some((l: any) => l.user_id === currentUser?.id),
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
-        timestamp: p.created_at
+        timestamp: p.created_at,
+        members: p.project_members?.map((m: any) => m.user_id) || []
       }));
 
       setProjects(transformed);
     } catch (error: any) {
       console.error("Refresh projects error:", error);
-      // If it's a fetch error, it's likely CORS
-      if (error.message === 'Failed to fetch') {
-        console.warn("Supabase connection failed. Check CORS settings in Supabase dashboard.");
-      }
     }
   };
 
@@ -137,29 +137,52 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
-      const { data, error } = await supabase
+      // 1. Get projects user is a member of for group chats
+      const { data: memberProjects } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', currentUser.id);
+      
+      const projectIds = memberProjects?.map(p => p.project_id) || [];
+      
+      // 2. Fetch all relevant messages (private or group)
+      let query = supabase
         .from('messages')
-        .select('*, sender:profiles(*), receiver:profiles(*)')
-        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .select('*, sender:profiles(*), receiver:profiles(*), project:projects(title, thumbnail_url)')
         .order('created_at', { ascending: false });
+
+      // Build the OR filter manually to handle both private and group messages
+      const orFilter = [
+        `sender_id.eq.${currentUser.id}`,
+        `receiver_id.eq.${currentUser.id}`
+      ];
+      
+      if (projectIds.length > 0) {
+        orFilter.push(`project_id.in.(${projectIds.join(',')})`);
+      }
+
+      const { data, error } = await query.or(orFilter.join(','));
 
       if (error) throw error;
 
       const conversations = new Map();
       data.forEach(msg => {
-        const partner = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
-        if (!partner) return;
-        if (!conversations.has(partner.id)) {
-          conversations.set(partner.id, {
-            id: partner.id,
-            name: partner.name,
-            avatar: partner.avatar_url,
-            lastMsg: msg.content,
-            time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            unread: 0
-          });
-        }
+        const isGroup = !!msg.project_id;
+        const chatId = isGroup ? msg.project_id : (msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id);
+        
+        if (!chatId || conversations.has(chatId)) return;
+
+        conversations.set(chatId, {
+          id: chatId,
+          name: isGroup ? msg.project?.title : (msg.sender_id === currentUser.id ? msg.receiver?.name : msg.sender?.name),
+          avatar: isGroup ? msg.project?.thumbnail_url : (msg.sender_id === currentUser.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url),
+          lastMsg: msg.content,
+          time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          unread: msg.is_read === false && msg.receiver_id === currentUser.id ? 1 : 0,
+          isGroup
+        });
       });
+      
       setChats(Array.from(conversations.values()));
     } catch (error) {
       console.error("Refresh chats error:", error);
