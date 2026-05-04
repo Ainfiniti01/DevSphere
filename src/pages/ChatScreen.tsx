@@ -192,28 +192,19 @@ const ChatScreen = () => {
                     {m.sender?.name}
                   </span>
                 )}
-                <div className={`p-3 rounded-2xl text-sm shadow-sm relative ${
+                <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] ${
                   isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
                 }`}>
                   {m.content}
-                  {isMe && (
-                    <div className="absolute -bottom-4 right-0 flex items-center gap-1">
-                      <span className="text-[9px] text-muted-foreground">
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {m.status === 'seen' ? (
-                        <CheckCheck size={12} className="text-blue-500" />
-                      ) : (
-                        <Check size={12} className="text-muted-foreground" />
-                      )}
-                    </div>
-                  )}
+                  <div className="absolute bottom-1 right-2 flex items-center gap-1 opacity-70">
+                    <span className="text-[9px]">
+                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {isMe && (
+                      m.status === 'seen' ? <CheckCheck size={12} className="text-blue-500" /> : <Check size={12} />
+                    )}
+                  </div>
                 </div>
-                {!isMe && (
-                  <span className="text-[9px] text-muted-foreground mt-1 px-1">
-                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
               </div>
             </div>
           );

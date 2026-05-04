@@ -24,8 +24,8 @@ const Messages = () => {
     const init = async () => {
       try {
         await refreshChats();
-        if (supabase) {
-          const { data } = await supabase.from('profiles').select('*').neq('id', currentUser?.id);
+        if (supabase && currentUser?.id) {
+          const { data } = await supabase.from('profiles').select('*').neq('id', currentUser.id);
           setUsers(data || []);
         }
       } catch (error) {
