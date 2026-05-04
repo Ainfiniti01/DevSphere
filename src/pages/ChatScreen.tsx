@@ -36,9 +36,10 @@ const ChatScreen = () => {
     };
 
     const fetchMessages = async () => {
+      // Specify the explicit relationship 'messages_sender_id_fkey' to resolve ambiguity
       let query = supabase
         .from('messages')
-        .select('*, sender:profiles(name, avatar_url)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url)')
         .order('created_at', { ascending: true });
 
       if (isGroup) {
