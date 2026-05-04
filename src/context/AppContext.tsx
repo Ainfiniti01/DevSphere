@@ -34,23 +34,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfile = async (userId: string) => {
     if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
       console.error("Error fetching profile:", error);
       return null;
     }
-    return data;
   };
 
   useEffect(() => {
     if (!supabase) return;
 
     const initApp = async () => {
+      // Get initial session
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
@@ -61,12 +64,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       await refreshProjects();
 
+      // Listen for auth changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          // Don't do anything special here, let the ResetPassword page handle it
-          return;
-        }
-
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
           setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
@@ -87,50 +86,65 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshProjects = async () => {
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from('projects')
-      .select(`
-        *,
-        creator:profiles(*),
-        comments(*, user:profiles(name, avatar_url)),
-        likes(user_id)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          creator:profiles(*),
+          comments(*, user:profiles(name, avatar_url)),
+          likes(user_id)
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) return;
+      if (error) throw error;
 
-    const transformed = data.map(p => ({
-      ...p,
-      likes: p.likes?.length || 0,
-      isLiked: p.likes?.some((l: any) => l.user_id === currentUser?.id),
-      skills: p.skills_required || [],
-      thumbnail: p.thumbnail_url,
-      timestamp: p.created_at
-    }));
+      const transformed = data.map(p => ({
+        ...p,
+        likes: p.likes?.length || 0,
+        isLiked: p.likes?.some((l: any) => l.user_id === currentUser?.id),
+        skills: p.skills_required || [],
+        thumbnail: p.thumbnail_url,
+        timestamp: p.created_at
+      }));
 
-    setProjects(transformed);
+      setProjects(transformed);
+    } catch (error: any) {
+      console.error("Refresh projects error:", error);
+      // If it's a fetch error, it's likely CORS
+      if (error.message === 'Failed to fetch') {
+        console.warn("Supabase connection failed. Check CORS settings in Supabase dashboard.");
+      }
+    }
   };
 
   const refreshNotifications = async () => {
     if (!supabase || !currentUser) return;
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*, actor:profiles(name, avatar_url)')
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*, actor:profiles(name, avatar_url)')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
 
-    if (!error) setNotifications(data);
+      if (error) throw error;
+      setNotifications(data);
+    } catch (error) {
+      console.error("Refresh notifications error:", error);
+    }
   };
 
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, sender:profiles(*), receiver:profiles(*)')
-      .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles(*), receiver:profiles(*)')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false });
 
-    if (!error) {
+      if (error) throw error;
+
       const conversations = new Map();
       data.forEach(msg => {
         const partner = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
@@ -147,6 +161,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       });
       setChats(Array.from(conversations.values()));
+    } catch (error) {
+      console.error("Refresh chats error:", error);
     }
   };
 
@@ -166,12 +182,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const project = projects.find(p => p.id === projectId);
     const isLiked = project?.isLiked;
 
-    if (isLiked) {
-      await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
-    } else {
-      await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+    try {
+      if (isLiked) {
+        await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
+      } else {
+        await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+      }
+      await refreshProjects();
+    } catch (error) {
+      toast.error("Failed to update like");
     }
-    await refreshProjects();
   };
 
   const addComment = async (projectId: string, text: string) => {
@@ -180,15 +200,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    const { error } = await supabase.from('comments').insert({
-      project_id: projectId,
-      user_id: currentUser.id,
-      content: text
-    });
+    try {
+      const { error } = await supabase.from('comments').insert({
+        project_id: projectId,
+        user_id: currentUser.id,
+        content: text
+      });
 
-    if (!error) {
+      if (error) throw error;
       await refreshProjects();
       toast.success("Comment added!");
+    } catch (error) {
+      toast.error("Failed to add comment");
     }
   };
 

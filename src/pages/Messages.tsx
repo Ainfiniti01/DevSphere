@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ListSkeleton } from '@/components/SkeletonLoader';
 import EmptyState from '@/components/EmptyState';
 import { useApp } from '@/context/AppContext';
+import { toast } from 'sonner';
 
 const Messages = () => {
   const navigate = useNavigate();
@@ -17,8 +18,13 @@ const Messages = () => {
 
   useEffect(() => {
     const init = async () => {
-      await refreshChats();
-      setIsLoading(false);
+      try {
+        await refreshChats();
+      } catch (error) {
+        console.error("Failed to load chats:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     init();
   }, []);
@@ -29,6 +35,11 @@ const Messages = () => {
       chat.lastMsg.toLowerCase().includes(search.toLowerCase())
     );
   }, [chats, search]);
+
+  const handleNewChat = () => {
+    toast.info("Select a developer from Explore to start a new chat!");
+    navigate('/explore');
+  };
 
   return (
     <MobileLayout title="Messages">
@@ -43,7 +54,10 @@ const Messages = () => {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <button className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/20">
+          <button 
+            onClick={handleNewChat}
+            className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+          >
             <Plus size={20} />
           </button>
         </div>
