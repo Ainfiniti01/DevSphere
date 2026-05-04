@@ -15,7 +15,7 @@ const ChatScreen = () => {
   const [searchParams] = useSearchParams();
   const isGroup = searchParams.get('group') === 'true';
   const navigate = useNavigate();
-  const { currentUser } = useApp();
+  const { currentUser, markAsRead } = useApp();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [chatPartner, setChatPartner] = useState<any>(null);
@@ -58,6 +58,9 @@ const ChatScreen = () => {
       const { data, error } = await query;
       if (!error) setMessages(data || []);
       setLoading(false);
+      
+      // Mark as read when opening
+      markAsRead(id, isGroup);
     };
 
     fetchChatInfo();
@@ -76,34 +79,67 @@ const ChatScreen = () => {
 
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
         setMessages(prev => {
+          // Avoid duplicates if optimistic update already added it
           if (prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content))) {
             return prev.map(m => m.isOptimistic && m.content === newMsg.content ? { ...newMsg, sender } : m);
           }
           return [...prev, { ...newMsg, sender }];
         });
         setPartnerTyping(false);
+        
+        // Mark as read if we are in the chat
+        if (newMsg.sender_id !== currentUser.id) {
+          markAsRead(id, isGroup);
+        }
       })
       .on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload.user_id !== currentUser.id) setPartnerTyping(payload.payload.isTyping);
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id, currentUser?.id, isGroup]);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [messages, partnerTyping]);
 
   const handleSend = async () => {
     if (!msg.trim() || !supabase || !currentUser) return;
-    const messageData: any = { sender_id: currentUser.id, content: msg.trim(), type: 'text' };
-    if (isGroup) messageData.project_id = id; else messageData.receiver_id = id;
+    
+    const messageData: any = {
+      sender_id: currentUser.id,
+      content: msg.trim(),
+      type: 'text'
+    };
 
+    if (isGroup) {
+      messageData.project_id = id;
+    } else {
+      messageData.receiver_id = id;
+    }
+
+    // Optimistic update
     const tempId = `temp-${Date.now()}`;
-    setMessages(prev => [...prev, { id: tempId, ...messageData, created_at: new Date().toISOString(), sender: currentUser, isOptimistic: true }]);
+    setMessages(prev => [...prev, {
+      id: tempId,
+      ...messageData,
+      created_at: new Date().toISOString(),
+      sender: currentUser,
+      isOptimistic: true
+    }]);
+
     setMsg('');
-    await supabase.from('messages').insert(messageData);
+    
+    const { error } = await supabase.from('messages').insert(messageData);
+    if (error) {
+      toast.error("Failed to send message");
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    }
   };
 
   return (

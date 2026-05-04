@@ -4,6 +4,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Search, PlusSquare, MessageSquare, User, Bell, ChevronLeft } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { useApp } from '@/context/AppContext';
 
 const MobileLayout = ({ 
   children, 
@@ -18,12 +19,24 @@ const MobileLayout = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { totalUnreadMessages } = useApp();
+
+  const formatBadge = (count: number) => {
+    if (count <= 0) return null;
+    if (count > 99) return "99+";
+    return count.toString();
+  };
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Explore', path: '/explore' },
     { icon: PlusSquare, label: 'Create', path: '/create' },
-    { icon: MessageSquare, label: 'Messages', path: '/messages' },
+    { 
+      icon: MessageSquare, 
+      label: 'Messages', 
+      path: '/messages',
+      badge: formatBadge(totalUnreadMessages)
+    },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 
@@ -61,11 +74,18 @@ const MobileLayout = ({
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  "flex flex-col items-center gap-1 transition-all duration-200",
+                  "flex flex-col items-center gap-1 transition-all duration-200 relative",
                   isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                <div className="relative">
+                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                  {item.badge && (
+                    <span className="absolute -top-2 -right-2 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-background min-w-[18px] flex items-center justify-center">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] font-medium">{item.label}</span>
               </button>
             );

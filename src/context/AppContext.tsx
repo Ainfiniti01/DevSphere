@@ -15,12 +15,14 @@ interface AppContextType {
   setChats: React.Dispatch<React.SetStateAction<any[]>>;
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
+  totalUnreadMessages: number;
   logout: () => void;
   toggleLike: (projectId: string) => Promise<void>;
   addComment: (projectId: string, text: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   refreshChats: () => Promise<void>;
+  markAsRead: (chatId: string, isGroup: boolean) => Promise<void>;
   updatePresence: () => Promise<void>;
   resolveName: (user: any) => string;
 }
@@ -33,6 +35,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
 
   const resolveName = (user: any) => {
     if (!user) return "User";
@@ -67,72 +70,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       // Silent fail for presence
     }
   }, [currentUser?.id]);
-
-  useEffect(() => {
-    if (!supabase) return;
-
-    const initApp = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
-      }
-
-      await refreshProjects();
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
-        } else {
-          setCurrentUser(null);
-          setNotifications([]);
-          setChats([]);
-        }
-      });
-
-      return () => subscription.unsubscribe();
-    };
-
-    initApp();
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      updatePresence();
-      const interval = setInterval(updatePresence, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [currentUser?.id, updatePresence]);
-
-  useEffect(() => {
-    if (currentUser) {
-      refreshNotifications();
-      refreshChats();
-      refreshRequests();
-    }
-  }, [currentUser?.id]);
-
-  const refreshRequests = async () => {
-    if (!supabase || !currentUser) return;
-    try {
-      const { data: myProjects } = await supabase.from('projects').select('id').eq('creator_id', currentUser.id);
-      const projectIds = myProjects?.map(p => p.id) || [];
-      
-      if (projectIds.length === 0) return;
-
-      const { data, error } = await supabase
-        .from('join_requests')
-        .select('*, user:profiles(*), project:projects(title)')
-        .in('project_id', projectIds)
-        .eq('status', 'pending');
-
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (error) {
-      console.error("Refresh requests error:", error);
-    }
-  };
 
   const refreshProjects = async () => {
     if (!supabase) return;
@@ -181,13 +118,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (data) setNotifications(data);
     }
   };
 
@@ -211,34 +141,141 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name), receiver:profiles!messages_receiver_id_fkey(name, avatar_url, display_name), project:projects(title, thumbnail_url)')
         .or(orFilter.join(','))
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const conversations = new Map();
+      let totalUnread = 0;
+
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
         const chatId = isGroup ? msg.project_id : (msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id);
         
-        if (!chatId || conversations.has(chatId)) return;
+        if (!chatId) return;
 
-        conversations.set(chatId, {
-          id: chatId,
-          name: isGroup ? msg.project?.title : resolveName(msg.sender_id === currentUser.id ? msg.receiver : msg.sender),
-          avatar: isGroup ? msg.project?.thumbnail_url : (msg.sender_id === currentUser.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url),
-          lastMsg: msg.content,
-          time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          unread: msg.is_read === false && msg.receiver_id === currentUser.id ? 1 : 0,
-          isGroup
-        });
+        const isUnread = msg.is_read === false && msg.sender_id !== currentUser.id;
+        if (isUnread) totalUnread++;
+
+        if (!conversations.has(chatId)) {
+          conversations.set(chatId, {
+            id: chatId,
+            name: isGroup ? msg.project?.title : resolveName(msg.sender_id === currentUser.id ? msg.receiver : msg.sender),
+            avatar: isGroup ? msg.project?.thumbnail_url : (msg.sender_id === currentUser.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url),
+            lastMsg: msg.content,
+            time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            unread: isUnread ? 1 : 0,
+            isGroup
+          });
+        } else if (isUnread) {
+          const chat = conversations.get(chatId);
+          chat.unread++;
+        }
       });
       
       setChats(Array.from(conversations.values()));
+      setTotalUnreadMessages(totalUnread);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
   };
+
+  const markAsRead = async (chatId: string, isGroup: boolean) => {
+    if (!supabase || !currentUser) return;
+    try {
+      let query = supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('is_read', false)
+        .neq('sender_id', currentUser.id);
+
+      if (isGroup) {
+        query = query.eq('project_id', chatId);
+      } else {
+        query = query.eq('sender_id', chatId).eq('receiver_id', currentUser.id);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+      await refreshChats();
+    } catch (error) {
+      console.error("Mark as read error:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const initApp = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
+      }
+
+      await refreshProjects();
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
+        } else {
+          setCurrentUser(null);
+          setNotifications([]);
+          setChats([]);
+          setTotalUnreadMessages(0);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    initApp();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      updatePresence();
+      const interval = setInterval(updatePresence, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser?.id, updatePresence]);
+
+  useEffect(() => {
+    if (currentUser) {
+      refreshNotifications();
+      refreshChats();
+      
+      // Real-time message subscription
+      const channel = supabase
+        .channel('global-messages')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages' 
+        }, (payload) => {
+          const newMsg = payload.new;
+          // Only refresh if the message involves the current user
+          if (newMsg.receiver_id === currentUser.id || newMsg.project_id) {
+            refreshChats();
+          }
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages'
+        }, (payload) => {
+          if (payload.new.is_read !== payload.old.is_read) {
+            refreshChats();
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [currentUser?.id]);
 
   const logout = async () => {
     if (!supabase) return;
@@ -296,8 +333,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       requests, setRequests,
       chats, setChats,
       notifications, setNotifications,
+      totalUnreadMessages,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
+      markAsRead,
       updatePresence, resolveName
     }}>
       {children}
