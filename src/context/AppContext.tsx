@@ -39,7 +39,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
-  // Ref to track like operations to prevent 409 conflicts
   const processingLikes = useRef<Set<string>>(new Set());
 
   const resolveName = (user: any) => {
@@ -130,25 +129,25 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // 1. Fetch last_read_at for all chats
+      // 1. Fetch last_read_at for all chats - Handle 403 gracefully
       const { data: readData, error: readError } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
       if (readError) {
-        // If we get a 403, it might be a race condition with the session
-        if (readError.code === '42501') return; 
-        throw readError;
+        console.warn("Chat reads fetch failed (likely RLS/Session sync):", readError.message);
       }
       
-      const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]));
+      const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
       // 2. Fetch project memberships for group chats
-      const { data: memberProjects } = await supabase
+      const { data: memberProjects, error: memberError } = await supabase
         .from('project_members')
         .select('project_id')
         .eq('user_id', currentUser.id);
+      
+      if (memberError) console.warn("Project members fetch failed:", memberError.message);
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
@@ -212,7 +211,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const now = new Date().toISOString();
       
-      // Optimistic UI update
       setChats(prev => {
         const chat = prev.find(c => c.id === chatId);
         if (chat && chat.unread > 0) {
@@ -221,14 +219,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
       });
 
-      // Persist to DB
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      // Compatibility for 1-on-1 is_read flag
       if (!isGroup) {
         await supabase
           .from('messages')
@@ -238,7 +234,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('is_read', false);
       }
 
-      // Final refresh to sync
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
@@ -315,7 +310,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // Prevent concurrent like operations for the same project
     if (processingLikes.current.has(projectId)) return;
     processingLikes.current.add(projectId);
 
@@ -327,7 +321,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
       } else {
         const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
-        // Handle 409 Conflict (already liked) gracefully
         if (error && error.code !== '23505') throw error;
       }
       await refreshProjects();
