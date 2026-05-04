@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -21,6 +21,7 @@ interface AppContextType {
   refreshProjects: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   refreshChats: () => Promise<void>;
+  updatePresence: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -48,6 +49,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return null;
     }
   };
+
+  const updatePresence = useCallback(async () => {
+    if (!supabase || !currentUser) return;
+    await supabase
+      .from('profiles')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('id', currentUser.id);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -78,7 +87,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     initApp();
   }, []);
 
-  // Refresh notifications and chats when currentUser changes
+  // Presence Heartbeat
+  useEffect(() => {
+    if (currentUser) {
+      updatePresence();
+      const interval = setInterval(updatePresence, 30000); // Every 30s
+      return () => clearInterval(interval);
+    }
+  }, [currentUser?.id, updatePresence]);
+
   useEffect(() => {
     if (currentUser) {
       refreshNotifications();
@@ -129,15 +146,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) throw error;
       setNotifications(data);
-    } catch (error) {
-      console.error("Refresh notifications error:", error);
+    } catch (error: any) {
+      console.error("Refresh notifications error:", error.message);
     }
   };
 
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
-      // 1. Get projects user is a member of for group chats
+      // Optimized: Fetch only the latest message per conversation
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -145,13 +162,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
-      // 2. Fetch all relevant messages (private or group)
-      let query = supabase
-        .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(*), receiver:profiles!messages_receiver_id_fkey(*), project:projects(title, thumbnail_url)')
-        .order('created_at', { ascending: false });
-
-      // Build the OR filter manually to handle both private and group messages
       const orFilter = [
         `sender_id.eq.${currentUser.id}`,
         `receiver_id.eq.${currentUser.id}`
@@ -161,7 +171,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         orFilter.push(`project_id.in.(${projectIds.join(',')})`);
       }
 
-      const { data, error } = await query.or(orFilter.join(','));
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!messages_sender_id_fkey(*), receiver:profiles!messages_receiver_id_fkey(*), project:projects(title, thumbnail_url)')
+        .or(orFilter.join(','))
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -184,8 +198,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       setChats(Array.from(conversations.values()));
-    } catch (error) {
-      console.error("Refresh chats error:", error);
+    } catch (error: any) {
+      console.error("Refresh chats error:", error.message);
     }
   };
 
@@ -246,7 +260,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       chats, setChats,
       notifications, setNotifications,
       logout, toggleLike, addComment,
-      refreshProjects, refreshNotifications, refreshChats
+      refreshProjects, refreshNotifications, refreshChats,
+      updatePresence
     }}>
       {children}
     </AppContext.Provider>

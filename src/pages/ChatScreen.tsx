@@ -20,7 +20,15 @@ const ChatScreen = () => {
   const [chatPartner, setChatPartner] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isOnline = (lastSeen: string) => {
+    if (!lastSeen) return false;
+    return Date.now() - new Date(lastSeen).getTime() < 60000;
+  };
 
   useEffect(() => {
     if (!id || !currentUser || !supabase) return;
@@ -36,7 +44,6 @@ const ChatScreen = () => {
     };
 
     const fetchMessages = async () => {
-      // Explicitly use the relationship name to avoid ambiguity
       let query = supabase
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url)')
@@ -51,7 +58,6 @@ const ChatScreen = () => {
       const { data, error } = await query;
       if (error) {
         console.error("[ChatScreen] Fetch error:", error);
-        toast.error("Failed to load messages");
       } else {
         setMessages(data || []);
       }
@@ -61,7 +67,7 @@ const ChatScreen = () => {
     fetchChatInfo();
     fetchMessages();
 
-    // Real-time subscription
+    // Real-time subscription for messages and typing
     const channel = supabase
       .channel(`chat:${id}`)
       .on('postgres_changes', { 
@@ -70,8 +76,6 @@ const ChatScreen = () => {
         table: 'messages'
       }, async (payload) => {
         const newMsg = payload.new;
-        
-        // Filter messages for this specific chat
         const isThisChat = isGroup 
           ? newMsg.project_id === id 
           : (newMsg.sender_id === currentUser.id && newMsg.receiver_id === id) || 
@@ -79,7 +83,6 @@ const ChatScreen = () => {
 
         if (!isThisChat) return;
 
-        // Fetch sender info for the new message
         const { data: sender } = await supabase
           .from('profiles')
           .select('name, avatar_url')
@@ -87,12 +90,17 @@ const ChatScreen = () => {
           .single();
           
         setMessages(prev => {
-          // Prevent duplicate messages if the sender also added it locally (optimistic update)
           if (prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content))) {
             return prev.map(m => m.isOptimistic && m.content === newMsg.content ? { ...newMsg, sender } : m);
           }
           return [...prev, { ...newMsg, sender }];
         });
+        setPartnerTyping(false);
+      })
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload.user_id !== currentUser.id) {
+          setPartnerTyping(payload.payload.isTyping);
+        }
       })
       .subscribe();
 
@@ -105,7 +113,29 @@ const ChatScreen = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, partnerTyping]);
+
+  const handleTyping = () => {
+    if (!isTyping) {
+      setIsTyping(true);
+      supabase.channel(`chat:${id}`).send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { user_id: currentUser.id, isTyping: true }
+      });
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      supabase.channel(`chat:${id}`).send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { user_id: currentUser.id, isTyping: false }
+      });
+    }, 2000);
+  };
 
   const handleSend = async () => {
     if (!msg.trim() || !supabase || !currentUser) return;
@@ -122,7 +152,6 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
-    // Optimistic update for better UX
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg = {
       id: tempId,
@@ -134,6 +163,7 @@ const ChatScreen = () => {
     
     setMessages(prev => [...prev, optimisticMsg]);
     setMsg('');
+    setIsTyping(false);
 
     const { error } = await supabase.from('messages').insert(messageData);
     
@@ -145,52 +175,67 @@ const ChatScreen = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border">
-      {/* Header */}
       <header className="px-4 py-3 border-b border-border flex items-center gap-3 bg-background/80 backdrop-blur-md sticky top-0 z-10">
         <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={24} />
         </button>
-        <Avatar className="h-10 w-10 border border-border">
-          <AvatarImage src={isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url} />
-          <AvatarFallback>{isGroup ? <Users size={20} /> : <User size={20} />}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-10 w-10 border border-border">
+            <AvatarImage src={isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url} />
+            <AvatarFallback>{isGroup ? <Users size={20} /> : <User size={20} />}</AvatarFallback>
+          </Avatar>
+          {!isGroup && isOnline(chatPartner?.last_seen) && (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-bold text-foreground truncate text-sm">{isGroup ? chatPartner?.title : chatPartner?.name}</h4>
           <p className="text-[10px] text-primary font-bold uppercase tracking-widest">
-            {isGroup ? 'Group Chat' : 'Online'}
+            {isGroup ? 'Group Chat' : (isOnline(chatPartner?.last_seen) ? 'Online' : 'Offline')}
           </p>
         </div>
       </header>
 
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">Loading messages...</p>
           </div>
         ) : messages.length > 0 ? (
-          messages.map((m) => {
-            const isMe = m.sender_id === currentUser?.id;
-            return (
-              <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                {!isMe && isGroup && (
-                  <span className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold">{m.sender?.name}</span>
-                )}
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm transition-opacity ${
-                  m.isOptimistic ? 'opacity-70' : 'opacity-100'
-                } ${
-                  isMe 
-                    ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                    : 'bg-card text-foreground border border-border rounded-tl-none'
-                }`}>
-                  {m.content}
+          <>
+            {messages.map((m) => {
+              const isMe = m.sender_id === currentUser?.id;
+              return (
+                <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  {!isMe && isGroup && (
+                    <span className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold">{m.sender?.name}</span>
+                  )}
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm transition-opacity ${
+                    m.isOptimistic ? 'opacity-70' : 'opacity-100'
+                  } ${
+                    isMe 
+                      ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                      : 'bg-card text-foreground border border-border rounded-tl-none'
+                  }`}>
+                    {m.content}
+                  </div>
+                  <span className="text-[9px] text-muted-foreground mt-1 px-1">
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
-                <span className="text-[9px] text-muted-foreground mt-1 px-1">
-                  {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+              );
+            })}
+            {partnerTyping && (
+              <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></div>
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></div>
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></div>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Typing...</span>
               </div>
-            );
-          })
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mb-4">
@@ -202,7 +247,6 @@ const ChatScreen = () => {
         )}
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-border bg-background">
         <div className="flex items-center gap-2 bg-accent/20 border border-border rounded-2xl px-3 py-2">
           <button className="text-muted-foreground p-1 hover:text-primary transition-colors">
@@ -210,7 +254,10 @@ const ChatScreen = () => {
           </button>
           <input 
             value={msg}
-            onChange={(e) => setMsg(e.target.value)}
+            onChange={(e) => {
+              setMsg(e.target.value);
+              handleTyping();
+            }}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground"
             placeholder="Type a message..."

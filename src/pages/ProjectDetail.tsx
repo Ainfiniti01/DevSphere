@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
@@ -12,20 +12,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket } from 'lucide-react';
+import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { projects, currentUser, notifications, refreshNotifications } = useApp();
+  const { projects, currentUser, refreshNotifications } = useApp();
   
   const project = projects.find(p => p.id === id);
   
   const [joinReason, setJoinReason] = useState('');
-  const [joinSkills, setJoinSkills] = useState('');
+  const [joinContribution, setJoinContribution] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
+
+  useEffect(() => {
+    const checkRequestStatus = async () => {
+      if (!currentUser || !id || !supabase) return;
+      const { data, error } = await supabase
+        .from('join_requests')
+        .select('status')
+        .eq('project_id', id)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      if (data) setRequestStatus(data.status as any);
+    };
+    checkRequestStatus();
+  }, [id, currentUser?.id]);
 
   if (!project) {
     return (
@@ -39,13 +55,17 @@ const ProjectDetail = () => {
   }
 
   const isOwner = currentUser?.id === project.creator_id;
-  const hasRequested = notifications.some(n => n.project_id === project.id && n.actor_id === currentUser?.id && n.type === 'request');
   const isMember = project.members?.includes(currentUser?.id);
 
   const handleJoin = async () => {
     if (!currentUser || !supabase) {
       toast.error("Please sign in to join projects");
       navigate('/auth');
+      return;
+    }
+
+    if (!joinReason.trim() || !joinContribution.trim()) {
+      toast.error("Please fill in all fields");
       return;
     }
 
@@ -56,24 +76,26 @@ const ProjectDetail = () => {
         project_id: project.id,
         user_id: currentUser.id,
         reason: joinReason,
-        skills: joinSkills
+        skills: joinContribution,
+        status: 'pending'
       });
 
       if (error) {
-        if (error.code === '42P01') {
-          throw new Error("The join requests system is currently being set up. Please try again in a moment.");
+        if (error.code === '23505') {
+          toast.error("Request already sent");
+          setRequestStatus('pending');
+        } else {
+          throw error;
         }
-        throw error;
+      } else {
+        toast.success("Application sent to founder!");
+        setRequestStatus('pending');
+        await refreshNotifications();
       }
-
-      toast.success("Application sent to founder!");
-      await refreshNotifications();
-      setJoinReason('');
-      setJoinSkills('');
       setIsDialogOpen(false);
     } catch (error: any) {
       console.error("[ProjectDetail] Join error:", error);
-      toast.error(error.message || "Failed to send application. Please ensure the database table exists.");
+      toast.error(error.message || "Failed to send application");
     } finally {
       setIsSubmitting(false);
     }
@@ -151,22 +173,6 @@ const ProjectDetail = () => {
                 {project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
               </div>
             </section>
-
-            {project.members && project.members.length > 0 && (
-              <section>
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <Users size={14} className="text-primary" /> Team Members
-                </h3>
-                <div className="flex -space-x-2">
-                  {project.members.map((memberId: string) => (
-                    <Avatar key={memberId} className="h-8 w-8 border-2 border-background">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${memberId}`} />
-                      <AvatarFallback>M</AvatarFallback>
-                    </Avatar>
-                  ))}
-                </div>
-              </section>
-            )}
           </div>
 
           <div className="pt-6 sticky bottom-0 bg-background/80 backdrop-blur-sm pb-4">
@@ -193,9 +199,13 @@ const ProjectDetail = () => {
               >
                 <MessageSquare size={20} /> Open Group Chat
               </Button>
-            ) : hasRequested ? (
+            ) : requestStatus === 'pending' ? (
               <Button disabled className="w-full h-14 text-lg font-bold rounded-2xl bg-muted text-muted-foreground">
-                Requested
+                Request Pending
+              </Button>
+            ) : requestStatus === 'rejected' ? (
+              <Button disabled className="w-full h-14 text-lg font-bold rounded-2xl bg-destructive/20 text-destructive">
+                Request Declined
               </Button>
             ) : (
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -222,20 +232,20 @@ const ProjectDetail = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">What value or skills do you bring?</Label>
+                      <Label className="text-sm font-bold">What can you contribute?</Label>
                       <Input 
-                        placeholder="e.g. React, UI Design, Growth..." 
+                        placeholder="e.g. React development, UI design..." 
                         className="h-12 rounded-xl bg-accent/20" 
-                        value={joinSkills} 
-                        onChange={e => setJoinSkills(e.target.value)} 
+                        value={joinContribution} 
+                        onChange={e => setJoinContribution(e.target.value)} 
                       />
                     </div>
                     <Button 
                       onClick={handleJoin} 
                       className="w-full h-12 rounded-xl font-bold text-lg"
-                      disabled={!joinReason || !joinSkills || isSubmitting}
+                      disabled={!joinReason.trim() || !joinContribution.trim() || isSubmitting}
                     >
-                      {isSubmitting ? "Sending..." : "Submit Application"}
+                      {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Submit Application"}
                     </Button>
                   </div>
                 </DialogContent>
