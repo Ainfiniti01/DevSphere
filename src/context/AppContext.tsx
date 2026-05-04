@@ -124,6 +124,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser) return;
     try {
+      // Fetch chat reads to determine unread status
+      const { data: readData } = await supabase
+        .from('chat_reads')
+        .select('*')
+        .eq('user_id', currentUser.id);
+      
+      const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]));
+
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -146,7 +154,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       const conversations = new Map();
-      let unreadChatsCount = 0;
+      let totalUnread = 0;
 
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
@@ -154,7 +162,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (!chatId) return;
 
-        const isUnread = msg.is_read === false && msg.sender_id !== currentUser.id;
+        const lastRead = readMap.get(chatId) || 0;
+        const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
 
         if (!conversations.has(chatId)) {
           conversations.set(chatId, {
@@ -166,7 +175,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             unread: isUnread ? 1 : 0,
             isGroup
           });
-          if (isUnread) unreadChatsCount++;
+          if (isUnread) totalUnread++;
         } else if (isUnread) {
           const chat = conversations.get(chatId);
           chat.unread++;
@@ -174,7 +183,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       setChats(Array.from(conversations.values()));
-      setTotalUnreadMessages(unreadChatsCount);
+      setTotalUnreadMessages(totalUnread);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
@@ -183,33 +192,34 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser) return;
     try {
-      // Update local state immediately for responsiveness
+      // Update chat_reads table
+      const now = new Date().toISOString();
+      await supabase.from('chat_reads').upsert({
+        user_id: currentUser.id,
+        chat_id: chatId,
+        last_read_at: now
+      }, { onConflict: 'user_id,chat_id' });
+
+      // Also update messages table for 1-on-1 compatibility
+      if (!isGroup) {
+        await supabase
+          .from('messages')
+          .update({ is_read: true, status: 'seen' })
+          .eq('sender_id', chatId)
+          .eq('receiver_id', currentUser.id)
+          .eq('is_read', false);
+      }
+
+      // Update local state immediately
       setChats(prev => prev.map(chat => 
         chat.id === chatId ? { ...chat, unread: 0 } : chat
       ));
       
-      // Recalculate total unread chats locally
       setTotalUnreadMessages(prev => {
         const chat = chats.find(c => c.id === chatId);
         return (chat && chat.unread > 0) ? Math.max(0, prev - 1) : prev;
       });
 
-      let query = supabase
-        .from('messages')
-        .update({ is_read: true, status: 'seen' })
-        .eq('is_read', false)
-        .neq('sender_id', currentUser.id);
-
-      if (isGroup) {
-        query = query.eq('project_id', chatId);
-      } else {
-        query = query.eq('sender_id', chatId).eq('receiver_id', currentUser.id);
-      }
-
-      const { error } = await query;
-      if (error) throw error;
-      
-      // Sync with backend
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
@@ -267,21 +277,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           schema: 'public', 
           table: 'messages' 
         }, (payload) => {
-          const newMsg = payload.new;
-          // Refresh if it's a DM for us or a group message
-          if (newMsg.receiver_id === currentUser.id || newMsg.project_id) {
-            refreshChats();
-          }
+          refreshChats();
         })
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public', 
           table: 'messages'
         }, (payload) => {
-          // Refresh if a message we sent was marked as read
-          if (payload.new.sender_id === currentUser.id && payload.new.is_read !== payload.old.is_read) {
-            refreshChats();
-          }
+          refreshChats();
         })
         .subscribe();
 

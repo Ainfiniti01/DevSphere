@@ -59,14 +59,13 @@ const ChatScreen = () => {
       if (!error) setMessages(data || []);
       setLoading(false);
       
-      // Mark as read when opening
       markAsRead(id, isGroup);
     };
 
     fetchChatInfo();
     fetchMessages();
 
-    // Specific channel for this chat to ensure real-time sync
+    // Subscribe to all message changes and filter locally for reliability
     const channel = supabase
       .channel(`chat_room_${id}`)
       .on('postgres_changes', { 
@@ -86,14 +85,15 @@ const ChatScreen = () => {
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
         
         setMessages(prev => {
-          // Avoid duplicates if optimistic update already added it
-          if (prev.some(m => m.id === newMsg.id)) return prev;
+          // Check if message already exists (by ID or by content/sender for optimistic matches)
+          const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
+          if (exists) {
+            // Replace optimistic message with real one to get the correct ID and timestamp
+            return prev.map(m => (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id) ? { ...newMsg, sender } : m);
+          }
           return [...prev, { ...newMsg, sender }];
         });
         
-        setPartnerTyping(false);
-        
-        // If we are the recipient, mark as read immediately
         if (newMsg.sender_id !== currentUser.id) {
           markAsRead(id, isGroup);
         }
@@ -103,7 +103,6 @@ const ChatScreen = () => {
         schema: 'public', 
         table: 'messages' 
       }, (payload) => {
-        // Update message status (sent/seen) in real-time
         setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .subscribe();
@@ -117,7 +116,7 @@ const ChatScreen = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, partnerTyping]);
+  }, [messages]);
 
   const handleSend = async () => {
     if (!msg.trim() || !supabase || !currentUser) return;
@@ -220,7 +219,6 @@ const ChatScreen = () => {
             </div>
           );
         })}
-        {partnerTyping && <div className="text-[10px] text-muted-foreground animate-pulse font-bold uppercase tracking-widest">Typing...</div>}
       </div>
 
       <div className="p-4 border-t border-border bg-background">
