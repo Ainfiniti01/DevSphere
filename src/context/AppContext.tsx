@@ -284,6 +284,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .channel('global-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refreshChats())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refreshNotifications())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reads' }, () => refreshChats())
         .subscribe();
 
       return () => {

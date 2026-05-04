@@ -29,6 +29,13 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
+  // Mark as read immediately when ID changes
+  useEffect(() => {
+    if (id && currentUser) {
+      markAsRead(id, isGroup);
+    }
+  }, [id, currentUser?.id, isGroup]);
+
   useEffect(() => {
     if (!id || !currentUser || !supabase) return;
 
@@ -57,9 +64,6 @@ const ChatScreen = () => {
       const { data, error } = await query;
       if (!error) setMessages(data || []);
       setLoading(false);
-      
-      // Mark as read on initial load
-      markAsRead(id, isGroup);
     };
 
     fetchChatInfo();
