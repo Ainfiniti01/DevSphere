@@ -185,7 +185,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       let query = supabase
         .from('messages')
-        .update({ is_read: true })
+        .update({ is_read: true, status: 'seen' })
         .eq('is_read', false)
         .neq('sender_id', currentUser.id);
 
@@ -197,6 +197,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { error } = await query;
       if (error) throw error;
+      
+      // Immediately update local state to clear badges
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, unread: 0 } : chat
+      ));
+      
+      // Recalculate total unread
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
@@ -255,7 +262,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           table: 'messages' 
         }, (payload) => {
           const newMsg = payload.new;
-          // Only refresh if the message involves the current user
           if (newMsg.receiver_id === currentUser.id || newMsg.project_id) {
             refreshChats();
           }
@@ -265,7 +271,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           schema: 'public',
           table: 'messages'
         }, (payload) => {
-          if (payload.new.is_read !== payload.old.is_read) {
+          // Refresh if a message we sent was marked as read
+          if (payload.new.sender_id === currentUser.id && payload.new.is_read !== payload.old.is_read) {
             refreshChats();
           }
         })

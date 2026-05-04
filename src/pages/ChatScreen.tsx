@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X } from 'lucide-react';
+import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, CheckCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -79,7 +79,6 @@ const ChatScreen = () => {
 
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
         setMessages(prev => {
-          // Avoid duplicates if optimistic update already added it
           if (prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content))) {
             return prev.map(m => m.isOptimistic && m.content === newMsg.content ? { ...newMsg, sender } : m);
           }
@@ -87,10 +86,13 @@ const ChatScreen = () => {
         });
         setPartnerTyping(false);
         
-        // Mark as read if we are in the chat
         if (newMsg.sender_id !== currentUser.id) {
           markAsRead(id, isGroup);
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        // Update message status in real-time for the sender
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload.user_id !== currentUser.id) setPartnerTyping(payload.payload.isTyping);
@@ -114,7 +116,8 @@ const ChatScreen = () => {
     const messageData: any = {
       sender_id: currentUser.id,
       content: msg.trim(),
-      type: 'text'
+      type: 'text',
+      status: 'sent'
     };
 
     if (isGroup) {
@@ -123,7 +126,6 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,
@@ -160,7 +162,7 @@ const ChatScreen = () => {
         <div className="flex-1 min-w-0">
           <h4 
             className="font-bold text-foreground truncate text-sm cursor-pointer hover:text-primary transition-colors"
-            onClick={() => !isGroup && navigate(`/profile/${chatPartner?.id}`)}
+            onClick={() => isGroup ? navigate(`/project/${id}`) : navigate(`/profile/${chatPartner?.id}`)}
           >
             {isGroup ? chatPartner?.title : chatPartner?.name}
           </h4>
@@ -190,14 +192,28 @@ const ChatScreen = () => {
                     {m.sender?.name}
                   </span>
                 )}
-                <div className={`p-3 rounded-2xl text-sm shadow-sm ${
+                <div className={`p-3 rounded-2xl text-sm shadow-sm relative ${
                   isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
                 }`}>
                   {m.content}
+                  {isMe && (
+                    <div className="absolute -bottom-4 right-0 flex items-center gap-1">
+                      <span className="text-[9px] text-muted-foreground">
+                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {m.status === 'seen' ? (
+                        <CheckCheck size={12} className="text-blue-500" />
+                      ) : (
+                        <Check size={12} className="text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span className="text-[9px] text-muted-foreground mt-1 px-1">
-                  {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                {!isMe && (
+                  <span className="text-[9px] text-muted-foreground mt-1 px-1">
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -222,7 +238,7 @@ const ChatScreen = () => {
       <Dialog open={!!previewAvatar} onOpenChange={() => setPreviewAvatar(null)}>
         <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-full flex items-center justify-center">
           <div className="relative group">
-            <img src={previewAvatar || ''} className="max-w-[90vw] max-h-[80vh] rounded-3xl shadow-2xl border-4 border-white/10" />
+            <img src={previewAvatar || ''} className="max-w-[90vw] max-h-[80vh] rounded-3xl shadow-2xl border-4 border-white/10 object-contain" />
             <button onClick={() => setPreviewAvatar(null)} className="absolute -top-4 -right-4 bg-white text-black p-2 rounded-full shadow-xl"><X size={20} /></button>
           </div>
         </DialogContent>
