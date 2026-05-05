@@ -133,12 +133,21 @@ const Messages = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="font-bold truncate text-sm">{chat.name}</h4>
+                    <h4 className={chat.unread > 0 ? "font-black truncate text-sm" : "font-bold truncate text-sm"}>
+                      {chat.name}
+                    </h4>
                     <span className="text-[10px] text-muted-foreground font-medium">{chat.time}</span>
                   </div>
-                  <p className="text-xs truncate text-muted-foreground">
-                    {chat.lastMsg}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs truncate ${chat.unread > 0 ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                      {chat.lastMsg}
+                    </p>
+                    {chat.unread > 0 && (
+                      <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                        {chat.unread > 99 ? '99+' : chat.unread}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))

@@ -19,13 +19,13 @@ const MobileLayout = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadNotificationsCount } = useApp();
+  const { unreadNotificationsCount, unreadChatsCount } = useApp();
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Explore', path: '/explore' },
     { icon: PlusSquare, label: 'Create', path: '/create' },
-    { icon: MessageSquare, label: 'Messages', path: '/messages' },
+    { icon: MessageSquare, label: 'Messages', path: '/messages', badge: unreadChatsCount },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 
@@ -71,6 +71,11 @@ const MobileLayout = ({
               >
                 <div className="relative">
                   <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-background min-w-[18px]">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] font-medium">{item.label}</span>
               </button>

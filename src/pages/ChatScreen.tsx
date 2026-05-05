@@ -19,6 +19,7 @@ const ChatScreen = () => {
   
   const [messages, setMessages] = useState<any[]>([]);
   const [chatPartner, setChatPartner] = useState<any>(null);
+  const [partnerLastRead, setPartnerLastRead] = useState<number>(0);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
@@ -29,7 +30,6 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
-  // Mark as read immediately when ID changes
   useEffect(() => {
     if (id && currentUser) {
       markAsRead(id, isGroup);
@@ -43,9 +43,32 @@ const ChatScreen = () => {
       if (isGroup) {
         const { data } = await supabase.from('projects').select('*').eq('id', id).single();
         setChatPartner(data);
+        
+        const { data: reads } = await supabase
+          .from('chat_reads')
+          .select('last_read_at')
+          .eq('chat_id', id)
+          .neq('user_id', currentUser.id)
+          .order('last_read_at', { ascending: false })
+          .limit(1);
+        
+        if (reads && reads.length > 0) {
+          setPartnerLastRead(new Date(reads[0].last_read_at).getTime());
+        }
       } else {
         const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
         setChatPartner(data);
+
+        const { data: read } = await supabase
+          .from('chat_reads')
+          .select('last_read_at')
+          .eq('user_id', id)
+          .eq('chat_id', currentUser.id)
+          .maybeSingle();
+        
+        if (read) {
+          setPartnerLastRead(new Date(read.last_read_at).getTime());
+        }
       }
     };
 
@@ -87,24 +110,24 @@ const ChatScreen = () => {
         const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url, display_name').eq('id', newMsg.sender_id).single();
         
         setMessages(prev => {
-          const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
-          if (exists) {
-            return prev.map(m => (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id) ? { ...newMsg, sender } : m);
-          }
+          const exists = prev.some(m => m.id === newMsg.id);
+          if (exists) return prev;
           return [...prev, { ...newMsg, sender }];
         });
         
-        // Mark as read for incoming messages while active in chat
         if (newMsg.sender_id !== currentUser.id) {
           markAsRead(id, isGroup);
         }
       })
       .on('postgres_changes', { 
-        event: 'UPDATE', 
+        event: '*', 
         schema: 'public', 
-        table: 'messages' 
+        table: 'chat_reads' 
       }, (payload) => {
-        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+        const data = payload.new as any;
+        if (data.chat_id === (isGroup ? id : currentUser.id) && data.user_id !== currentUser.id) {
+          setPartnerLastRead(new Date(data.last_read_at).getTime());
+        }
       })
       .subscribe();
 
@@ -185,6 +208,8 @@ const ChatScreen = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
         {messages.map((m) => {
           const isMe = m.sender_id === currentUser?.id;
+          const isSeen = partnerLastRead >= new Date(m.created_at).getTime();
+          
           return (
             <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end`}>
               {!isMe && (
@@ -211,7 +236,7 @@ const ChatScreen = () => {
                       {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {isMe && (
-                      m.status === 'seen' ? <CheckCheck size={12} className="text-blue-500" /> : <Check size={12} />
+                      isSeen ? <CheckCheck size={12} className="text-blue-400" /> : <Check size={12} />
                     )}
                   </div>
                 </div>

@@ -104,7 +104,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // Also refresh requests for the current user's projects
       const { data: reqData } = await supabase
         .from('join_requests')
         .select('*, user:profiles(*)');
@@ -136,7 +135,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // 1. Fetch last_read_at for all chats
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -144,7 +142,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
-      // 2. Fetch project memberships for group chats
       const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
@@ -152,7 +149,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
-      // 3. Fetch all relevant messages
       const orFilter = [
         `sender_id.eq.${currentUser.id}`,
         `receiver_id.eq.${currentUser.id}`
@@ -198,8 +194,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       const sortedChats = Array.from(conversations.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
-      
-      // Calculate total unread chats (count of chats that have at least one unread message)
       const totalUnreadChats = sortedChats.filter(c => c.unread > 0).length;
 
       setChats(sortedChats);
@@ -212,10 +206,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
-    // OPTIMISTIC UPDATE: Immediately clear unread for this chat in UI
     setChats(prev => {
       const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
-      // Recalculate global count immediately
       const newGlobalCount = updated.filter(c => c.unread > 0).length;
       setUnreadChatsCount(newGlobalCount);
       return updated;
@@ -223,15 +215,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const now = new Date().toISOString();
-      
-      // Persist the read timestamp
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      // Compatibility for 1-on-1 is_read flag
       if (!isGroup) {
         await supabase
           .from('messages')
@@ -242,7 +231,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error("Mark as read error:", error);
-      // If it fails, refresh to get correct state
       refreshChats();
     }
   };
