@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 
 const Messages = () => {
   const navigate = useNavigate();
-  const { chats, refreshChats, currentUser } = useApp();
+  const { chats, refreshChats, currentUser, getOrCreateDMChat } = useApp();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
@@ -31,26 +31,19 @@ const Messages = () => {
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
-      try {
-        await refreshChats();
-        if (supabase && currentUser?.id) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .neq('id', currentUser.id)
-            .limit(20);
-          setUsers(data || []);
-        }
-      } catch (error) {
-        console.error("Failed to load initial message data:", error);
-      } finally {
-        setIsLoading(false);
+      await refreshChats();
+      if (supabase && currentUser?.id) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('id', currentUser.id)
+          .limit(20);
+        setUsers(data || []);
       }
+      setIsLoading(false);
     };
     
-    if (currentUser?.id) {
-      init();
-    }
+    if (currentUser?.id) init();
   }, [currentUser?.id]);
 
   const filteredChats = useMemo(() => {
@@ -67,6 +60,11 @@ const Messages = () => {
     );
   }, [users, userSearch]);
 
+  const startNewDM = async (partnerId: string) => {
+    const chatId = await getOrCreateDMChat(partnerId);
+    if (chatId) navigate(`/chat/${chatId}`);
+  };
+
   return (
     <MobileLayout title="Messages">
       <div className="px-4 py-4">
@@ -74,7 +72,7 @@ const Messages = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <input 
-              className="w-full pl-9 pr-4 py-2 bg-accent/20 border border-border rounded-xl text-sm outline-none focus:ring-2 ring-primary/50" 
+              className="w-full pl-9 pr-4 py-2 bg-accent/20 border border-border rounded-xl text-sm outline-none" 
               placeholder="Search chats..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -82,19 +80,13 @@ const Messages = () => {
           </div>
           
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="rounded-xl h-10 w-10 shrink-0"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
+            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10" onClick={handleRefresh} disabled={isRefreshing}>
               <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
             </Button>
 
             <Sheet>
               <SheetTrigger asChild>
-                <Button className="h-10 w-10 p-0 rounded-xl shadow-lg shadow-primary/20 shrink-0">
+                <Button className="h-10 w-10 p-0 rounded-xl shadow-lg shadow-primary/20">
                   <Plus size={20} />
                 </Button>
               </SheetTrigger>
@@ -115,11 +107,7 @@ const Messages = () => {
                   <ScrollArea className="h-[50vh]">
                     <div className="space-y-2">
                       {filteredUsers.map(u => (
-                        <div 
-                          key={u.id} 
-                          onClick={() => navigate(`/chat/${u.id}`)}
-                          className="flex items-center gap-3 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors"
-                        >
+                        <div key={u.id} onClick={() => startNewDM(u.id)} className="flex items-center gap-3 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer">
                           <Avatar className="h-12 w-12 border border-border">
                             <AvatarImage src={u.avatar_url} />
                             <AvatarFallback><User size={20} /></AvatarFallback>
@@ -130,9 +118,6 @@ const Messages = () => {
                           </div>
                         </div>
                       ))}
-                      {filteredUsers.length === 0 && (
-                        <p className="text-center text-muted-foreground py-10 text-sm">No developers found.</p>
-                      )}
                     </div>
                   </ScrollArea>
                 </div>
@@ -148,8 +133,8 @@ const Messages = () => {
             filteredChats.map(chat => (
               <div 
                 key={chat.id} 
-                onClick={() => navigate(`/chat/${chat.id}${chat.isGroup ? '?group=true' : ''}`)}
-                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors group"
+                onClick={() => navigate(`/chat/${chat.id}`)}
+                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer group"
               >
                 <div className="relative">
                   <Avatar className="h-14 w-14 border-2 border-border shadow-sm group-hover:border-primary/30 transition-colors">
@@ -174,8 +159,8 @@ const Messages = () => {
                       {chat.lastMsg}
                     </p>
                     {chat.unread > 0 && (
-                      <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse">
-                        {chat.unread > 99 ? '99+' : chat.unread}
+                      <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                        {chat.unread}
                       </span>
                     )}
                   </div>
@@ -186,9 +171,9 @@ const Messages = () => {
             <EmptyState 
               icon={MessageSquare}
               title="No messages yet"
-              description={search ? "No chats match your search." : "Start a conversation with other developers!"}
-              actionLabel={search ? "Clear Search" : "Explore Projects"}
-              actionPath={search ? undefined : "/explore"}
+              description="Start a conversation with other developers!"
+              actionLabel="Explore Projects"
+              actionPath="/explore"
             />
           )}
         </div>
