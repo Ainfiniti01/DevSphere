@@ -6,7 +6,7 @@ import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2 } from 'lucide-react';
+import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -131,9 +131,9 @@ const ManageTeam = () => {
           <div className="space-y-4">
             {projectRequests.map(req => (
               <div key={req.id} className="bg-card border border-border p-5 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex gap-4 mb-4">
+                <div className="flex gap-4 mb-4 items-center">
                   <div 
-                    className="cursor-pointer" 
+                    className="cursor-pointer hover:opacity-80 transition-opacity" 
                     onClick={() => navigate(`/profile/${req.user_id}`)}
                   >
                     <Avatar className="h-12 w-12 border border-border">
@@ -143,18 +143,23 @@ const ManageTeam = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 
-                      className="text-sm font-bold truncate cursor-pointer hover:text-primary transition-colors"
+                      className="text-sm font-bold truncate cursor-pointer hover:text-primary transition-colors flex items-center gap-1"
                       onClick={() => navigate(`/profile/${req.user_id}`)}
                     >
                       {resolveName(req.user)}
+                      <ChevronRight size={14} className="text-muted-foreground" />
                     </h4>
                     <p className="text-[11px] text-primary font-medium truncate">{req.user?.title || 'Developer'}</p>
                   </div>
                 </div>
-                <div className="bg-accent/30 p-3 rounded-2xl mb-4">
-                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Reason for joining</p>
-                  <p className="text-xs italic text-foreground leading-relaxed">"{req.reason}"</p>
-                </div>
+                
+                {req.reason && (
+                  <div className="bg-accent/30 p-3 rounded-2xl mb-4">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Message</p>
+                    <p className="text-xs italic text-foreground leading-relaxed">"{req.reason}"</p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <Button 
                     onClick={(e) => {
@@ -202,7 +207,9 @@ const ManageTeam = () => {
                     <AvatarFallback><User size={18} /></AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold truncate">{resolveName(member)}</h4>
+                    <h4 className="text-sm font-bold truncate cursor-pointer hover:text-primary transition-colors" onClick={() => navigate(`/profile/${member.id}`)}>
+                      {resolveName(member)}
+                    </h4>
                     <p className="text-[10px] text-muted-foreground truncate">{member.title || 'Member'}</p>
                   </div>
                 </div>

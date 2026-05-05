@@ -168,7 +168,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       const conversations = new Map();
-      let totalUnreadChats = 0;
 
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
@@ -201,7 +200,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const sortedChats = Array.from(conversations.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
       
       // Calculate total unread chats (count of chats that have at least one unread message)
-      totalUnreadChats = sortedChats.filter(c => c.unread > 0).length;
+      const totalUnreadChats = sortedChats.filter(c => c.unread > 0).length;
 
       setChats(sortedChats);
       setUnreadChatsCount(totalUnreadChats);
@@ -212,18 +211,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
+    
+    // OPTIMISTIC UPDATE: Immediately clear unread for this chat in UI
+    setChats(prev => {
+      const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
+      // Recalculate global count immediately
+      const newGlobalCount = updated.filter(c => c.unread > 0).length;
+      setUnreadChatsCount(newGlobalCount);
+      return updated;
+    });
+
     try {
       const now = new Date().toISOString();
       
-      // Optimistic UI update: Clear unread for this specific chat
-      setChats(prev => {
-        const chat = prev.find(c => c.id === chatId);
-        if (chat && chat.unread > 0) {
-          // We don't decrement unreadChatsCount here because we'll refresh it from DB
-        }
-        return prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
-      });
-
       // Persist the read timestamp
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
@@ -240,11 +240,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('receiver_id', currentUser.id)
           .eq('is_read', false);
       }
-
-      // Final refresh to sync all counts
-      await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
+      // If it fails, refresh to get correct state
+      refreshChats();
     }
   };
 
@@ -297,6 +296,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refreshChats())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refreshNotifications())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reads' }, () => refreshChats())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => refreshProjects())
         .subscribe();
 
       return () => {

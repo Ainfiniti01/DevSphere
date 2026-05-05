@@ -52,7 +52,7 @@ const ChatScreen = () => {
     const fetchMessages = async () => {
       let query = supabase
         .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url)')
+        .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
         .order('created_at', { ascending: true });
 
       if (isGroup) {
@@ -84,7 +84,7 @@ const ChatScreen = () => {
 
         if (!isThisChat) return;
 
-        const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', newMsg.sender_id).single();
+        const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url, display_name').eq('id', newMsg.sender_id).single();
         
         setMessages(prev => {
           const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
@@ -188,7 +188,7 @@ const ChatScreen = () => {
           return (
             <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end`}>
               {!isMe && (
-                <Avatar className="h-8 w-8 border border-border cursor-pointer shrink-0" onClick={() => setPreviewAvatar(m.sender?.avatar_url)}>
+                <Avatar className="h-8 w-8 border border-border cursor-pointer shrink-0" onClick={() => navigate(`/profile/${m.sender?.id}`)}>
                   <AvatarImage src={m.sender?.avatar_url} />
                   <AvatarFallback><User size={14} /></AvatarFallback>
                 </Avatar>
@@ -199,7 +199,7 @@ const ChatScreen = () => {
                     className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold cursor-pointer hover:text-primary"
                     onClick={() => navigate(`/profile/${m.sender?.id}`)}
                   >
-                    {m.sender?.name}
+                    {m.sender?.display_name || m.sender?.name}
                   </span>
                 )}
                 <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] ${
