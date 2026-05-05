@@ -142,7 +142,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // 1. Get all chats I'm a member of
       const { data: myMemberships, error: memError } = await supabase
         .from('chat_members')
         .select(`
@@ -165,7 +164,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 2. Get last read timestamps
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -173,16 +171,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
-      // 3. Get latest message for each chat
       const { data: latestMessages, error: msgError } = await supabase
         .from('messages')
-        .select('*, sender:profiles(name, avatar_url, display_name)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
         .order('created_at', { ascending: false });
 
       if (msgError) throw msgError;
 
-      // 4. Get other members for DM naming
       const { data: otherMembers } = await supabase
         .from('chat_members')
         .select('chat_id, user:profiles(*)')
@@ -195,7 +191,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         memberMap.get(m.chat_id).push(m.user);
       });
 
-      // 5. Assemble chat list
       const chatList = myMemberships.map(m => {
         const chat = m.chat;
         const messages = latestMessages?.filter(msg => msg.chat_id === chat.id) || [];
@@ -242,7 +237,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser) return null;
 
     try {
-      // Check if DM already exists
       const { data: existing } = await supabase.rpc('get_dm_chat', { 
         user1: currentUser.id, 
         user2: partnerId 
@@ -250,7 +244,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (existing && existing.length > 0) return existing[0].chat_id;
 
-      // Create new chat
       const { data: newChat, error: chatError } = await supabase
         .from('chats')
         .insert({ type: 'dm' })
@@ -259,7 +252,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (chatError) throw chatError;
 
-      // Add members
       await supabase.from('chat_members').insert([
         { chat_id: newChat.id, user_id: currentUser.id },
         { chat_id: newChat.id, user_id: partnerId }
@@ -283,7 +275,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      // Optimistic update
       setChats(prev => prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c));
       setUnreadChatsCount(prev => Math.max(0, prev - 1));
     } catch (error) {

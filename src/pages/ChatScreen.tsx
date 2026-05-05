@@ -39,7 +39,6 @@ const ChatScreen = () => {
 
     const fetchChatData = async () => {
       try {
-        // 1. Get Chat Metadata
         const { data: chat, error: chatError } = await supabase
           .from('chats')
           .select('*, project:projects(title, thumbnail_url)')
@@ -48,7 +47,6 @@ const ChatScreen = () => {
 
         if (chatError) throw chatError;
 
-        // 2. Get Partner Info if DM
         if (chat.type === 'dm') {
           const { data: partner } = await supabase
             .from('chat_members')
@@ -61,10 +59,9 @@ const ChatScreen = () => {
         }
         setChatMeta(chat);
 
-        // 3. Get Messages (Paginated)
         const { data: msgs, error: msgError } = await supabase
           .from('messages')
-          .select('*, sender:profiles(id, name, avatar_url, display_name)')
+          .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
           .eq('chat_id', chatId)
           .order('created_at', { ascending: true })
           .limit(100);
@@ -72,7 +69,6 @@ const ChatScreen = () => {
         if (msgError) throw msgError;
         setMessages(msgs || []);
 
-        // 4. Get Partner's Last Read
         const { data: reads } = await supabase
           .from('chat_reads')
           .select('last_read_at')
@@ -94,7 +90,6 @@ const ChatScreen = () => {
 
     fetchChatData();
 
-    // Real-time subscription PER CHAT
     const channel = supabase
       .channel(`chat:${chatId}`)
       .on('postgres_changes', { 
@@ -105,7 +100,6 @@ const ChatScreen = () => {
       }, async (payload) => {
         const newMsg = payload.new;
         
-        // Fetch sender profile if not me
         let senderInfo = null;
         if (newMsg.sender_id === currentUser.id) {
           senderInfo = { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name };
@@ -154,7 +148,6 @@ const ChatScreen = () => {
       type: 'text'
     };
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,
