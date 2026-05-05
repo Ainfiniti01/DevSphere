@@ -8,7 +8,7 @@ import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, Che
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const ChatScreen = () => {
   const { id } = useParams();
@@ -30,7 +30,6 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
-  // Mark chat as read when opened or when new messages arrive
   useEffect(() => {
     if (id && currentUser) {
       markAsRead(id, isGroup);
@@ -45,7 +44,6 @@ const ChatScreen = () => {
         const { data } = await supabase.from('projects').select('*').eq('id', id).single();
         setChatPartner(data);
         
-        // For groups, seen means at least one other person has read it since the message was sent
         const { data: reads } = await supabase
           .from('chat_reads')
           .select('last_read_at')
@@ -61,7 +59,6 @@ const ChatScreen = () => {
         const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
         setChatPartner(data);
 
-        // For 1-on-1, check when the specific partner last read this chat
         const { data: read } = await supabase
           .from('chat_reads')
           .select('last_read_at')
@@ -95,7 +92,6 @@ const ChatScreen = () => {
     fetchChatInfo();
     fetchMessages();
 
-    // Subscribe to new messages and read receipts
     const channel = supabase
       .channel(`chat_room_${id}`)
       .on('postgres_changes', { 
@@ -125,7 +121,6 @@ const ChatScreen = () => {
         table: 'chat_reads' 
       }, (payload) => {
         const data = payload.new as any;
-        // Update partnerLastRead if the other person (or any other person in group) updates their read status
         const isRelevantRead = isGroup 
           ? data.chat_id === id && data.user_id !== currentUser.id
           : data.chat_id === currentUser.id && data.user_id === id;
@@ -213,7 +208,6 @@ const ChatScreen = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
         {messages.map((m) => {
           const isMe = m.sender_id === currentUser?.id;
-          // Message is seen if it's explicitly marked read OR if the partner's last read timestamp is after this message
           const isSeen = m.is_read || partnerLastRead >= new Date(m.created_at).getTime();
           
           return (
@@ -272,6 +266,10 @@ const ChatScreen = () => {
 
       <Dialog open={!!previewAvatar} onOpenChange={() => setPreviewAvatar(null)}>
         <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-full flex items-center justify-center">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Avatar Preview</DialogTitle>
+            <DialogDescription>Full size view of the profile picture</DialogDescription>
+          </DialogHeader>
           <div className="relative group">
             <img src={previewAvatar || ''} className="max-w-[90vw] max-h-[80vh] rounded-3xl shadow-2xl border-4 border-white/10 object-contain" />
             <button onClick={() => setPreviewAvatar(null)} className="absolute -top-4 -right-4 bg-white text-black p-2 rounded-full shadow-xl"><X size={20} /></button>

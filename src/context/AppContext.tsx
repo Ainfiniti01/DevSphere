@@ -104,10 +104,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // Fixed: Using simpler relationship selection to avoid fkey constraint name errors
+      // Fixed: Using explicit relationship hint to resolve PGRST200 error
       const { data: reqData, error: reqError } = await supabase
         .from('join_requests')
-        .select('*, user:profiles(*)');
+        .select('*, user:profiles!user_id(*)');
       
       if (!reqError && reqData) {
         setRequests(reqData);
@@ -140,20 +140,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // CRITICAL: Fetch read state first.
       const { data: readData, error: readError } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
       if (readError) {
-        if (readError.code === '42501') {
-          console.error("CRITICAL: Permission denied for chat_reads. Please run the SQL fix in Supabase dashboard.");
-          toast.error("Messaging system requires database permissions. Please check console.");
-        } else {
-          console.error("CRITICAL: Failed to fetch chat_reads.", readError);
-        }
-        // STOP processing as per non-negotiable requirement
+        console.error("CRITICAL: Failed to fetch chat_reads.", readError);
         return;
       }
 
@@ -223,7 +216,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
-    // Optimistic UI update
     setChats(prev => {
       const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
       const newGlobalCount = updated.filter(c => c.unread > 0).length;
