@@ -19,24 +19,13 @@ const MobileLayout = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadChatsCount, unreadNotificationsCount } = useApp();
-
-  const formatBadge = (count: number) => {
-    if (count <= 0) return null;
-    if (count > 99) return "99+";
-    return count.toString();
-  };
+  const { unreadNotificationsCount } = useApp();
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Explore', path: '/explore' },
     { icon: PlusSquare, label: 'Create', path: '/create' },
-    { 
-      icon: MessageSquare, 
-      label: 'Messages', 
-      path: '/messages',
-      badge: formatBadge(unreadChatsCount)
-    },
+    { icon: MessageSquare, label: 'Messages', path: '/messages' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 
@@ -82,11 +71,6 @@ const MobileLayout = ({
               >
                 <div className="relative">
                   <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                  {item.badge && (
-                    <span className="absolute -top-2 -right-2 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-background min-w-[18px] flex items-center justify-center">
-                      {item.badge}
-                    </span>
-                  )}
                 </div>
                 <span className="text-[10px] font-medium">{item.label}</span>
               </button>

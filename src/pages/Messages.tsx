@@ -51,12 +51,6 @@ const Messages = () => {
     );
   }, [users, userSearch]);
 
-  const formatBadge = (count: number) => {
-    if (count <= 0) return null;
-    if (count > 99) return "99+";
-    return count.toString();
-  };
-
   return (
     <MobileLayout title="Messages">
       <div className="px-4 py-4">
@@ -142,15 +136,10 @@ const Messages = () => {
                     <h4 className="font-bold truncate text-sm">{chat.name}</h4>
                     <span className="text-[10px] text-muted-foreground font-medium">{chat.time}</span>
                   </div>
-                  <p className={`text-xs truncate ${chat.unread > 0 ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
+                  <p className="text-xs truncate text-muted-foreground">
                     {chat.lastMsg}
                   </p>
                 </div>
-                {chat.unread > 0 && (
-                  <div className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] flex items-center justify-center shadow-sm shadow-primary/50">
-                    {formatBadge(chat.unread)}
-                  </div>
-                )}
               </div>
             ))
           ) : (
