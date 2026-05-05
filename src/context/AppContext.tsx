@@ -104,6 +104,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
+      // Fixed relationship name from 'user' to 'profiles'
       const { data: reqData } = await supabase
         .from('join_requests')
         .select('*, user:profiles(*)');
@@ -206,6 +207,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
+    // Optimistic UI update
     setChats(prev => {
       const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
       const newGlobalCount = updated.filter(c => c.unread > 0).length;
@@ -215,11 +217,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const now = new Date().toISOString();
-      await supabase.from('chat_reads').upsert({
+      const { error } = await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
+
+      if (error) throw error;
 
       if (!isGroup) {
         await supabase
@@ -231,6 +235,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error("Mark as read error:", error);
+      // Revert or refresh on error
       refreshChats();
     }
   };
