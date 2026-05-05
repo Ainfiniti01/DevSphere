@@ -132,12 +132,22 @@ const ManageTeam = () => {
             {projectRequests.map(req => (
               <div key={req.id} className="bg-card border border-border p-5 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex gap-4 mb-4">
-                  <Avatar className="h-12 w-12 border border-border cursor-pointer" onClick={() => navigate(`/profile/${req.user_id}`)}>
-                    <AvatarImage src={req.user?.avatar_url} />
-                    <AvatarFallback><User size={20} /></AvatarFallback>
-                  </Avatar>
+                  <div 
+                    className="cursor-pointer" 
+                    onClick={() => navigate(`/profile/${req.user_id}`)}
+                  >
+                    <Avatar className="h-12 w-12 border border-border">
+                      <AvatarImage src={req.user?.avatar_url} />
+                      <AvatarFallback><User size={20} /></AvatarFallback>
+                    </Avatar>
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold truncate">{resolveName(req.user)}</h4>
+                    <h4 
+                      className="text-sm font-bold truncate cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => navigate(`/profile/${req.user_id}`)}
+                    >
+                      {resolveName(req.user)}
+                    </h4>
                     <p className="text-[11px] text-primary font-medium truncate">{req.user?.title || 'Developer'}</p>
                   </div>
                 </div>
@@ -147,14 +157,20 @@ const ManageTeam = () => {
                 </div>
                 <div className="flex gap-3">
                   <Button 
-                    onClick={() => handleRequest(req.id, 'accepted', req.user_id)} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRequest(req.id, 'accepted', req.user_id);
+                    }} 
                     disabled={!!isProcessing}
                     className="flex-1 h-11 rounded-xl bg-primary text-xs font-bold gap-2 shadow-lg shadow-primary/20"
                   >
                     {isProcessing === req.id ? <Loader2 className="animate-spin" size={16} /> : <><Check size={16} /> Accept</>}
                   </Button>
                   <Button 
-                    onClick={() => handleRequest(req.id, 'rejected', req.user_id)} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRequest(req.id, 'rejected', req.user_id);
+                    }} 
                     disabled={!!isProcessing}
                     variant="outline" 
                     className="flex-1 h-11 rounded-xl text-xs font-bold gap-2 border-border"
