@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from '@/context/AppContext';
 import { toast } from "sonner";
-import { Camera, Loader2, AtSign } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const EditProfile = () => {
@@ -22,8 +22,6 @@ const EditProfile = () => {
   
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
-    display_name: currentUser?.display_name || '',
-    username: currentUser?.username || '',
     title: currentUser?.title || '',
     bio: currentUser?.bio || '',
     skills: currentUser?.skills?.join(', ') || '',
@@ -69,8 +67,6 @@ const EditProfile = () => {
       const updates = {
         id: currentUser.id,
         name: formData.name,
-        display_name: formData.display_name,
-        username: formData.username.toLowerCase().replace(/[^a-z0-9_]/g, ''),
         title: formData.title,
         bio: formData.bio,
         skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
@@ -87,11 +83,7 @@ const EditProfile = () => {
       toast.success("Profile updated successfully!");
       navigate('/profile');
     } catch (error: any) {
-      if (error.message.includes('unique constraint')) {
-        toast.error("Username is already taken");
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -116,22 +108,6 @@ const EditProfile = () => {
         </div>
 
         <div className="space-y-5">
-          <div className="space-y-1.5">
-            <Label>Username</Label>
-            <div className="relative">
-              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-              <Input 
-                value={formData.username} 
-                onChange={e => setFormData({...formData, username: e.target.value})} 
-                className="rounded-xl h-12 pl-10" 
-                placeholder="johndoe"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Display Name (Public)</Label>
-            <Input value={formData.display_name} onChange={e => setFormData({...formData, display_name: e.target.value})} className="rounded-xl h-12" placeholder="John D." />
-          </div>
           <div className="space-y-1.5">
             <Label>Full Name</Label>
             <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="rounded-xl h-12" />
