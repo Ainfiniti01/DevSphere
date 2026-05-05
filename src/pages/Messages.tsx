@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Plus, Users, MessageSquare, User } from 'lucide-react';
+import { Search, Plus, Users, MessageSquare, User, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ListSkeleton } from '@/components/SkeletonLoader';
 import EmptyState from '@/components/EmptyState';
@@ -11,51 +11,67 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from '@/components/ui/button';
 
 const Messages = () => {
   const navigate = useNavigate();
   const { chats, refreshChats, currentUser } = useApp();
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshChats();
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
     const init = async () => {
+      setIsLoading(true);
       try {
         await refreshChats();
         if (supabase && currentUser?.id) {
-          const { data } = await supabase.from('profiles').select('*').neq('id', currentUser.id);
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .neq('id', currentUser.id)
+            .limit(20);
           setUsers(data || []);
         }
       } catch (error) {
-        console.error("Failed to load chats:", error);
+        console.error("Failed to load initial message data:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    init();
+    
+    if (currentUser?.id) {
+      init();
+    }
   }, [currentUser?.id]);
 
   const filteredChats = useMemo(() => {
     return chats.filter(chat => 
-      chat.name?.toLowerCase().includes(search.toLowerCase()) ||
-      chat.lastMsg?.toLowerCase().includes(search.toLowerCase())
+      (chat.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (chat.lastMsg || '').toLowerCase().includes(search.toLowerCase())
     );
   }, [chats, search]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
-      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.title?.toLowerCase().includes(userSearch.toLowerCase())
+      (u.name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.title || '').toLowerCase().includes(userSearch.toLowerCase())
     );
   }, [users, userSearch]);
 
   return (
     <MobileLayout title="Messages">
       <div className="px-4 py-4">
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative flex-1 mr-4">
+        <div className="flex items-center justify-between mb-6 gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <input 
               className="w-full pl-9 pr-4 py-2 bg-accent/20 border border-border rounded-xl text-sm outline-none focus:ring-2 ring-primary/50" 
@@ -65,49 +81,64 @@ const Messages = () => {
             />
           </div>
           
-          <Sheet>
-            <SheetTrigger asChild>
-              <button className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-transform">
-                <Plus size={20} />
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh] rounded-t-[2rem] bg-background border-border">
-              <SheetHeader className="pb-4 border-b border-border">
-                <SheetTitle className="text-xl font-bold">New Message</SheetTitle>
-              </SheetHeader>
-              <div className="py-4">
-                <div className="relative mb-6">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                  <input 
-                    className="w-full pl-9 pr-4 py-3 bg-accent/20 border border-border rounded-xl text-sm outline-none" 
-                    placeholder="Search developers..." 
-                    value={userSearch}
-                    onChange={e => setUserSearch(e.target.value)}
-                  />
-                </div>
-                <ScrollArea className="h-[50vh]">
-                  <div className="space-y-2">
-                    {filteredUsers.map(u => (
-                      <div 
-                        key={u.id} 
-                        onClick={() => navigate(`/chat/${u.id}`)}
-                        className="flex items-center gap-3 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors"
-                      >
-                        <Avatar className="h-12 w-12 border border-border">
-                          <AvatarImage src={u.avatar_url} />
-                          <AvatarFallback><User size={20} /></AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-sm truncate">{u.name}</h4>
-                          <p className="text-xs text-muted-foreground truncate">{u.title}</p>
-                        </div>
-                      </div>
-                    ))}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-xl h-10 w-10 shrink-0"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+            </Button>
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button className="h-10 w-10 p-0 rounded-xl shadow-lg shadow-primary/20 shrink-0">
+                  <Plus size={20} />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[80vh] rounded-t-[2rem] bg-background border-border">
+                <SheetHeader className="pb-4 border-b border-border">
+                  <SheetTitle className="text-xl font-bold">New Message</SheetTitle>
+                </SheetHeader>
+                <div className="py-4">
+                  <div className="relative mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <input 
+                      className="w-full pl-9 pr-4 py-3 bg-accent/20 border border-border rounded-xl text-sm outline-none" 
+                      placeholder="Search developers..." 
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                    />
                   </div>
-                </ScrollArea>
-              </div>
-            </SheetContent>
-          </Sheet>
+                  <ScrollArea className="h-[50vh]">
+                    <div className="space-y-2">
+                      {filteredUsers.map(u => (
+                        <div 
+                          key={u.id} 
+                          onClick={() => navigate(`/chat/${u.id}`)}
+                          className="flex items-center gap-3 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors"
+                        >
+                          <Avatar className="h-12 w-12 border border-border">
+                            <AvatarImage src={u.avatar_url} />
+                            <AvatarFallback><User size={20} /></AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-sm truncate">{u.name}</h4>
+                            <p className="text-xs text-muted-foreground truncate">{u.title}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredUsers.length === 0 && (
+                        <p className="text-center text-muted-foreground py-10 text-sm">No developers found.</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -118,12 +149,12 @@ const Messages = () => {
               <div 
                 key={chat.id} 
                 onClick={() => navigate(`/chat/${chat.id}${chat.isGroup ? '?group=true' : ''}`)}
-                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors"
+                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors group"
               >
                 <div className="relative">
-                  <Avatar className="h-14 w-14 border-2 border-border shadow-sm">
+                  <Avatar className="h-14 w-14 border-2 border-border shadow-sm group-hover:border-primary/30 transition-colors">
                     <AvatarImage src={chat.avatar} />
-                    <AvatarFallback>{chat.name?.[0] || '?'}</AvatarFallback>
+                    <AvatarFallback>{(chat.name || '?')[0]}</AvatarFallback>
                   </Avatar>
                   {chat.isGroup && (
                     <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-lg border-2 border-background">
@@ -143,7 +174,7 @@ const Messages = () => {
                       {chat.lastMsg}
                     </p>
                     {chat.unread > 0 && (
-                      <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                      <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse">
                         {chat.unread > 99 ? '99+' : chat.unread}
                       </span>
                     )}
