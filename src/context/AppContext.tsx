@@ -20,7 +20,7 @@ interface AppContextType {
   logout: () => void;
   toggleLike: (projectId: string) => Promise<void>;
   addComment: (projectId: string, text: string) => Promise<void>;
-  refreshProjects: () => Promise<void>;
+  refreshProjects: (userOverride?: any) => Promise<void>;
   refreshNotifications: () => Promise<void>;
   refreshChats: () => Promise<void>;
   markAsRead: (chatId: string, isGroup: boolean) => Promise<void>;
@@ -75,10 +75,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id]);
 
-  const refreshProjects = async () => {
+  const refreshProjects = async (userOverride?: any) => {
     if (!supabase) return;
+    
+    // Use provided user or current state
+    const activeUser = userOverride || currentUser;
+
     try {
-      // 1. Fetch Projects with creators and comments
+      // 1. Fetch Projects (Publicly accessible)
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -95,7 +99,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const transformed = data.map(p => ({
         ...p,
         likes: p.likes?.length || 0,
-        isLiked: p.likes?.some((l: any) => l.user_id === currentUser?.id),
+        isLiked: p.likes?.some((l: any) => l.user_id === activeUser?.id),
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
@@ -105,35 +109,40 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // 2. Fetch Join Requests and Profiles separately to avoid PGRST200 relationship error
-      const { data: reqData, error: reqError } = await supabase
-        .from('join_requests')
-        .select('*');
-      
-      if (!reqError && reqData) {
-        const userIds = [...new Set(reqData.map(r => r.user_id))].filter(Boolean);
+      // 2. Only fetch Join Requests if user is authenticated to avoid 401/42501 errors
+      if (activeUser?.id) {
+        const { data: reqData, error: reqError } = await supabase
+          .from('join_requests')
+          .select('*');
         
-        if (userIds.length > 0) {
-          const { data: userData, error: userError } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('id', userIds);
+        if (!reqError && reqData) {
+          const userIds = [...new Set(reqData.map(r => r.user_id))].filter(Boolean);
           
-          if (!userError && userData) {
-            const userMap = new Map(userData.map(u => [u.id, u]));
-            const enrichedRequests = reqData.map(r => ({
-              ...r,
-              user: userMap.get(r.user_id)
-            }));
-            setRequests(enrichedRequests);
+          if (userIds.length > 0) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('*')
+              .in('id', userIds);
+            
+            if (!userError && userData) {
+              const userMap = new Map(userData.map(u => [u.id, u]));
+              const enrichedRequests = reqData.map(r => ({
+                ...r,
+                user: userMap.get(r.user_id)
+              }));
+              setRequests(enrichedRequests);
+            } else {
+              setRequests(reqData);
+            }
           } else {
             setRequests(reqData);
           }
-        } else {
-          setRequests(reqData);
+        } else if (reqError) {
+          // Log but don't crash
+          console.warn("Join requests fetch skipped or failed:", reqError.message);
         }
-      } else if (reqError) {
-        console.error("Refresh join_requests error:", reqError);
+      } else {
+        setRequests([]);
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error);
@@ -273,23 +282,30 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initApp = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      let user = null;
+      
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
-        setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
+        user = profile ? { ...session.user, ...profile } : session.user;
+        setCurrentUser(user);
       }
 
-      await refreshProjects();
+      // Pass the user explicitly to refreshProjects to ensure correct state during init
+      await refreshProjects(user);
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          setCurrentUser(profile ? { ...session.user, ...profile } : session.user);
+          const newUser = profile ? { ...session.user, ...profile } : session.user;
+          setCurrentUser(newUser);
+          refreshProjects(newUser);
         } else {
           setCurrentUser(null);
           setNotifications([]);
           setChats([]);
           setUnreadChatsCount(0);
           setUnreadNotificationsCount(0);
+          refreshProjects(null);
         }
       });
 
