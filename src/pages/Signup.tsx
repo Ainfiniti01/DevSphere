@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from 'lucide-react';
@@ -19,7 +18,6 @@ const Signup = () => {
     email: '',
     password: '',
     title: '',
-    bio: '',
     skills: '',
     location: '',
     portfolio_url: ''
@@ -64,7 +62,6 @@ const Signup = () => {
             id: data.user.id,
             name: formData.name,
             title: formData.title,
-            bio: formData.bio,
             skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
             location: formData.location,
             portfolio_url: formData.portfolio_url,
@@ -110,7 +107,7 @@ const Signup = () => {
               className="rounded-xl h-12 pr-10" 
             />
             <button 
-              type="button" 
+              type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             >
@@ -121,10 +118,6 @@ const Signup = () => {
         <div className="space-y-1.5">
           <Label>Professional Title</Label>
           <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Senior Developer" className="rounded-xl h-12" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Bio (Optional)</Label>
-          <Textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} placeholder="Tell us about your background..." className="rounded-xl min-h-[80px]" />
         </div>
         <div className="space-y-1.5">
           <Label>Skills (comma separated)</Label>

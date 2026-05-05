@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, Info } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2 } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
@@ -60,7 +60,7 @@ const Profile = () => {
       <MobileLayout title="Profile">
         <div className="flex flex-col items-center justify-center h-[60vh] px-6 text-center">
           <h2 className="text-xl font-bold mb-4">User not found</h2>
-          <Button onClick={() => navigate('/auth')}>Login</Button>
+          <Button onClick={() => navigate('/')}>Return Home</Button>
         </div>
       </MobileLayout>
     );
@@ -123,17 +123,6 @@ const Profile = () => {
               )}
             </div>
           </div>
-
-          {profile.bio && (
-            <section className="mb-8 bg-accent/20 p-5 rounded-3xl border border-border">
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
-                <Info size={16} /> About
-              </h3>
-              <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                {profile.bio}
-              </p>
-            </section>
-          )}
 
           <section className="mb-8">
             <h3 className="text-lg font-bold mb-4">Skills</h3>
