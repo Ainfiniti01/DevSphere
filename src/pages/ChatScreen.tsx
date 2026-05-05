@@ -50,7 +50,7 @@ const ChatScreen = () => {
         if (chat.type === 'dm') {
           const { data: partner } = await supabase
             .from('chat_members')
-            .select('user:profiles!chat_members_user_id_fkey(*)')
+            .select('user:profiles!user_id(*)')
             .eq('chat_id', chatId)
             .neq('user_id', currentUser.id)
             .single();
@@ -61,7 +61,7 @@ const ChatScreen = () => {
 
         const { data: msgs, error: msgError } = await supabase
           .from('messages')
-          .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
+          .select('*, sender:profiles!sender_id(id, name, avatar_url, display_name)')
           .eq('chat_id', chatId)
           .order('created_at', { ascending: true })
           .limit(100);
