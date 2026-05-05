@@ -211,23 +211,23 @@ const ChatScreen = () => {
           const isSeen = partnerLastRead >= new Date(m.created_at).getTime();
           
           return (
-            <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end`}>
+            <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end w-full`}>
               {!isMe && (
                 <Avatar className="h-8 w-8 border border-border cursor-pointer shrink-0" onClick={() => navigate(`/profile/${m.sender?.id}`)}>
                   <AvatarImage src={m.sender?.avatar_url} />
                   <AvatarFallback><User size={14} /></AvatarFallback>
                 </Avatar>
               )}
-              <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
+              <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%] min-w-0`}>
                 {!isMe && isGroup && (
                   <span 
-                    className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold cursor-pointer hover:text-primary"
+                    className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold cursor-pointer hover:text-primary truncate max-w-full"
                     onClick={() => navigate(`/profile/${m.sender?.id}`)}
                   >
                     {m.sender?.display_name || m.sender?.name}
                   </span>
                 )}
-                <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] break-words whitespace-pre-wrap ${
+                <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] break-all whitespace-pre-wrap overflow-hidden ${
                   isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
                 }`}>
                   {m.content}
