@@ -60,7 +60,7 @@ const Profile = () => {
       <MobileLayout title="Profile">
         <div className="flex flex-col items-center justify-center h-[60vh] px-6 text-center">
           <h2 className="text-xl font-bold mb-4">User not found</h2>
-          <Button onClick={() => navigate('/')}>Return Home</Button>
+          <Button onClick={() => navigate('/login')}>login</Button>
         </div>
       </MobileLayout>
     );
