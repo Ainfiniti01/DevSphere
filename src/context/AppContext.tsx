@@ -104,15 +104,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // Fixed relationship name to use explicit foreign key reference
       const { data: reqData, error: reqError } = await supabase
         .from('join_requests')
         .select('*, user:profiles!join_requests_user_id_fkey(*)');
       
       if (!reqError && reqData) {
         setRequests(reqData);
-      } else if (reqError) {
-        console.error("Join requests error:", reqError);
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error);
@@ -140,12 +137,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
+      // CRITICAL: Fetch read state first. If this fails, we STOP.
       const { data: readData, error: readError } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
-      // If we get a 403, we'll just proceed with an empty read map for now
+      if (readError) {
+        console.error("CRITICAL: Failed to fetch chat_reads. Stopping chat processing.", readError);
+        return;
+      }
+
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
       const { data: memberProjects } = await supabase
@@ -212,7 +214,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
-    // Optimistic UI update - we keep this even if the server fails to ensure the banner clears for the session
+    // Optimistic UI update
     setChats(prev => {
       const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
       const newGlobalCount = updated.filter(c => c.unread > 0).length;
@@ -222,17 +224,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const now = new Date().toISOString();
+      // This must succeed now that RLS is fixed
       const { error } = await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      // If we get a permission error, we don't call refreshChats to avoid reverting the optimistic UI
-      if (error) {
-        console.warn("Could not update read status on server:", error.message);
-        return;
-      }
+      if (error) throw error;
 
       if (!isGroup) {
         await supabase
@@ -243,7 +242,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('is_read', false);
       }
     } catch (error) {
-      console.error("Mark as read error:", error);
+      console.error("CRITICAL: markAsRead failed. Reverting UI state.", error);
+      refreshChats();
     }
   };
 
