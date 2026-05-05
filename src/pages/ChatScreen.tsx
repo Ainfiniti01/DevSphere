@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, CheckCheck } from 'lucide-react';
+import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, CheckCheck, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -30,6 +30,7 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
+  // Mark as read whenever messages change or we enter the chat
   useEffect(() => {
     if (id && currentUser) {
       markAsRead(id, isGroup);
@@ -92,6 +93,7 @@ const ChatScreen = () => {
     fetchChatInfo();
     fetchMessages();
 
+    // Real-time subscription for messages and read receipts
     const channel = supabase
       .channel(`chat_room_${id}`)
       .on('postgres_changes', { 
@@ -107,12 +109,24 @@ const ChatScreen = () => {
 
         if (!isThisChat) return;
 
-        const { data: sender } = await supabase.from('profiles').select('id, name, avatar_url, display_name').eq('id', newMsg.sender_id).single();
+        // Optimization: If it's from me or the partner we already have info for, don't fetch profile
+        let senderInfo = null;
+        if (newMsg.sender_id === currentUser.id) {
+          senderInfo = { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name };
+        } else if (!isGroup && newMsg.sender_id === id) {
+          senderInfo = { id: chatPartner?.id, name: chatPartner?.name, avatar_url: chatPartner?.avatar_url, display_name: chatPartner?.display_name };
+        } else {
+          const { data } = await supabase.from('profiles').select('id, name, avatar_url, display_name').eq('id', newMsg.sender_id).single();
+          senderInfo = data;
+        }
         
         setMessages(prev => {
-          const exists = prev.some(m => m.id === newMsg.id);
-          if (exists) return prev;
-          return [...prev, { ...newMsg, sender }];
+          // Prevent duplicates from optimistic updates
+          const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
+          if (exists) {
+            return prev.map(m => (m.isOptimistic && m.content === newMsg.content) ? { ...newMsg, sender: senderInfo } : m);
+          }
+          return [...prev, { ...newMsg, sender: senderInfo }];
         });
       })
       .on('postgres_changes', { 
@@ -134,7 +148,7 @@ const ChatScreen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, currentUser?.id, isGroup]);
+  }, [id, currentUser?.id, isGroup, chatPartner?.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -159,12 +173,13 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
+    // Optimistic update for instant feel
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: tempId,
       ...messageData,
       created_at: new Date().toISOString(),
-      sender: currentUser,
+      sender: { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name },
       isOptimistic: true
     }]);
 
@@ -176,6 +191,15 @@ const ChatScreen = () => {
       setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
+
+  if (loading && messages.length === 0) {
+    return (
+      <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={32} />
+        <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border overflow-hidden">
