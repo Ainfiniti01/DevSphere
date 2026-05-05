@@ -50,7 +50,7 @@ const ChatScreen = () => {
         if (chat.type === 'dm') {
           const { data: partner } = await supabase
             .from('chat_members')
-            .select('user:profiles(*)')
+            .select('user:profiles!chat_members_user_id_fkey(*)')
             .eq('chat_id', chatId)
             .neq('user_id', currentUser.id)
             .single();

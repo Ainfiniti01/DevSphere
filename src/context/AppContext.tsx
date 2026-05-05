@@ -86,9 +86,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .select(`
           *,
           creator:profiles!projects_creator_id_fkey(*),
-          comments(*, user:profiles(name, avatar_url, display_name)),
+          comments(*, user:profiles!comments_user_id_fkey(name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user:profiles(*))
+          project_members(user:profiles!project_members_user_id_fkey(*))
         `)
         .order('created_at', { ascending: false });
 
@@ -110,7 +110,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (activeUser?.id) {
         const { data: reqData, error: reqError } = await supabase
           .from('join_requests')
-          .select('*, user:profiles(*)');
+          .select('*, user:profiles!join_requests_user_id_fkey(*)');
         
         if (!reqError) setRequests(reqData || []);
       } else {
@@ -181,7 +181,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: otherMembers } = await supabase
         .from('chat_members')
-        .select('chat_id, user:profiles(*)')
+        .select('chat_id, user:profiles!chat_members_user_id_fkey(*)')
         .in('chat_id', chatIds)
         .neq('user_id', currentUser.id);
 
