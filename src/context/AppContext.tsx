@@ -107,10 +107,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       // Fixed: Using simpler relationship selection to avoid fkey constraint name errors
       const { data: reqData, error: reqError } = await supabase
         .from('join_requests')
-        .select('*, user:profiles(id, name, avatar_url, display_name, title)');
+        .select('*, user:profiles(*)');
       
       if (!reqError && reqData) {
         setRequests(reqData);
+      } else if (reqError) {
+        console.error("Refresh join_requests error:", reqError);
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error);
