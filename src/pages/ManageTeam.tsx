@@ -37,20 +37,25 @@ const ManageTeam = () => {
     if (!supabase) return;
     setIsProcessing(reqId);
     try {
-      const { error } = await supabase
+      // 1. Update the request status
+      const { error: reqError } = await supabase
         .from('join_requests')
         .update({ status })
         .eq('id', reqId);
 
-      if (error) throw error;
+      if (reqError) throw reqError;
 
       if (status === 'accepted') {
-        await supabase.from('project_members').insert({
+        // 2. Add to project members (this automatically grants access to the group chat)
+        const { error: memberError } = await supabase.from('project_members').insert({
           project_id: project.id,
           user_id: userId,
           role: 'Member'
         });
         
+        if (memberError && memberError.code !== '23505') throw memberError;
+
+        // 3. Notify the user
         await supabase.from('notifications').insert({
           user_id: userId,
           actor_id: currentUser.id,
@@ -61,6 +66,14 @@ const ManageTeam = () => {
         
         toast.success("Member added to team!");
       } else {
+        // Notify about rejection
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          actor_id: currentUser.id,
+          type: 'request_rejected',
+          project_id: project.id,
+          content: `declined your request to join ${project.title}`
+        });
         toast.info("Request declined");
       }
       
@@ -119,14 +132,13 @@ const ManageTeam = () => {
             {projectRequests.map(req => (
               <div key={req.id} className="bg-card border border-border p-5 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex gap-4 mb-4">
-                  <Avatar className="h-12 w-12 border border-border cursor-pointer" onClick={() => navigate(`/profile/${req.user?.id}`)}>
+                  <Avatar className="h-12 w-12 border border-border cursor-pointer" onClick={() => navigate(`/profile/${req.user_id}`)}>
                     <AvatarImage src={req.user?.avatar_url} />
                     <AvatarFallback><User size={20} /></AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold truncate">{resolveName(req.user)}</h4>
                     <p className="text-[11px] text-primary font-medium truncate">{req.user?.title || 'Developer'}</p>
-                    {req.user?.username && <p className="text-[10px] text-muted-foreground">@{req.user.username}</p>}
                   </div>
                 </div>
                 <div className="bg-accent/30 p-3 rounded-2xl mb-4">
@@ -176,7 +188,6 @@ const ManageTeam = () => {
                   <div className="min-w-0">
                     <h4 className="text-sm font-bold truncate">{resolveName(member)}</h4>
                     <p className="text-[10px] text-muted-foreground truncate">{member.title || 'Member'}</p>
-                    {member.username && <p className="text-[9px] text-primary font-medium">@{member.username}</p>}
                   </div>
                 </div>
                 <div className="flex gap-2">

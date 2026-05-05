@@ -103,6 +103,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }));
 
       setProjects(transformed);
+
+      // Also refresh requests for the current user's projects
+      const { data: reqData } = await supabase
+        .from('join_requests')
+        .select('*, user:profiles(*)');
+      
+      if (reqData) setRequests(reqData);
     } catch (error: any) {
       console.error("Refresh projects error:", error);
     }
@@ -129,25 +136,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // 1. Fetch last_read_at for all chats - Handle 403 gracefully
-      const { data: readData, error: readError } = await supabase
+      // 1. Fetch last_read_at for all chats
+      const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
-      if (readError) {
-        console.warn("Chat reads fetch failed (likely RLS/Session sync):", readError.message);
-      }
-      
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
       // 2. Fetch project memberships for group chats
-      const { data: memberProjects, error: memberError } = await supabase
+      const { data: memberProjects } = await supabase
         .from('project_members')
         .select('project_id')
         .eq('user_id', currentUser.id);
-      
-      if (memberError) console.warn("Project members fetch failed:", memberError.message);
       
       const projectIds = memberProjects?.map(p => p.project_id) || [];
       
@@ -167,7 +168,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       const conversations = new Map();
-      let unreadChats = 0;
+      let totalUnreadChats = 0;
 
       data?.forEach(msg => {
         const isGroup = !!msg.project_id;
@@ -189,7 +190,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             isGroup,
             lastTimestamp: new Date(msg.created_at).getTime()
           });
-          if (isUnread) unreadChats++;
         } else {
           const chat = conversations.get(chatId);
           if (isUnread) {
@@ -199,8 +199,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       const sortedChats = Array.from(conversations.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+      
+      // Calculate total unread chats (count of chats that have at least one unread message)
+      totalUnreadChats = sortedChats.filter(c => c.unread > 0).length;
+
       setChats(sortedChats);
-      setUnreadChatsCount(unreadChats);
+      setUnreadChatsCount(totalUnreadChats);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
@@ -211,20 +215,23 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const now = new Date().toISOString();
       
+      // Optimistic UI update: Clear unread for this specific chat
       setChats(prev => {
         const chat = prev.find(c => c.id === chatId);
         if (chat && chat.unread > 0) {
-          setUnreadChatsCount(count => Math.max(0, count - 1));
+          // We don't decrement unreadChatsCount here because we'll refresh it from DB
         }
         return prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
       });
 
+      // Persist the read timestamp
       await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
+      // Compatibility for 1-on-1 is_read flag
       if (!isGroup) {
         await supabase
           .from('messages')
@@ -234,6 +241,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('is_read', false);
       }
 
+      // Final refresh to sync all counts
       await refreshChats();
     } catch (error) {
       console.error("Mark as read error:", error);
