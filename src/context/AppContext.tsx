@@ -104,9 +104,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
+      // Fixed: Using simpler relationship selection to avoid fkey constraint name errors
       const { data: reqData, error: reqError } = await supabase
         .from('join_requests')
-        .select('*, user:profiles!join_requests_user_id_fkey(*)');
+        .select('*, user:profiles(id, name, avatar_url, display_name, title)');
       
       if (!reqError && reqData) {
         setRequests(reqData);
@@ -137,14 +138,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      // CRITICAL: Fetch read state first. If this fails, we STOP.
+      // CRITICAL: Fetch read state first.
       const { data: readData, error: readError } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
       if (readError) {
-        console.error("CRITICAL: Failed to fetch chat_reads. Stopping chat processing.", readError);
+        if (readError.code === '42501') {
+          console.error("CRITICAL: Permission denied for chat_reads. Please run the SQL fix in Supabase dashboard.");
+          toast.error("Messaging system requires database permissions. Please check console.");
+        } else {
+          console.error("CRITICAL: Failed to fetch chat_reads.", readError);
+        }
+        // STOP processing as per non-negotiable requirement
         return;
       }
 
@@ -224,7 +231,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const now = new Date().toISOString();
-      // This must succeed now that RLS is fixed
       const { error } = await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
