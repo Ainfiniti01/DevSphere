@@ -78,6 +78,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshProjects = async () => {
     if (!supabase) return;
     try {
+      // 1. Fetch Projects with creators and comments
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -104,13 +105,33 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // Fixed: Using explicit relationship hint to resolve PGRST200 error
+      // 2. Fetch Join Requests and Profiles separately to avoid PGRST200 relationship error
       const { data: reqData, error: reqError } = await supabase
         .from('join_requests')
-        .select('*, user:profiles!user_id(*)');
+        .select('*');
       
       if (!reqError && reqData) {
-        setRequests(reqData);
+        const userIds = [...new Set(reqData.map(r => r.user_id))].filter(Boolean);
+        
+        if (userIds.length > 0) {
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', userIds);
+          
+          if (!userError && userData) {
+            const userMap = new Map(userData.map(u => [u.id, u]));
+            const enrichedRequests = reqData.map(r => ({
+              ...r,
+              user: userMap.get(r.user_id)
+            }));
+            setRequests(enrichedRequests);
+          } else {
+            setRequests(reqData);
+          }
+        } else {
+          setRequests(reqData);
+        }
       } else if (reqError) {
         console.error("Refresh join_requests error:", reqError);
       }
