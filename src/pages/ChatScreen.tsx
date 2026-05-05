@@ -30,11 +30,12 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
+  // Mark chat as read when opened or when new messages arrive
   useEffect(() => {
     if (id && currentUser) {
       markAsRead(id, isGroup);
     }
-  }, [id, currentUser?.id, isGroup]);
+  }, [id, currentUser?.id, isGroup, messages.length]);
 
   useEffect(() => {
     if (!id || !currentUser || !supabase) return;
@@ -44,6 +45,7 @@ const ChatScreen = () => {
         const { data } = await supabase.from('projects').select('*').eq('id', id).single();
         setChatPartner(data);
         
+        // For groups, seen means at least one other person has read it since the message was sent
         const { data: reads } = await supabase
           .from('chat_reads')
           .select('last_read_at')
@@ -59,6 +61,7 @@ const ChatScreen = () => {
         const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
         setChatPartner(data);
 
+        // For 1-on-1, check when the specific partner last read this chat
         const { data: read } = await supabase
           .from('chat_reads')
           .select('last_read_at')
@@ -92,6 +95,7 @@ const ChatScreen = () => {
     fetchChatInfo();
     fetchMessages();
 
+    // Subscribe to new messages and read receipts
     const channel = supabase
       .channel(`chat_room_${id}`)
       .on('postgres_changes', { 
@@ -114,10 +118,6 @@ const ChatScreen = () => {
           if (exists) return prev;
           return [...prev, { ...newMsg, sender }];
         });
-        
-        if (newMsg.sender_id !== currentUser.id) {
-          markAsRead(id, isGroup);
-        }
       })
       .on('postgres_changes', { 
         event: '*', 
@@ -125,7 +125,12 @@ const ChatScreen = () => {
         table: 'chat_reads' 
       }, (payload) => {
         const data = payload.new as any;
-        if (data.chat_id === (isGroup ? id : currentUser.id) && data.user_id !== currentUser.id) {
+        // Update partnerLastRead if the other person (or any other person in group) updates their read status
+        const isRelevantRead = isGroup 
+          ? data.chat_id === id && data.user_id !== currentUser.id
+          : data.chat_id === currentUser.id && data.user_id === id;
+
+        if (isRelevantRead) {
           setPartnerLastRead(new Date(data.last_read_at).getTime());
         }
       })
@@ -208,7 +213,8 @@ const ChatScreen = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
         {messages.map((m) => {
           const isMe = m.sender_id === currentUser?.id;
-          const isSeen = partnerLastRead >= new Date(m.created_at).getTime();
+          // Message is seen if it's explicitly marked read OR if the partner's last read timestamp is after this message
+          const isSeen = m.is_read || partnerLastRead >= new Date(m.created_at).getTime();
           
           return (
             <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end w-full`}>
@@ -236,7 +242,11 @@ const ChatScreen = () => {
                       {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {isMe && (
-                      isSeen ? <CheckCheck size={12} className="text-blue-400" /> : <Check size={12} />
+                      isSeen ? (
+                        <CheckCheck size={12} className="text-blue-400" />
+                      ) : (
+                        <Check size={12} className="text-white/70" />
+                      )
                     )}
                   </div>
                 </div>
