@@ -25,6 +25,7 @@ const ChatScreen = () => {
   const [loading, setLoading] = useState(true);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initRef = useRef(false);
 
   const isOnline = (lastSeen: string) => {
     if (!lastSeen) return false;
@@ -32,9 +33,17 @@ const ChatScreen = () => {
   };
 
   useEffect(() => {
-    if (!id || !currentUser || !supabase) return;
+    if (!id || !currentUser || !supabase || initRef.current) return;
+    
+    // Prevent messaging self which causes 409 Conflict in the DB function
+    if (!isGroup && id === currentUser.id) {
+      toast.error("You cannot message yourself.");
+      navigate('/messages');
+      return;
+    }
 
     const initChat = async () => {
+      initRef.current = true;
       setLoading(true);
       try {
         let resolvedChatId = null;
@@ -74,7 +83,8 @@ const ChatScreen = () => {
             user2_id: id
           });
 
-          if (!dmError) resolvedChatId = dmChatId;
+          if (dmError) throw dmError;
+          resolvedChatId = dmChatId;
         }
 
         if (resolvedChatId) {
@@ -105,16 +115,17 @@ const ChatScreen = () => {
           // Mark as read
           markAsRead(resolvedChatId, isGroup);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Chat init error:", err);
-        toast.error("Failed to load chat");
+        toast.error(err.message || "Failed to load chat");
+        initRef.current = false; // Allow retry
       } finally {
         setLoading(false);
       }
     };
 
     initChat();
-  }, [id, currentUser?.id, isGroup]);
+  }, [id, currentUser?.id, isGroup, navigate, markAsRead]);
 
   // Real-time subscription
   useEffect(() => {
@@ -164,7 +175,7 @@ const ChatScreen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatId, currentUser?.id]);
+  }, [chatId, currentUser?.id, isGroup, markAsRead]);
 
   useEffect(() => {
     if (scrollRef.current) {
