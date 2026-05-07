@@ -32,14 +32,20 @@ const Profile = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (!error) setProfile(data);
-      setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+        
+        if (error) throw error;
+        setProfile(data);
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchProfile();
@@ -60,7 +66,8 @@ const Profile = () => {
       <MobileLayout title="Profile">
         <div className="flex flex-col items-center justify-center h-[60vh] px-6 text-center">
           <h2 className="text-xl font-bold mb-4">User not found</h2>
-          <Button onClick={() => navigate('/auth')}>Login</Button>
+          <p className="text-sm text-muted-foreground mb-6">This profile might not exist or is private.</p>
+          <Button onClick={() => navigate('/')}>Return Home</Button>
         </div>
       </MobileLayout>
     );
