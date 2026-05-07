@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface AppContextType {
   currentUser: any;
   setCurrentUser: (user: any) => void;
+  authLoading: boolean;
   projects: any[];
   setProjects: React.Dispatch<React.SetStateAction<any[]>>;
   requests: any[];
@@ -32,6 +33,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
@@ -64,7 +66,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updatePresence = useCallback(async () => {
-    if (!supabase || !currentUser) return;
+    if (!supabase || !currentUser?.id) return;
     try {
       await supabase
         .from('profiles')
@@ -77,20 +79,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshProjects = async (userOverride?: any) => {
     if (!supabase) return;
-    
-    // Use provided user or current state
     const activeUser = userOverride || currentUser;
 
     try {
-      // 1. Fetch Projects (Publicly accessible)
       const { data, error } = await supabase
         .from('projects')
         .select(`
           *,
-          creator:profiles!projects_creator_id_fkey(*),
-          comments(*, user:profiles(name, avatar_url, display_name)),
+          creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
+          comments(id, content, created_at, user:profiles(id, name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user:profiles(*))
+          project_members(user:profiles(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -109,37 +108,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProjects(transformed);
 
-      // 2. Only fetch Join Requests if user is authenticated to avoid 401/42501 errors
       if (activeUser?.id) {
         const { data: reqData, error: reqError } = await supabase
           .from('join_requests')
-          .select('*');
+          .select('*, user:profiles!join_requests_user_id_fkey(*)');
         
         if (!reqError && reqData) {
-          const userIds = [...new Set(reqData.map(r => r.user_id))].filter(Boolean);
-          
-          if (userIds.length > 0) {
-            const { data: userData, error: userError } = await supabase
-              .from('profiles')
-              .select('*')
-              .in('id', userIds);
-            
-            if (!userError && userData) {
-              const userMap = new Map(userData.map(u => [u.id, u]));
-              const enrichedRequests = reqData.map(r => ({
-                ...r,
-                user: userMap.get(r.user_id)
-              }));
-              setRequests(enrichedRequests);
-            } else {
-              setRequests(reqData);
-            }
-          } else {
-            setRequests(reqData);
-          }
-        } else if (reqError) {
-          // Log but don't crash
-          console.warn("Join requests fetch skipped or failed:", reqError.message);
+          setRequests(reqData);
         }
       } else {
         setRequests([]);
@@ -170,74 +145,105 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = async () => {
     if (!supabase || !currentUser?.id) return;
     try {
-      const { data: readData, error: readError } = await supabase
+      const { data: chatMemberships, error: memberError } = await supabase
+        .from('chat_members')
+        .select(`
+          chat_id,
+          chat:chats (
+            id,
+            type,
+            project_id,
+            project:projects (title, thumbnail_url)
+          )
+        `)
+        .eq('user_id', currentUser.id);
+
+      if (memberError) throw memberError;
+
+      const chatIds = chatMemberships?.map(m => m.chat_id) || [];
+      if (chatIds.length === 0) {
+        setChats([]);
+        setUnreadChatsCount(0);
+        return;
+      }
+
+      const { data: lastMessages, error: msgError } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
+        .in('chat_id', chatIds)
+        .order('created_at', { ascending: false });
+
+      if (msgError) throw msgError;
+
+      const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
         .eq('user_id', currentUser.id);
       
-      if (readError) {
-        console.error("CRITICAL: Failed to fetch chat_reads.", readError);
-        return;
-      }
-
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
-      const { data: memberProjects } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('user_id', currentUser.id);
-      
-      const projectIds = memberProjects?.map(p => p.project_id) || [];
-      
-      const orFilter = [
-        `sender_id.eq.${currentUser.id}`,
-        `receiver_id.eq.${currentUser.id}`
-      ];
-      if (projectIds.length > 0) orFilter.push(`project_id.in.(${projectIds.join(',')})`);
-
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name), receiver:profiles!messages_receiver_id_fkey(name, avatar_url, display_name), project:projects(title, thumbnail_url)')
-        .or(orFilter.join(','))
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
       const conversations = new Map();
+      
+      for (const membership of chatMemberships) {
+        const chat = membership.chat as any;
+        if (!chat) continue;
 
-      data?.forEach(msg => {
-        const isGroup = !!msg.project_id;
-        const chatId = isGroup ? msg.project_id : (msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id);
-        
-        if (!chatId) return;
+        const isGroup = chat.type === 'group';
+        let chatName = isGroup ? chat.project?.title : 'Loading...';
+        let chatAvatar = isGroup ? chat.project?.thumbnail_url : null;
+        let targetId = isGroup ? chat.project_id : null;
 
-        const lastRead = readMap.get(chatId) || 0;
-        const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
-
-        if (!conversations.has(chatId)) {
-          conversations.set(chatId, {
-            id: chatId,
-            name: isGroup ? msg.project?.title : resolveName(msg.sender_id === currentUser.id ? msg.receiver : msg.sender),
-            avatar: isGroup ? msg.project?.thumbnail_url : (msg.sender_id === currentUser.id ? msg.receiver?.avatar_url : msg.sender?.avatar_url),
-            lastMsg: msg.content,
-            time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            unread: isUnread ? 1 : 0,
-            isGroup,
-            lastTimestamp: new Date(msg.created_at).getTime()
-          });
-        } else {
-          const chat = conversations.get(chatId);
-          if (isUnread) {
-            chat.unread++;
+        if (!isGroup) {
+          const { data: otherMember } = await supabase
+            .from('chat_members')
+            .select('user:profiles!chat_members_user_id_fkey(*)')
+            .eq('chat_id', chat.id)
+            .neq('user_id', currentUser.id)
+            .maybeSingle();
+          
+          if (otherMember?.user) {
+            chatName = resolveName(otherMember.user);
+            chatAvatar = (otherMember.user as any).avatar_url;
+            targetId = (otherMember.user as any).id;
           }
         }
+
+        conversations.set(chat.id, {
+          id: chat.id,
+          targetId,
+          name: chatName,
+          avatar: chatAvatar,
+          lastMsg: 'No messages yet',
+          time: '',
+          unread: 0,
+          isGroup,
+          lastTimestamp: 0
+        });
+      }
+
+      lastMessages?.forEach(msg => {
+        const chat = conversations.get(msg.chat_id);
+        if (!chat) return;
+
+        const lastRead = readMap.get(msg.chat_id) || 0;
+        const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
+
+        if (chat.lastTimestamp === 0) {
+          chat.lastMsg = msg.content;
+          chat.time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          chat.lastTimestamp = new Date(msg.created_at).getTime();
+        }
+
+        if (isUnread) {
+          chat.unread++;
+        }
       });
-      
-      const sortedChats = Array.from(conversations.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
-      const totalUnreadChats = sortedChats.filter(c => c.unread > 0).length;
+
+      const sortedChats = Array.from(conversations.values())
+        .sort((a, b) => b.lastTimestamp - a.lastTimestamp);
 
       setChats(sortedChats);
-      setUnreadChatsCount(totalUnreadChats);
+      setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
@@ -246,34 +252,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const markAsRead = async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
-    setChats(prev => {
-      const updated = prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c);
-      const newGlobalCount = updated.filter(c => c.unread > 0).length;
-      setUnreadChatsCount(newGlobalCount);
-      return updated;
-    });
-
     try {
       const now = new Date().toISOString();
-      const { error } = await supabase.from('chat_reads').upsert({
+      await supabase.from('chat_reads').upsert({
         user_id: currentUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
 
-      if (error) throw error;
-
-      if (!isGroup) {
-        await supabase
-          .from('messages')
-          .update({ is_read: true, status: 'seen' })
-          .eq('sender_id', chatId)
-          .eq('receiver_id', currentUser.id)
-          .eq('is_read', false);
-      }
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, unread: 0 } : c));
+      setUnreadChatsCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error("CRITICAL: markAsRead failed. Reverting UI state.", error);
-      refreshChats();
+      console.error("markAsRead failed:", error);
     }
   };
 
@@ -281,35 +271,49 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase) return;
 
     const initApp = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      let user = null;
-      
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        user = profile ? { ...session.user, ...profile } : session.user;
-        setCurrentUser(user);
-      }
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          await supabase.auth.signOut();
+          setAuthLoading(false);
+          return;
+        }
 
-      // Pass the user explicitly to refreshProjects to ensure correct state during init
-      await refreshProjects(user);
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        let user = null;
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          const newUser = profile ? { ...session.user, ...profile } : session.user;
-          setCurrentUser(newUser);
-          refreshProjects(newUser);
-        } else {
-          setCurrentUser(null);
-          setNotifications([]);
-          setChats([]);
-          setUnreadChatsCount(0);
-          setUnreadNotificationsCount(0);
-          refreshProjects(null);
+          user = profile ? { ...session.user, ...profile } : session.user;
+          setCurrentUser(user);
         }
-      });
 
-      return () => subscription.unsubscribe();
+        await refreshProjects(user);
+        setAuthLoading(false);
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT') {
+            setCurrentUser(null);
+            setNotifications([]);
+            setChats([]);
+            setUnreadChatsCount(0);
+            setUnreadNotificationsCount(0);
+            refreshProjects(null);
+            setAuthLoading(false);
+          } else if (session?.user) {
+            const profile = await fetchProfile(session.user.id);
+            const newUser = profile ? { ...session.user, ...profile } : session.user;
+            setCurrentUser(newUser);
+            refreshProjects(newUser);
+            setAuthLoading(false);
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      } catch (err) {
+        console.error("App initialization failed:", err);
+        setAuthLoading(false);
+      }
     };
 
     initApp();
@@ -400,7 +404,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AppContext.Provider value={{ 
-      currentUser, setCurrentUser, 
+      currentUser, setCurrentUser, authLoading,
       projects, setProjects, 
       requests, setRequests,
       chats, setChats,
