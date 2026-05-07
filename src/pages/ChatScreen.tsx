@@ -11,14 +11,15 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const ChatScreen = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // This is either a user_id (DM) or project_id (Group)
   const [searchParams] = useSearchParams();
   const isGroup = searchParams.get('group') === 'true';
   const navigate = useNavigate();
-  const { currentUser, markAsRead } = useApp();
+  const { currentUser, markAsRead, resolveName } = useApp();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [chatPartner, setChatPartner] = useState<any>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
   const [partnerLastRead, setPartnerLastRead] = useState<number>(0);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,116 +31,131 @@ const ChatScreen = () => {
     return Date.now() - new Date(lastSeen).getTime() < 60000;
   };
 
-  // Mark as read whenever messages change or we enter the chat
-  useEffect(() => {
-    if (id && currentUser) {
-      markAsRead(id, isGroup);
-    }
-  }, [id, currentUser?.id, isGroup, messages.length]);
-
   useEffect(() => {
     if (!id || !currentUser || !supabase) return;
 
-    const fetchChatInfo = async () => {
-      if (isGroup) {
-        const { data } = await supabase.from('projects').select('*').eq('id', id).single();
-        setChatPartner(data);
-        
-        const { data: reads } = await supabase
-          .from('chat_reads')
-          .select('last_read_at')
-          .eq('chat_id', id)
-          .neq('user_id', currentUser.id)
-          .order('last_read_at', { ascending: false })
-          .limit(1);
-        
-        if (reads && reads.length > 0) {
-          setPartnerLastRead(new Date(reads[0].last_read_at).getTime());
-        }
-      } else {
-        const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
-        setChatPartner(data);
+    const initChat = async () => {
+      setLoading(true);
+      try {
+        let resolvedChatId = null;
 
-        const { data: read } = await supabase
-          .from('chat_reads')
-          .select('last_read_at')
-          .eq('user_id', id)
-          .eq('chat_id', currentUser.id)
-          .maybeSingle();
-        
-        if (read) {
-          setPartnerLastRead(new Date(read.last_read_at).getTime());
+        if (isGroup) {
+          // 1. Fetch Project Info
+          const { data: project } = await supabase
+            .from('projects')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+          
+          setChatPartner(project);
+
+          // 2. Find Group Chat ID
+          const { data: chat } = await supabase
+            .from('chats')
+            .select('id')
+            .eq('project_id', id)
+            .eq('type', 'group')
+            .maybeSingle();
+          
+          resolvedChatId = chat?.id;
+        } else {
+          // 1. Fetch User Info
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+          
+          setChatPartner(profile);
+
+          // 2. Find or Create DM Chat ID
+          const { data: dmChatId, error: dmError } = await supabase.rpc('get_or_create_dm', {
+            user1_id: currentUser.id,
+            user2_id: id
+          });
+
+          if (!dmError) resolvedChatId = dmChatId;
         }
+
+        if (resolvedChatId) {
+          setChatId(resolvedChatId);
+          
+          // Fetch Messages for this Chat ID
+          const { data: msgs } = await supabase
+            .from('messages')
+            .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
+            .eq('chat_id', resolvedChatId)
+            .order('created_at', { ascending: true });
+          
+          setMessages(msgs || []);
+
+          // Fetch Partner Read Status
+          const { data: reads } = await supabase
+            .from('chat_reads')
+            .select('last_read_at')
+            .eq('chat_id', resolvedChatId)
+            .neq('user_id', currentUser.id)
+            .order('last_read_at', { ascending: false })
+            .limit(1);
+          
+          if (reads && reads.length > 0) {
+            setPartnerLastRead(new Date(reads[0].last_read_at).getTime());
+          }
+
+          // Mark as read
+          markAsRead(resolvedChatId, isGroup);
+        }
+      } catch (err) {
+        console.error("Chat init error:", err);
+        toast.error("Failed to load chat");
+      } finally {
+        setLoading(false);
       }
     };
 
-    const fetchMessages = async () => {
-      let query = supabase
-        .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
-        .order('created_at', { ascending: true });
+    initChat();
+  }, [id, currentUser?.id, isGroup]);
 
-      if (isGroup) {
-        query = query.eq('project_id', id);
-      } else {
-        query = query.or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${id}),and(sender_id.eq.${id},receiver_id.eq.${currentUser.id})`);
-      }
+  // Real-time subscription
+  useEffect(() => {
+    if (!chatId || !supabase || !currentUser) return;
 
-      const { data, error } = await query;
-      if (!error) setMessages(data || []);
-      setLoading(false);
-    };
-
-    fetchChatInfo();
-    fetchMessages();
-
-    // Real-time subscription for messages and read receipts
     const channel = supabase
-      .channel(`chat_room_${id}`)
+      .channel(`chat_room_${chatId}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'messages' 
+        table: 'messages',
+        filter: `chat_id=eq.${chatId}`
       }, async (payload) => {
         const newMsg = payload.new;
-        const isThisChat = isGroup 
-          ? newMsg.project_id === id 
-          : (newMsg.sender_id === currentUser.id && newMsg.receiver_id === id) || 
-            (newMsg.sender_id === id && newMsg.receiver_id === currentUser.id);
-
-        if (!isThisChat) return;
-
-        // Optimization: If it's from me or the partner we already have info for, don't fetch profile
+        
+        // Fetch sender info if not me
         let senderInfo = null;
         if (newMsg.sender_id === currentUser.id) {
           senderInfo = { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name };
-        } else if (!isGroup && newMsg.sender_id === id) {
-          senderInfo = { id: chatPartner?.id, name: chatPartner?.name, avatar_url: chatPartner?.avatar_url, display_name: chatPartner?.display_name };
         } else {
           const { data } = await supabase.from('profiles').select('id, name, avatar_url, display_name').eq('id', newMsg.sender_id).single();
           senderInfo = data;
         }
         
         setMessages(prev => {
-          // Prevent duplicates from optimistic updates
-          const exists = prev.some(m => m.id === newMsg.id || (m.isOptimistic && m.content === newMsg.content && m.sender_id === newMsg.sender_id));
-          if (exists) {
-            return prev.map(m => (m.isOptimistic && m.content === newMsg.content) ? { ...newMsg, sender: senderInfo } : m);
-          }
+          const exists = prev.some(m => m.id === newMsg.id);
+          if (exists) return prev;
           return [...prev, { ...newMsg, sender: senderInfo }];
         });
+
+        // Mark as read if we are looking at the chat
+        markAsRead(chatId, isGroup);
       })
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'chat_reads' 
+        table: 'chat_reads',
+        filter: `chat_id=eq.${chatId}`
       }, (payload) => {
         const data = payload.new as any;
-        const isRelevantRead = isGroup 
-          ? data.chat_id === id && data.user_id !== currentUser.id
-          : data.chat_id === currentUser.id && data.user_id === id;
-
-        if (isRelevantRead) {
+        if (data.user_id !== currentUser.id) {
           setPartnerLastRead(new Date(data.last_read_at).getTime());
         }
       })
@@ -148,7 +164,7 @@ const ChatScreen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, currentUser?.id, isGroup, chatPartner?.id]);
+  }, [chatId, currentUser?.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -157,9 +173,10 @@ const ChatScreen = () => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!msg.trim() || !supabase || !currentUser) return;
+    if (!msg.trim() || !supabase || !currentUser || !chatId) return;
     
     const messageData: any = {
+      chat_id: chatId,
       sender_id: currentUser.id,
       content: msg.trim(),
       type: 'text',
@@ -173,16 +190,17 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
-    // Optimistic update for instant feel
+    // Optimistic update
     const tempId = `temp-${Date.now()}`;
-    setMessages(prev => [...prev, {
+    const optimisticMsg = {
       id: tempId,
       ...messageData,
       created_at: new Date().toISOString(),
       sender: { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name },
       isOptimistic: true
-    }]);
+    };
 
+    setMessages(prev => [...prev, optimisticMsg]);
     setMsg('');
     
     const { error } = await supabase.from('messages').insert(messageData);
@@ -192,11 +210,22 @@ const ChatScreen = () => {
     }
   };
 
-  if (loading && messages.length === 0) {
+  if (loading) {
     return (
       <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center">
         <Loader2 className="animate-spin text-primary" size={32} />
         <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
+      </div>
+    );
+  }
+
+  if (!chatPartner && !loading) {
+    return (
+      <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center p-8 text-center">
+        <X size={48} className="text-muted-foreground mb-4" />
+        <h2 className="text-xl font-bold">Chat not found</h2>
+        <p className="text-sm text-muted-foreground mt-2">The user or project you are looking for doesn't exist.</p>
+        <Button onClick={() => navigate(-1)} className="mt-6 rounded-xl">Go Back</Button>
       </div>
     );
   }
@@ -221,7 +250,7 @@ const ChatScreen = () => {
             className="font-bold text-foreground truncate text-sm cursor-pointer hover:text-primary transition-colors"
             onClick={() => isGroup ? navigate(`/project/${id}`) : navigate(`/profile/${chatPartner?.id}`)}
           >
-            {isGroup ? chatPartner?.title : chatPartner?.name}
+            {isGroup ? chatPartner?.title : resolveName(chatPartner)}
           </h4>
           <p className="text-[10px] text-primary font-bold uppercase tracking-widest">
             {isGroup ? 'Group Chat' : (isOnline(chatPartner?.last_seen) ? 'Online' : 'Offline')}
@@ -248,7 +277,7 @@ const ChatScreen = () => {
                     className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold cursor-pointer hover:text-primary truncate max-w-full"
                     onClick={() => navigate(`/profile/${m.sender?.id}`)}
                   >
-                    {m.sender?.display_name || m.sender?.name}
+                    {resolveName(m.sender)}
                   </span>
                 )}
                 <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] break-all whitespace-pre-wrap overflow-hidden ${
@@ -272,6 +301,12 @@ const ChatScreen = () => {
             </div>
           );
         })}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+            <MessageSquare size={48} className="mb-4" />
+            <p className="text-sm">No messages yet. Start the conversation!</p>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-t border-border bg-background">
@@ -284,7 +319,7 @@ const ChatScreen = () => {
             className="flex-1 bg-transparent border-none outline-none text-sm text-foreground"
             placeholder="Type a message..."
           />
-          <button onClick={handleSend} disabled={!msg.trim()} className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg disabled:opacity-50"><Send size={18} /></button>
+          <button onClick={handleSend} disabled={!msg.trim() || !chatId} className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg disabled:opacity-50"><Send size={18} /></button>
         </div>
       </div>
 
