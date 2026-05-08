@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from '@/context/AppContext';
 import { toast } from "sonner";
-import { Camera, Loader2, AtSign, MapPin, Link as LinkIcon, User, Upload } from 'lucide-react';
+import { Camera, Loader2, MapPin, Link as LinkIcon, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const EditProfile = () => {
@@ -20,10 +20,11 @@ const EditProfile = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
+  // Split existing name into first and last for the UI
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+
   const [formData, setFormData] = useState({
-    name: currentUser?.name || '',
-    display_name: currentUser?.display_name || '',
-    username: currentUser?.username || '',
     title: currentUser?.title || '',
     bio: currentUser?.bio || '',
     skills: currentUser?.skills?.join(', ') || '',
@@ -31,6 +32,14 @@ const EditProfile = () => {
     portfolio_url: currentUser?.portfolio_url || '',
     avatar_url: currentUser?.avatar_url || ''
   });
+
+  useEffect(() => {
+    if (currentUser?.name) {
+      const parts = currentUser.name.split(' ');
+      setFirstName(parts[0] || '');
+      setLastName(parts.slice(1).join(' ') || '');
+    }
+  }, [currentUser]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,14 +78,18 @@ const EditProfile = () => {
 
   const handleSave = async () => {
     if (!supabase || !currentUser) return;
+    if (!firstName.trim()) {
+      toast.error("First name is required");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       const updates = {
         id: currentUser.id,
-        name: formData.name,
-        display_name: formData.display_name,
-        username: formData.username.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+        name: fullName,
         title: formData.title,
         bio: formData.bio,
         skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
@@ -110,7 +123,7 @@ const EditProfile = () => {
 
   return (
     <MobileLayout title="Edit Profile" showBack>
-      <div className="px-6 py-6 space-y-8 pb-24">
+      <div className="px-6 py-6 space-y-8 pb-40">
         {/* Avatar Section */}
         <div className="flex flex-col items-center gap-4">
           <div className="relative group">
@@ -140,33 +153,23 @@ const EditProfile = () => {
           <section className="space-y-4">
             <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Identity</h3>
             <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-              <div className="space-y-1.5">
-                <Label>Full Name</Label>
-                <Input 
-                  value={formData.name} 
-                  onChange={e => setFormData({...formData, name: e.target.value})} 
-                  className="rounded-xl h-12 bg-accent/10" 
-                  placeholder="John Doe" 
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Display Name (Public)</Label>
-                <Input 
-                  value={formData.display_name} 
-                  onChange={e => setFormData({...formData, display_name: e.target.value})} 
-                  className="rounded-xl h-12 bg-accent/10" 
-                  placeholder="John D." 
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Username</Label>
-                <div className="relative">
-                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>First Name</Label>
                   <Input 
-                    value={formData.username} 
-                    onChange={e => setFormData({...formData, username: e.target.value})} 
-                    className="rounded-xl h-12 bg-accent/10 pl-10" 
-                    placeholder="johndoe" 
+                    value={firstName} 
+                    onChange={e => setFirstName(e.target.value)} 
+                    className="rounded-xl h-12 bg-accent/10" 
+                    placeholder="John" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Last Name</Label>
+                  <Input 
+                    value={lastName} 
+                    onChange={e => setLastName(e.target.value)} 
+                    className="rounded-xl h-12 bg-accent/10" 
+                    placeholder="Doe" 
                   />
                 </div>
               </div>
@@ -239,7 +242,8 @@ const EditProfile = () => {
           </section>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 bg-background/80 backdrop-blur-md border-t border-border z-50">
+        {/* Fixed button container adjusted to be above the nav bar */}
+        <div className="fixed bottom-[72px] left-0 right-0 max-w-md mx-auto p-6 bg-background/80 backdrop-blur-md border-t border-border z-50">
           <Button 
             onClick={handleSave} 
             disabled={loading || uploading} 
