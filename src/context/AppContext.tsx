@@ -153,9 +153,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setProjects(transformed);
 
       if (activeUser?.id) {
+        // FIX: Use specific columns for join_requests to avoid fetch errors
         const { data: reqData, error: reqError } = await supabase
           .from('join_requests')
-          .select('*, user:profiles(*)');
+          .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
         
         if (!reqError && reqData) {
           setRequests(reqData);

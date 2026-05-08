@@ -156,6 +156,62 @@ const Referrals = () => {
           ))}
         </div>
 
+        {/* Restored How it works section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">How it works</h3>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="text-[10px] font-bold text-primary flex items-center gap-1">
+                  <Info size={12} /> View Rules
+                </button>
+              </DialogTrigger>
+              <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Referral Rules</DialogTitle>
+                  <DialogDescription>Please follow these guidelines to ensure your rewards are valid.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <ul className="space-y-3">
+                    {[
+                      "Fake referrals are strictly prohibited",
+                      "Self-referrals using multiple accounts are not allowed",
+                      "Abuse may lead to permanent reward removal",
+                      "Rewards are subject to manual verification",
+                      "The referral system may evolve over time"
+                    ].map((rule, i) => (
+                      <li key={i} className="flex gap-3 text-sm">
+                        <AlertCircle size={16} className="text-primary shrink-0 mt-0.5" />
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <DialogFooter>
+                  <Button className="w-full h-12 rounded-xl font-bold" onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))}>
+                    I Understand
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="space-y-3">
+            {[
+              { title: "Friend Signs Up", points: "+10", desc: "When they create a verified account" },
+              { title: "7-Day Streak", points: "+5", desc: "When they stay active for a week" },
+              { title: "First Project", points: "+10", desc: "When they launch their first project" }
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-accent/10 border border-border rounded-2xl">
+                <div>
+                  <h4 className="text-sm font-bold">{item.title}</h4>
+                  <p className="text-[10px] text-muted-foreground">{item.desc}</p>
+                </div>
+                <span className="text-sm font-black text-primary">{item.points}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="space-y-4">
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Milestone Progress</h3>
           <div className="space-y-3">
