@@ -106,15 +106,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
-      // FIX: Use 'profiles' instead of 'profiles_public' for joins to avoid PGRST200 error
+      // FIX: Specify explicit relationship names to resolve ambiguity (PGRST201)
       const { data, error } = await supabase
         .from('projects')
         .select(`
           *,
-          creator:profiles(id, name, avatar_url, title, display_name),
+          creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           comments(id, content, created_at, user:profiles(id, name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user:profiles(id, name, avatar_url, title, display_name))
+          project_members(user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -157,9 +157,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
     isRefreshing.current.notifications = true;
     try {
+      // FIX: Specify explicit relationship for actor (PGRST201)
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles(name, avatar_url, display_name)')
+        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -218,7 +219,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
-        .select('*, sender:profiles(name, avatar_url, display_name)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
         .order('created_at', { ascending: false });
 
