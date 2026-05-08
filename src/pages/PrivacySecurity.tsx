@@ -64,12 +64,28 @@ const PrivacySecurity = () => {
 
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-            <Shield size={16} /> Data Privacy
+            <Shield size={16} /> Preferences
           </h3>
           <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
-            </p>
+            <div className="flex items-center justify-between">
+              <Label>Auto Logout</Label>
+              <Select defaultValue="never">
+                <SelectTrigger className="w-[120px] rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="never">Never</SelectItem>
+                  <SelectItem value="5">5 min</SelectItem>
+                  <SelectItem value="15">15 min</SelectItem>
+                  <SelectItem value="30">30 min</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
+              </p>
+            </div>
           </div>
         </section>
 
