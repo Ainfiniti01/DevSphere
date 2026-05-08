@@ -31,7 +31,7 @@ const Messages = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
-  const [userSearch, setUserSearch] = useState('');
+  const [userSearch, setSearchUser] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleRefresh = async () => {
@@ -80,6 +80,9 @@ const Messages = () => {
   }, [users, userSearch]);
 
   const handleDelete = async (chat: any) => {
+    if (chat.isOwner) {
+      return; // AppContext handles the toast
+    }
     setIsDeleting(chat.id);
     if (chat.isGroup) {
       await leaveGroup(chat.id);
@@ -131,7 +134,7 @@ const Messages = () => {
                       className="w-full pl-9 pr-4 py-3 bg-accent/20 border border-border rounded-xl text-sm outline-none" 
                       placeholder="Search developers..." 
                       value={userSearch}
-                      onChange={e => setUserSearch(e.target.value)}
+                      onChange={e => setSearchUser(e.target.value)}
                     />
                   </div>
                   <ScrollArea className="h-[50vh]">
@@ -217,24 +220,39 @@ const Messages = () => {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>{chat.isGroup ? "Exit Group?" : "Remove Chat?"}</AlertDialogTitle>
+                        <AlertDialogTitle>{chat.isOwner ? "Cannot Leave Group" : (chat.isGroup ? "Exit Group?" : "Remove Chat?")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          {chat.isGroup 
-                            ? "You are still a member of this group. To remove it from your chat list, you must exit first."
-                            : "This will remove the conversation from your list. It will reappear if you receive a new message."}
+                          {chat.isOwner 
+                            ? "You are the owner of this project. You must transfer the admin role to another member before leaving."
+                            : (chat.isGroup 
+                                ? "You are still a member of this group. To remove it from your chat list, you must exit first."
+                                : "This will remove the conversation from your list. It will reappear if you receive a new message.")}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(chat);
-                          }} 
-                          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          {chat.isGroup ? "Exit & Remove" : "Remove"}
-                        </AlertDialogAction>
+                        {!chat.isOwner && (
+                          <AlertDialogAction 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(chat);
+                            }} 
+                            className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {chat.isGroup ? "Exit & Remove" : "Remove"}
+                          </AlertDialogAction>
+                        )}
+                        {chat.isOwner && (
+                          <AlertDialogAction 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/manage-team/${chat.targetId}`);
+                            }} 
+                            className="rounded-xl bg-primary text-primary-foreground"
+                          >
+                            Manage Team
+                          </AlertDialogAction>
+                        )}
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>

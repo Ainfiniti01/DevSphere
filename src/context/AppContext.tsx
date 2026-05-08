@@ -46,6 +46,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const processingLikes = useRef<Set<string>>(new Set());
   const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
   const refreshTimeout = useRef<any>(null);
+  const initStarted = useRef(false);
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -140,7 +141,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setRequests([]);
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
         console.error("Refresh projects error:", error);
       }
     } finally {
@@ -163,7 +164,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
         console.error("Refresh notifications error:", error.message);
       }
     } finally {
@@ -199,7 +200,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             id,
             type,
             project_id,
-            project:projects (title, thumbnail_url)
+            project:projects (title, thumbnail_url, creator_id)
           )
         `)
         .eq('user_id', currentUser.id);
@@ -239,6 +240,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (hiddenChatIds.has(chat.id)) continue;
 
         const isGroup = chat.type === 'group';
+        const isOwner = isGroup && chat.project?.creator_id === currentUser.id;
         let chatName = isGroup ? chat.project?.title : 'Loading...';
         let chatAvatar = isGroup ? chat.project?.thumbnail_url : null;
         let targetId = isGroup ? chat.project_id : null;
@@ -267,6 +269,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           time: '',
           unread: 0,
           isGroup,
+          isOwner,
           lastTimestamp: 0
         });
       }
@@ -295,7 +298,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
         console.error("Refresh chats error:", error.message);
       }
     } finally {
@@ -343,6 +346,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const leaveGroup = useCallback(async (chatId: string) => {
     if (!supabase || !currentUser?.id) return;
 
+    const chat = chats.find(c => c.id === chatId);
+    if (chat?.isOwner) {
+      toast.error("Transfer admin role before leaving the group.");
+      return;
+    }
+
     try {
       // Step 1: Remove user from group
       const { error: memberError } = await supabase
@@ -366,7 +375,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       toast.error("Failed to exit group");
       console.error(error);
     }
-  }, [currentUser?.id, refreshChats]);
+  }, [currentUser?.id, refreshChats, chats]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -425,7 +434,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser?.id, refreshProjects]);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || initStarted.current) return;
+    initStarted.current = true;
 
     const initApp = async () => {
       try {
@@ -443,9 +453,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
-          await refreshProjects(user);
-          await refreshNotifications();
-          await refreshChats();
+          // Initial load
+          await Promise.allSettled([
+            refreshProjects(user),
+            refreshNotifications(),
+            refreshChats()
+          ]);
         } else {
           await refreshProjects(null);
         }
@@ -465,9 +478,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const profile = await ensureProfile(session.user.id, session.user);
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
-            await refreshProjects(newUser);
-            await refreshNotifications();
-            await refreshChats();
+            
+            // Debounced refresh to avoid collision with initApp
+            if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+            refreshTimeout.current = setTimeout(() => {
+              Promise.allSettled([
+                refreshProjects(newUser),
+                refreshNotifications(),
+                refreshChats()
+              ]);
+            }, 500);
+            
             setAuthLoading(false);
           }
         });
