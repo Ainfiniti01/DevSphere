@@ -169,17 +169,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
-      // 1. Get hidden chats with error handling
-      const { data: hiddenData, error: hiddenError } = await supabase
-        .from('hidden_chats')
-        .select('chat_id')
-        .eq('user_id', currentUser.id);
-      
-      if (hiddenError && hiddenError.code !== 'PGRST116') {
-        console.warn("Hidden chats fetch failed (likely permissions):", hiddenError.message);
+      // 1. Get hidden chats with silent error handling
+      let hiddenChatIds = new Set<string>();
+      try {
+        const { data: hiddenData, error: hiddenError } = await supabase
+          .from('hidden_chats')
+          .select('chat_id')
+          .eq('user_id', currentUser.id);
+        
+        if (!hiddenError && hiddenData) {
+          hiddenChatIds = new Set(hiddenData.map(h => h.chat_id));
+        }
+      } catch (e) {
+        console.warn("Could not fetch hidden chats, showing all.");
       }
-      
-      const hiddenChatIds = new Set(hiddenData?.map(h => h.chat_id) || []);
 
       // 2. Get chat memberships
       const { data: chatMemberships, error: memberError } = await supabase
@@ -481,7 +484,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const msg = payload.new as any;
             supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
               refreshChats();
-            });
+            }).catch(() => refreshChats());
           } else {
             refreshChats();
           }
