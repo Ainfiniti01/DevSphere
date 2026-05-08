@@ -34,8 +34,8 @@ const NotificationSettings = () => {
     // Play preview if turned ON
     if (value) {
       if (key === 'messages') notificationService.play('message', true);
+      if (key === 'projects') notificationService.play('project', true);
       if (key === 'sound') notificationService.play('system', true);
-      if (key === 'project') notificationService.play('project', true);
     }
 
     const { error } = await supabase
