@@ -42,6 +42,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const processingLikes = useRef<Set<string>>(new Set());
+  const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -93,7 +94,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser?.id]);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
-    if (!supabase) return;
+    if (!supabase || isRefreshing.current.projects) return;
+    isRefreshing.current.projects = true;
     const activeUser = userOverride || currentUser;
 
     try {
@@ -136,11 +138,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error);
+    } finally {
+      isRefreshing.current.projects = false;
     }
   }, [currentUser]);
 
   const refreshNotifications = useCallback(async () => {
-    if (!supabase || !currentUser?.id) return;
+    if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
+    isRefreshing.current.notifications = true;
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -154,11 +159,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
+    } finally {
+      isRefreshing.current.notifications = false;
     }
   }, [currentUser?.id]);
 
   const refreshChats = useCallback(async () => {
-    if (!supabase || !currentUser?.id) return;
+    if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
+    isRefreshing.current.chats = true;
     try {
       const { data: chatMemberships, error: memberError } = await supabase
         .from('chat_members')
@@ -261,6 +269,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
+    } finally {
+      isRefreshing.current.chats = false;
     }
   }, [currentUser?.id, resolveName]);
 
@@ -357,9 +367,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
+          // Consolidate initial data fetch
+          await Promise.all([
+            refreshProjects(user),
+            refreshNotifications(),
+            refreshChats()
+          ]);
+        } else {
+          await refreshProjects(null);
         }
 
-        await refreshProjects(user);
         setAuthLoading(false);
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -371,11 +388,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             setUnreadNotificationsCount(0);
             refreshProjects(null);
             setAuthLoading(false);
-          } else if (session?.user) {
+          } else if (session?.user && event === 'SIGNED_IN') {
             const profile = await ensureProfile(session.user.id, session.user);
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
-            refreshProjects(newUser);
+            await Promise.all([
+              refreshProjects(newUser),
+              refreshNotifications(),
+              refreshChats()
+            ]);
             setAuthLoading(false);
           }
         });
@@ -388,7 +409,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     initApp();
-  }, [ensureProfile, refreshProjects]);
+  }, [ensureProfile, refreshProjects, refreshNotifications, refreshChats]);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -400,9 +421,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (currentUser?.id) {
-      refreshNotifications();
-      refreshChats();
-      
       const channel = supabase
         .channel('global-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refreshChats())
