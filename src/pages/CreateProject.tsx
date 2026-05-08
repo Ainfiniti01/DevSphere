@@ -236,25 +236,25 @@ const CreateProject = () => {
 
         {/* Configuration */}
 <div className="grid grid-cols-2 gap-4 items-end">
-          <div className="space-y-2 col-span-2 sm:col-span-1">
-            <Label className="text-sm font-bold">Project Stage</Label>
-            <Select 
-              value={formData.stage} 
-              onValueChange={val => setFormData({...formData, stage: val})}
-              disabled={isAtTotalLimit}
-            >
-              <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
-                <SelectValue placeholder="Select stage" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border rounded-xl">
-                <SelectItem value="Idea">Idea</SelectItem>
-                <SelectItem value="Building">Building</SelectItem>
-                <SelectItem value="MVP">MVP</SelectItem>
-                <SelectItem value="Scaling">Scaling</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="space-y-2">
+  <Label className="text-sm font-bold">Project Stage</Label>
+  <Select 
+    value={formData.stage} 
+    onValueChange={val => setFormData({...formData, stage: val})}
+    disabled={isAtTotalLimit}
+  >
+    <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
+      <SelectValue placeholder="Select stage" />
+    </SelectTrigger>
+    <SelectContent className="bg-background border-border rounded-xl">
+      <SelectItem value="Idea">Idea</SelectItem>
+      <SelectItem value="Building">Building</SelectItem>
+      <SelectItem value="MVP">MVP</SelectItem>
+      <SelectItem value="Scaling">Scaling</SelectItem>
+      <SelectItem value="Completed">Completed</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
 
           <div className="space-y-2 col-span-2 sm:col-span-1">
             <Label className="text-sm font-bold">Required Skills</Label>
