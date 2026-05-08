@@ -6,11 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Shield, Lock, LogOut, Loader2 } from 'lucide-react';
+import { Shield, Lock, LogOut, Loader2, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
@@ -18,6 +36,14 @@ const PrivacySecurity = () => {
   const [loading, setLoading] = useState(false);
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
   const [autoLogout, setAutoLogout] = useState('never');
+  
+  // Modal states
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [resultModal, setResultModal] = useState<{ open: boolean, success: boolean, message: string }>({
+    open: false,
+    success: false,
+    message: ''
+  });
 
   useEffect(() => {
     if (currentUser?.notification_settings?.auto_logout) {
@@ -25,8 +51,7 @@ const PrivacySecurity = () => {
     }
   }, [currentUser]);
 
-  const handleUpdatePassword = async () => {
-    if (!supabase) return;
+  const validateAndConfirm = () => {
     if (!passwords.new || !passwords.confirm) {
       toast.error("Please fill all fields");
       return;
@@ -39,15 +64,30 @@ const PrivacySecurity = () => {
       toast.error("Passwords do not match");
       return;
     }
+    setIsConfirmOpen(true);
+  };
 
+  const handleUpdatePassword = async () => {
+    if (!supabase) return;
+    setIsConfirmOpen(false);
     setLoading(true);
+    
     try {
       const { error } = await supabase.auth.updateUser({ password: passwords.new });
       if (error) throw error;
-      toast.success("Password updated successfully!");
+      
+      setResultModal({
+        open: true,
+        success: true,
+        message: "Your password has been updated successfully. You can continue using the app with your new credentials."
+      });
       setPasswords({ new: '', confirm: '' });
     } catch (err: any) {
-      toast.error(err.message || "Failed to update password");
+      setResultModal({
+        open: true,
+        success: false,
+        message: err.message || "We encountered an error while updating your password. Please try again later."
+      });
     } finally {
       setLoading(false);
     }
@@ -106,7 +146,7 @@ const PrivacySecurity = () => {
                 placeholder="••••••••"
               />
             </div>
-            <Button onClick={handleUpdatePassword} disabled={loading} className="w-full h-12 mt-2 rounded-xl font-bold">
+            <Button onClick={validateAndConfirm} disabled={loading} className="w-full h-12 mt-2 rounded-xl font-bold">
               {loading ? <Loader2 className="animate-spin" /> : "Update Password"}
             </Button>
           </div>
@@ -150,7 +190,51 @@ const PrivacySecurity = () => {
           <LogOut size={20} /> Sign Out
         </Button>
       </div>
-    </MobileLayout>
+
+      {/* Confirmation Modal */}
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Password?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change your password? You will need to use the new password for future logins.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUpdatePassword} className="rounded-xl bg-primary">
+              Confirm Update
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Result Modal (Success/Fail) */}
+      <Dialog open={resultModal.open} onOpenChange={(open) => setResultModal(prev => ({ ...prev, open }))}>
+        <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
+          <DialogHeader className="flex flex-col items-center text-center">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${resultModal.success ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+              {resultModal.success ? (
+                <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={32} />
+              ) : (
+                <XCircle className="text-red-600 dark:text-red-400" size={32} />
+              )}
+            </div>
+            <DialogTitle className="text-2xl font-bold">
+              {resultModal.success ? "Success!" : "Update Failed"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-2">
+              {resultModal.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pt-4">
+            <Button onClick={() => setResultModal(prev => ({ ...prev, open: false }))} className="w-full h-12 rounded-xl font-bold text-lg">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
