@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, Gift, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Gift, CheckCircle2, Link as LinkIcon, MapPin, Briefcase, Code } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -34,6 +34,7 @@ const Signup = () => {
       localStorage.setItem('pending_referral_code', ref);
       
       const fetchInviter = async () => {
+        if (!supabase) return;
         const { data } = await supabase
           .from('profiles')
           .select('name')
@@ -63,7 +64,8 @@ const Signup = () => {
       if (authError) throw authError;
 
       if (data.user) {
-        await supabase.from('profiles').upsert({
+        // Create the profile with all details
+        const { error: profileError } = await supabase.from('profiles').upsert({
           id: data.user.id,
           name: formData.name,
           title: formData.title,
@@ -73,6 +75,127 @@ const Signup = () => {
           updated_at: new Date().toISOString()
         });
 
+        if (profileError) throw profileError;
+
+        // Handle Referral Logic
+        const finalRefCode = formData.referralCode || localStorage.getItem('pending_referral_code');
+        if (finalRefCode) {
+          const { data: referrer } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .eq('referral_code', finalRefCode)
+            .maybeSingle();
+
+          if (referrer && referrer.id !== data.user.id) {
+            await supabase.from('referrals').insert({
+              referrer_id: referrer.id,
+              referred_user_id: data.user.id,
+              referral_code: finalRefCode,
+              status: 'joined'
+            });
+
+            // Notify Referrer
+            await supabase.from('notifications').insert({
+              user_id: referrer.id,
+              actor_id: data.user.id,
+              type: 'request',
+              content: `joined DevSphere using your referral link! You earned 10 points.`
+            });
+
+            await supabase.rpc('award_referral_points', {
+              p_referrer_id: referrer.id,
+              p_referred_user_id: data.user.id,
+              p_points: 10,
+              p_reason_key: 'Signup Reward'
+            });
+          }
+        }
+
+        localStorage.removeItem('pending_referral_code');
+        toast.success("Account created! Please check your email.");
+        navigate('/auth');
+      }
+    } catch (error: any) {<dyad-write path="src/pages/Signup.tsx" description="Restoring all profile detail fields to the signup page and ensuring referral logic is intact.">
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from '@/lib/supabase';
+import { toast } from "sonner";
+import { Loader2, Eye, EyeOff, Gift, CheckCircle2, Link as LinkIcon, MapPin, Briefcase, Code } from 'lucide-react';
+
+const Signup = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [inviterName, setInviterName] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    title: '',
+    skills: '',
+    location: '',
+    portfolio_url: '',
+    referralCode: ''
+  });
+
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setFormData(prev => ({ ...prev, referralCode: ref }));
+      localStorage.setItem('pending_referral_code', ref);
+      
+      const fetchInviter = async () => {
+        if (!supabase) return;
+        const { data } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('referral_code', ref)
+          .maybeSingle();
+        if (data) setInviterName(data.name);
+      };
+      fetchInviter();
+    }
+  }, [searchParams]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) return;
+
+    setLoading(true);
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: { full_name: formData.name },
+          redirectTo: window.location.origin
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (data.user) {
+        // Create the profile with all details
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: formData.name,
+          title: formData.title,
+          skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
+          location: formData.location,
+          portfolio_url: formData.portfolio_url,
+          updated_at: new Date().toISOString()
+        });
+
+        if (profileError) throw profileError;
+
+        // Handle Referral Logic
         const finalRefCode = formData.referralCode || localStorage.getItem('pending_referral_code');
         if (finalRefCode) {
           const { data: referrer } = await supabase
@@ -128,15 +251,17 @@ const Signup = () => {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 flex-1">
+      <form onSubmit={handleSubmit} className="space-y-4 flex-1 pb-10">
         <div className="space-y-1.5">
           <Label>Full Name</Label>
           <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="John Doe" className="rounded-xl h-12" />
         </div>
+        
         <div className="space-y-1.5">
           <Label>Email</Label>
           <Input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="john@example.com" className="rounded-xl h-12" />
         </div>
+
         <div className="space-y-1.5">
           <Label>Password</Label>
           <div className="relative">
@@ -146,9 +271,51 @@ const Signup = () => {
             </button>
           </div>
         </div>
+
+        <div className="space-y-1.5">
+          <Label>Professional Title</Label>
+          <div className="relative">
+            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Senior Developer, UI Engineer" className="rounded-xl h-12 pl-10" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Skills (comma separated)</Label>
+          <div className="relative">
+            <Code className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, TypeScript, Node.js" className="rounded-xl h-12 pl-10" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Location</Label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="San Francisco, CA" className="rounded-xl h-12 pl-10" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Portfolio URL (Optional)</Label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input value={formData.portfolio_url} onChange={e => setFormData({...formData, portfolio_url: e.target.value})} placeholder="https://myportfolio.com" className="rounded-xl h-12 pl-10" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Referral Code (Optional)</Label>
+          <Input value={formData.referralCode} onChange={e => setFormData({...formData, referralCode: e.target.value})} placeholder="Enter code" className="rounded-xl h-12" />
+        </div>
+
         <Button type="submit" disabled={loading} className="w-full h-14 mt-6 text-lg font-bold rounded-2xl shadow-lg">
           {loading ? <Loader2 className="animate-spin" /> : "Complete Profile"}
         </Button>
+        
+        <p className="text-center text-sm text-muted-foreground mt-4">
+          Already have an account? <span onClick={() => navigate('/auth')} className="text-primary font-semibold cursor-pointer hover:underline">Sign in</span>
+        </p>
       </form>
     </div>
   );
