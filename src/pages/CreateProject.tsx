@@ -269,17 +269,17 @@ const CreateProject = () => {
 </div>
 
           <div className="space-y-2 col-span-2">
-            <Label className="text-sm font-bold flex items-center gap-2">
-              <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
-            </Label>
-            <Input 
-              placeholder="https://github.com/..." 
-              className="h-12 rounded-xl bg-accent/20 border-border" 
-              value={formData.projectUrl}
-              onChange={e => setFormData({...formData, projectUrl: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
+  <Label className="text-sm font-bold flex items-center gap-2">
+    <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
+  </Label>
+  <Input 
+    placeholder="https://github.com/..." 
+    className="h-12 rounded-xl bg-accent/20 border-border" 
+    value={formData.projectUrl}
+    onChange={e => setFormData({...formData, projectUrl: e.target.value})}
+    disabled={isAtTotalLimit}
+  />
+</div>
         </div>
 
         {/* Media Section */}
