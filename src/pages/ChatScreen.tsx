@@ -11,11 +11,11 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const ChatScreen = () => {
-  const { id } = useParams(); // This is either a user_id (DM) or project_id (Group)
+  const { id } = useParams(); 
   const [searchParams] = useSearchParams();
   const isGroup = searchParams.get('group') === 'true';
   const navigate = useNavigate();
-  const { currentUser, markAsRead, resolveName } = useApp();
+  const { currentUser, markAsRead, resolveName, refreshChats } = useApp();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [chatPartner, setChatPartner] = useState<any>(null);
@@ -38,17 +38,14 @@ const ChatScreen = () => {
   };
 
   useEffect(() => {
-    // Strict guard: check if already initializing or missing core data
     if (!id || !currentUser || !supabase || initRef.current) return;
     
-    // Prevent messaging self which causes 409 Conflict in the DB function
     if (!isGroup && id === currentUser.id) {
       toast.error("You cannot message yourself.");
       navigate('/messages');
       return;
     }
 
-    // Mark as initializing immediately to prevent duplicate calls
     initRef.current = true;
 
     const initChat = async () => {
@@ -57,7 +54,6 @@ const ChatScreen = () => {
         let resolvedChatId = null;
 
         if (isGroup) {
-          // 1. Fetch Project Info
           const { data: project } = await supabase
             .from('projects')
             .select('*')
@@ -66,7 +62,6 @@ const ChatScreen = () => {
           
           setChatPartner(project);
 
-          // 2. Find Group Chat ID
           const { data: chat } = await supabase
             .from('chats')
             .select('id')
@@ -76,7 +71,6 @@ const ChatScreen = () => {
           
           resolvedChatId = chat?.id;
         } else {
-          // 1. Fetch User Info
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -84,12 +78,11 @@ const ChatScreen = () => {
             .maybeSingle();
           
           if (!profile) {
-            throw new Error("The user you are trying to message does not have a profile yet.");
+            throw new Error("User profile not found.");
           }
           
           setChatPartner(profile);
 
-          // 2. Find or Create DM Chat ID
           const { data: dmChatId, error: dmError } = await supabase.rpc('get_or_create_dm', {
             user1_id: currentUser.id,
             user2_id: id
@@ -102,7 +95,6 @@ const ChatScreen = () => {
         if (resolvedChatId) {
           setChatId(resolvedChatId);
           
-          // Fetch Messages for this Chat ID
           const { data: msgs } = await supabase
             .from('messages')
             .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
@@ -111,7 +103,6 @@ const ChatScreen = () => {
           
           setMessages(msgs || []);
 
-          // Fetch Partner Read Status
           const { data: reads } = await supabase
             .from('chat_reads')
             .select('last_read_at')
@@ -124,17 +115,13 @@ const ChatScreen = () => {
             setPartnerLastRead(new Date(reads[0].last_read_at).getTime());
           }
 
-          // Mark as read
           markAsRead(resolvedChatId, isGroup);
-          
-          // Initial scroll to bottom (instant)
           setTimeout(() => scrollToBottom('auto'), 100);
         }
       } catch (err: any) {
         console.error("Chat init error:", err);
-        const errorMsg = err?.message || (typeof err === 'string' ? err : "Failed to load chat");
-        toast.error(errorMsg);
-        initRef.current = false; // Allow retry on failure
+        toast.error(err?.message || "Failed to load chat");
+        initRef.current = false;
       } finally {
         setLoading(false);
       }
@@ -143,7 +130,6 @@ const ChatScreen = () => {
     initChat();
   }, [id, currentUser?.id, isGroup, navigate, markAsRead]);
 
-  // Real-time subscription
   useEffect(() => {
     if (!chatId || !supabase || !currentUser) return;
 
@@ -157,7 +143,6 @@ const ChatScreen = () => {
       }, async (payload) => {
         const newMsg = payload.new;
         
-        // Fetch sender info if not me
         let senderInfo = null;
         if (newMsg.sender_id === currentUser.id) {
           senderInfo = { id: currentUser.id, name: currentUser.name, avatar_url: currentUser.avatar_url, display_name: currentUser.display_name };
@@ -166,16 +151,30 @@ const ChatScreen = () => {
           senderInfo = data;
         }
         
+        const fullMsg = { ...newMsg, sender: senderInfo };
+
         setMessages(prev => {
-          const exists = prev.some(m => m.id === newMsg.id);
-          if (exists) return prev;
-          return [...prev, { ...newMsg, sender: senderInfo }];
+          // 1. Check if this exact message ID already exists
+          if (prev.some(m => m.id === fullMsg.id)) return prev;
+
+          // 2. Check for an optimistic message to replace
+          // We match by content and sender_id if it was sent very recently
+          const optimisticIndex = prev.findIndex(m => 
+            m.isOptimistic && 
+            m.content === fullMsg.content && 
+            m.sender_id === fullMsg.sender_id
+          );
+
+          if (optimisticIndex !== -1) {
+            const newMessages = [...prev];
+            newMessages[optimisticIndex] = fullMsg;
+            return newMessages;
+          }
+
+          return [...prev, fullMsg];
         });
 
-        // Mark as read if we are looking at the chat
         markAsRead(chatId, isGroup);
-        
-        // Scroll to bottom on new message
         setTimeout(() => scrollToBottom('smooth'), 100);
       })
       .on('postgres_changes', { 
@@ -214,7 +213,6 @@ const ChatScreen = () => {
       messageData.receiver_id = id;
     }
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg = {
       id: tempId,
@@ -226,12 +224,16 @@ const ChatScreen = () => {
 
     setMessages(prev => [...prev, optimisticMsg]);
     setMsg('');
-    
-    // Scroll to bottom immediately for sender
     setTimeout(() => scrollToBottom('smooth'), 50);
 
-    const { error } = await supabase.from('messages').insert(messageData);
-    if (error) {
+    try {
+      // Unhide chat for sender immediately
+      await supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: chatId });
+      refreshChats();
+
+      const { error } = await supabase.from('messages').insert(messageData);
+      if (error) throw error;
+    } catch (err) {
       toast.error("Failed to send message");
       setMessages(prev => prev.filter(m => m.id !== tempId));
     }
