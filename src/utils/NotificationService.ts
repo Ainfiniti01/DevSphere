@@ -1,8 +1,8 @@
 "use client";
 
 import messageSound from '../../assets/sounds/universfield-new-notification-051-494246.mp3';
-import projectSound from '../../assets/sounds/dragon-studio-notification-sound-effect-372475.mp3';
-import systemSound from '../../assets/sounds/universfield-new-notification-057-494255.mp3';
+import projectSound from '../../assets/sounds/universfield-new-notification-057-494255.mp3';
+import systemSound from '../../assets/sounds/dragon-studio-notification-sound-effect-372475.mp3';
 
 export type NotificationSoundType = 'message' | 'project' | 'system';
 
