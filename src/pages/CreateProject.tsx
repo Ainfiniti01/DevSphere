@@ -236,7 +236,7 @@ const CreateProject = () => {
 
         {/* Configuration */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2 sm:col-span-1">
             <Label className="text-sm font-bold">Project Stage</Label>
             <Select 
               value={formData.stage} 
