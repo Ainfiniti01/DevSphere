@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Plus, Users, MessageSquare, User, RefreshCw } from 'lucide-react';
+import { Search, Plus, Users, MessageSquare, User, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ListSkeleton } from '@/components/SkeletonLoader';
 import EmptyState from '@/components/EmptyState';
@@ -12,15 +12,27 @@ import { supabase } from '@/lib/supabase';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Messages = () => {
   const navigate = useNavigate();
-  const { chats, refreshChats, currentUser } = useApp();
+  const { chats, refreshChats, currentUser, deleteChat } = useApp();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -66,6 +78,12 @@ const Messages = () => {
       (u.title || '').toLowerCase().includes(userSearch.toLowerCase())
     );
   }, [users, userSearch]);
+
+  const handleDelete = async (chatId: string) => {
+    setIsDeleting(chatId);
+    await deleteChat(chatId);
+    setIsDeleting(null);
+  };
 
   return (
     <MobileLayout title="Messages">
@@ -148,8 +166,8 @@ const Messages = () => {
             filteredChats.map(chat => (
               <div 
                 key={chat.id} 
-                onClick={() => navigate(`/chat/${chat.id}${chat.isGroup ? '?group=true' : ''}`)}
-                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors group"
+                className="flex items-center gap-4 p-3 hover:bg-accent/30 rounded-2xl cursor-pointer transition-colors group relative"
+                onClick={() => navigate(`/chat/${chat.targetId}${chat.isGroup ? '?group=true' : ''}`)}
               >
                 <div className="relative">
                   <Avatar className="h-14 w-14 border-2 border-border shadow-sm group-hover:border-primary/30 transition-colors">
@@ -170,7 +188,7 @@ const Messages = () => {
                     <span className="text-[10px] text-muted-foreground font-medium">{chat.time}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className={`text-xs truncate ${chat.unread > 0 ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                    <p className={`text-xs truncate pr-8 ${chat.unread > 0 ? "text-foreground font-bold" : "text-muted-foreground"}`}>
                       {chat.lastMsg}
                     </p>
                     {chat.unread > 0 && (
@@ -179,6 +197,43 @@ const Messages = () => {
                       </span>
                     )}
                   </div>
+                </div>
+
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isDeleting === chat.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={16} />}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Chat?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {chat.isGroup 
+                            ? "This will remove the chat from your list. You must leave the group first if you are still a member."
+                            : "This will remove the conversation from your list. It will reappear if you receive a new message."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(chat.id);
+                          }} 
+                          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))

@@ -25,6 +25,7 @@ interface AppContextType {
   refreshNotifications: () => Promise<void>;
   refreshChats: () => Promise<void>;
   markAsRead: (chatId: string, isGroup: boolean) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
   updatePresence: () => Promise<void>;
   resolveName: (user: any) => string;
 }
@@ -168,6 +169,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
+      // 1. Get hidden chats
+      const { data: hiddenData } = await supabase
+        .from('hidden_chats')
+        .select('chat_id')
+        .eq('user_id', currentUser.id);
+      
+      const hiddenChatIds = new Set(hiddenData?.map(h => h.chat_id) || []);
+
+      // 2. Get chat memberships
       const { data: chatMemberships, error: memberError } = await supabase
         .from('chat_members')
         .select(`
@@ -190,6 +200,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      // 3. Get last messages for all chats
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
@@ -198,6 +209,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (msgError) throw msgError;
 
+      // 4. Get read status
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -210,6 +222,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       for (const membership of chatMemberships) {
         const chat = membership.chat as any;
         if (!chat) continue;
+
+        // Skip hidden chats unless they have a message newer than the hide date
+        // For simplicity, we'll just skip them if they are in the hidden set
+        // and reappearing logic will be handled by deleting from hidden_chats on new message
+        if (hiddenChatIds.has(chat.id)) continue;
 
         const isGroup = chat.type === 'group';
         let chatName = isGroup ? chat.project?.title : 'Loading...';
@@ -251,6 +268,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const lastRead = readMap.get(msg.chat_id) || 0;
         const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
 
+        // Since messages are sorted DESC, the first one we hit for a chat is the latest
         if (chat.lastTimestamp === 0) {
           chat.lastMsg = msg.content;
           chat.time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -291,6 +309,44 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("markAsRead failed:", error);
     }
   }, [currentUser?.id]);
+
+  const deleteChat = useCallback(async (chatId: string) => {
+    if (!supabase || !currentUser?.id) return;
+    
+    try {
+      const chat = chats.find(c => c.id === chatId);
+      if (!chat) return;
+
+      if (chat.isGroup) {
+        // Check if still a member
+        const { data: membership } = await supabase
+          .from('chat_members')
+          .select('*')
+          .eq('chat_id', chatId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+        
+        if (membership) {
+          toast.error("You must leave the group before deleting the chat.");
+          return;
+        }
+      }
+
+      // Add to hidden chats
+      const { error } = await supabase.from('hidden_chats').upsert({
+        user_id: currentUser.id,
+        chat_id: chatId
+      }, { onConflict: 'user_id,chat_id' });
+
+      if (error) throw error;
+
+      toast.success("Chat removed from list");
+      await refreshChats();
+    } catch (error: any) {
+      toast.error("Failed to remove chat");
+      console.error(error);
+    }
+  }, [currentUser?.id, chats, refreshChats]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -423,7 +479,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (currentUser?.id) {
       const channel = supabase
         .channel('global-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refreshChats())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+          // If a new message arrives for a hidden chat, we should unhide it
+          if (payload.event === 'INSERT') {
+            const msg = payload.new as any;
+            supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
+              refreshChats();
+            });
+          } else {
+            refreshChats();
+          }
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refreshNotifications())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reads' }, () => refreshChats())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => refreshProjects())
@@ -446,7 +512,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       unreadNotificationsCount,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
-      markAsRead,
+      markAsRead, deleteChat,
       updatePresence, resolveName
     }}>
       {children}

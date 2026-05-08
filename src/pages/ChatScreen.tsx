@@ -25,11 +25,16 @@ const ChatScreen = () => {
   const [loading, setLoading] = useState(true);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
 
   const isOnline = (lastSeen: string) => {
     if (!lastSeen) return false;
     return Date.now() - new Date(lastSeen).getTime() < 60000;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   useEffect(() => {
@@ -121,6 +126,9 @@ const ChatScreen = () => {
 
           // Mark as read
           markAsRead(resolvedChatId, isGroup);
+          
+          // Initial scroll to bottom (instant)
+          setTimeout(() => scrollToBottom('auto'), 100);
         }
       } catch (err: any) {
         console.error("Chat init error:", err);
@@ -166,6 +174,9 @@ const ChatScreen = () => {
 
         // Mark as read if we are looking at the chat
         markAsRead(chatId, isGroup);
+        
+        // Scroll to bottom on new message
+        setTimeout(() => scrollToBottom('smooth'), 100);
       })
       .on('postgres_changes', { 
         event: '*', 
@@ -184,12 +195,6 @@ const ChatScreen = () => {
       supabase.removeChannel(channel);
     };
   }, [chatId, currentUser?.id, isGroup, markAsRead]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   const handleSend = async () => {
     if (!msg.trim() || !supabase || !currentUser || !chatId) return;
@@ -222,6 +227,9 @@ const ChatScreen = () => {
     setMessages(prev => [...prev, optimisticMsg]);
     setMsg('');
     
+    // Scroll to bottom immediately for sender
+    setTimeout(() => scrollToBottom('smooth'), 50);
+
     const { error } = await supabase.from('messages').insert(messageData);
     if (error) {
       toast.error("Failed to send message");
@@ -320,6 +328,7 @@ const ChatScreen = () => {
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
             <MessageSquare size={48} className="mb-4" />
