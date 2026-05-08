@@ -256,17 +256,17 @@ const CreateProject = () => {
   </Select>
 </div>
 
-          <div className="space-y-2 col-span-2 sm:col-span-1">
-            <Label className="text-sm font-bold">Required Skills</Label>
-            <Input 
-              placeholder="React, Node, UI... (comma separated)" 
-              className="h-12 rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.skills}
-              onChange={e => setFormData({...formData, skills: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
+          <div className="space-y-2">
+  <Label className="text-sm font-bold">Required Skills</Label>
+  <Input 
+    placeholder="React, Node, UI... (comma separated)" 
+    className="h-12 rounded-xl bg-accent/20 border-border" 
+    required 
+    value={formData.skills}
+    onChange={e => setFormData({...formData, skills: e.target.value})}
+    disabled={isAtTotalLimit}
+  />
+</div>
 
           <div className="space-y-2 col-span-2">
             <Label className="text-sm font-bold flex items-center gap-2">
