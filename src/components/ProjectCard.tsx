@@ -94,6 +94,13 @@ const ProjectCard = ({ project }: { project: any }) => {
         )}
         onClick={() => navigate(`/project/${project.id}`)}
       >
+        {/* Stage Badge - Always visible */}
+        <div className="absolute top-4 left-4 z-10">
+          <span className="px-2.5 py-1 bg-primary/90 text-white text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-white/20 shadow-lg backdrop-blur-sm">
+            {project.stage}
+          </span>
+        </div>
+
         {hasMedia ? (
           <>
             <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
@@ -106,11 +113,6 @@ const ProjectCard = ({ project }: { project: any }) => {
           </>
         ) : (
           <div className="p-8 text-center flex flex-col items-center justify-center h-full w-full">
-            <div className="absolute top-4 left-4">
-              <span className="px-2.5 py-1 bg-primary/15 text-primary text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-primary/20">
-                {project.stage}
-              </span>
-            </div>
             <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight max-w-[90%] mb-2">
               {project.title}
             </h3>

@@ -88,10 +88,12 @@ const ProjectDetail = () => {
         }
       } else {
         toast.success(newStatus === 'ACTIVE' ? "Project is now active!" : "Project paused.");
+        // Force a refresh of the projects list in context
         await refreshProjects();
       }
     } catch (err: any) {
-      toast.error(err.message);
+      console.error("[ProjectDetail] Status change error:", err);
+      toast.error(err.message || "Failed to update project status");
     } finally {
       setIsSubmitting(false);
     }
@@ -201,7 +203,7 @@ const ProjectDetail = () => {
                 onClick={() => handleStatusChange(project.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE')}
                 disabled={isSubmitting}
               >
-                {project.status === 'ACTIVE' ? <><Pause size={18} /> Pause</> : <><Play size={18} /> Resume</>}
+                {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : (project.status === 'ACTIVE' ? <><Pause size={18} /> Pause</> : <><Play size={18} /> Resume</>)}
               </Button>
               <Button 
                 variant="outline" 

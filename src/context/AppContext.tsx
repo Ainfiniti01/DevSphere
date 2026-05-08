@@ -153,12 +153,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setProjects(transformed);
 
       if (activeUser?.id) {
-        const { data: reqData, error: reqError } = await supabase
-          .from('join_requests')
-          .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
-        
-        if (!reqError && reqData) {
-          setRequests(reqData);
+        try {
+          const { data: reqData, error: reqError } = await supabase
+            .from('join_requests')
+            .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
+          
+          if (!reqError && reqData) {
+            setRequests(reqData);
+          }
+        } catch (e) {
+          console.warn("[AppContext] Failed to fetch join requests:", e);
         }
       } else {
         setRequests([]);
