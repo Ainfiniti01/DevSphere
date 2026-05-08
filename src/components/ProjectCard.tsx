@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle, Send, User, Loader2 } from 'lucide-react';
+import { Heart, Share2, MessageCircle, Send, User, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -51,7 +51,7 @@ const ProjectCard = ({ project }: { project: any }) => {
     if (!commentText.trim()) return;
     await addComment(project.id, commentText);
     setCommentText('');
-    fetchComments(); // Refresh local list
+    fetchComments();
   };
 
   const handleShare = async () => {
@@ -94,7 +94,6 @@ const ProjectCard = ({ project }: { project: any }) => {
         )}
         onClick={() => navigate(`/project/${project.id}`)}
       >
-        {/* Stage Badge - Always visible */}
         <div className="absolute top-4 left-4 z-10">
           <span className="px-2.5 py-1 bg-primary/90 text-white text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-white/20 shadow-lg backdrop-blur-sm">
             {project.stage}
@@ -104,9 +103,6 @@ const ProjectCard = ({ project }: { project: any }) => {
         {hasMedia ? (
           <>
             <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-              <PlayCircle className="text-white opacity-80 group-hover:opacity-100 transition-opacity" size={48} />
-            </div>
             <div className="absolute bottom-3 left-3 right-3">
               <h3 className="text-white font-bold text-lg drop-shadow-md">{project.title}</h3>
             </div>

@@ -125,11 +125,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
-      // Simplified query: removed comments join to prevent timeouts
       const { data, error } = await supabase
         .from('projects')
         .select(`
-          id, title, problem, solution, description, stage, skills_required, thumbnail_url, video_url, created_at, status, project_url, creator_id,
+          id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
           project_members(user_id),

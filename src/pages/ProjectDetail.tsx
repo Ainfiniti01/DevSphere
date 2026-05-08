@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, PlayCircle, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -88,7 +88,6 @@ const ProjectDetail = () => {
         }
       } else {
         toast.success(newStatus === 'ACTIVE' ? "Project is now active!" : "Project paused.");
-        // Force a refresh of the projects list in context
         await refreshProjects();
       }
     } catch (err: any) {
@@ -144,9 +143,14 @@ const ProjectDetail = () => {
   return (
     <MobileLayout title="Project Details" showBack>
       <div className="relative bg-background text-foreground pb-24">
-        <div className="aspect-video relative bg-muted">
-          {project.thumbnail ? <img src={project.thumbnail} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-primary/10 flex items-center justify-center"><Rocket size={48} className="text-primary/40" /></div>}
-          <div className="absolute inset-0 bg-black/30 flex items-center justify-center"><PlayCircle size={64} className="text-white/80" /></div>
+        <div className="aspect-video relative bg-muted overflow-hidden">
+          {project.thumbnail ? (
+            <img src={project.thumbnail} className="w-full h-full object-cover" alt={project.title} />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center">
+              <Rocket size={48} className="text-primary/40" />
+            </div>
+          )}
           {project.status === 'PAUSED' && (
             <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
               Paused
@@ -164,7 +168,12 @@ const ProjectDetail = () => {
               <Button variant="outline" size="icon" className="rounded-xl" onClick={handleLike}>
                 <Heart size={18} className={project.isLiked ? "fill-red-500 text-red-500" : ""} />
               </Button>
-              <Button variant="outline" size="icon" className="rounded-xl"><Share2 size={18} /></Button>
+              <Button variant="outline" size="icon" className="rounded-xl" onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                toast.success("Link copied!");
+              }}>
+                <Share2 size={18} />
+              </Button>
             </div>
           </div>
 

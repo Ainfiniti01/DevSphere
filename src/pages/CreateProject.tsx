@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon } from 'lucide-react';
+import { Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon, Upload } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
@@ -20,9 +20,8 @@ const CreateProject = () => {
   const { projects, refreshProjects, currentUser } = useApp();
   
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState<'image' | 'video' | null>(null);
+  const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -32,7 +31,6 @@ const CreateProject = () => {
     skills: '',
     stage: 'Idea',
     thumbnail: '',
-    videoUrl: '',
     projectUrl: ''
   });
 
@@ -53,18 +51,24 @@ const CreateProject = () => {
           skills: projectToEdit.skills.join(', '),
           stage: projectToEdit.stage,
           thumbnail: projectToEdit.thumbnail || '',
-          videoUrl: projectToEdit.videoUrl || '',
           projectUrl: projectToEdit.project_url || ''
         });
       }
     }
   }, [editId, projects]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !supabase || !currentUser) return;
 
-    setUploading(type);
+    // Validation
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Only images (.jpg, .png, .webp) are allowed");
+      return;
+    }
+
+    setUploading(true);
     const fileExt = file.name.split('.').pop();
     const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`;
     const filePath = `project-media/${fileName}`;
@@ -82,9 +86,9 @@ const CreateProject = () => {
 
       setFormData(prev => ({
         ...prev,
-        [type === 'image' ? 'thumbnail' : 'videoUrl']: publicUrl
+        thumbnail: publicUrl
       }));
-      toast.success(`${type === 'image' ? 'Image' : 'Video'} uploaded!`);
+      toast.success("Project image uploaded!");
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -100,11 +104,10 @@ const CreateProject = () => {
     }
 
     if (isAtTotalLimit) {
-      toast.error("You've reached your limit of 5 projects. Pause or manage existing projects to create a new one.");
+      toast.error("You've reached your limit of 5 projects.");
       return;
     }
 
-    // URL Validation
     if (formData.projectUrl && !formData.projectUrl.match(/^https?:\/\/.+/)) {
       toast.error("Please enter a valid URL starting with http:// or https://");
       return;
@@ -112,14 +115,12 @@ const CreateProject = () => {
 
     setLoading(true);
     
-    // Define data based on whether it's an edit or new project
     const projectData: any = {
       stage: formData.stage,
       skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
       description: formData.description,
       project_url: formData.projectUrl,
       thumbnail_url: formData.thumbnail,
-      video_url: formData.videoUrl,
     };
 
     if (!editId) {
@@ -168,8 +169,13 @@ const CreateProject = () => {
           </div>
         )}
 
-        <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={e => handleFileUpload(e, 'image')} />
-        <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={e => handleFileUpload(e, 'video')} />
+        <input 
+          type="file" 
+          ref={imageInputRef} 
+          className="hidden" 
+          accept="image/jpeg,image/png,image/webp" 
+          onChange={handleImageUpload} 
+        />
 
         <div className="space-y-2">
           <Label className="text-sm font-bold">Project Title</Label>
@@ -181,7 +187,6 @@ const CreateProject = () => {
             onChange={e => setFormData({...formData, title: e.target.value})}
             disabled={isAtTotalLimit || !!editId}
           />
-          {editId && <p className="text-[10px] text-muted-foreground px-1">Project title cannot be changed after creation.</p>}
         </div>
 
         <div className="space-y-2">
@@ -263,27 +268,30 @@ const CreateProject = () => {
         </div>
 
         <div className="space-y-4">
-          <Label className="text-sm font-bold">Media (Optional)</Label>
-          <div className="grid grid-cols-2 gap-4">
-            <div 
-              onClick={() => !isAtTotalLimit && imageInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.thumbnail ? 'border-primary' : 'border-border'} ${isAtTotalLimit ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {uploading === 'image' ? <Loader2 className="animate-spin text-primary" /> : <ImageIcon className={formData.thumbnail ? 'text-primary' : 'text-muted-foreground'} size={24} />}
-              <p className="text-[10px] font-bold mt-2">{formData.thumbnail ? 'Image Added' : 'Add Image'}</p>
-            </div>
-            <div 
-              onClick={() => !isAtTotalLimit && videoInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer ${formData.videoUrl ? 'border-primary' : 'border-border'} ${isAtTotalLimit ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {uploading === 'video' ? <Loader2 className="animate-spin text-primary" /> : <Video className={formData.videoUrl ? 'text-primary' : 'text-muted-foreground'} size={24} />}
-              <p className="text-[10px] font-bold mt-2">{formData.videoUrl ? 'Video Added' : 'Add Video'}</p>
-            </div>
+          <Label className="text-sm font-bold">Project Image (Optional)</Label>
+          <div 
+            onClick={() => !isAtTotalLimit && imageInputRef.current?.click()}
+            className={`relative aspect-video border-2 border-dashed rounded-2xl flex flex-col items-center justify-center bg-accent/10 hover:bg-accent/20 transition-all cursor-pointer overflow-hidden ${formData.thumbnail ? 'border-primary' : 'border-border'} ${isAtTotalLimit ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {formData.thumbnail ? (
+              <>
+                <img src={formData.thumbnail} alt="Preview" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <Upload className="text-white" size={32} />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                {uploading ? <Loader2 className="animate-spin text-primary" size={32} /> : <ImageIcon className="text-muted-foreground" size={32} />}
+                <p className="text-xs font-bold text-muted-foreground">Upload Project Image</p>
+                <p className="text-[10px] text-muted-foreground/60">JPG, PNG, WEBP only</p>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="pt-4">
-          <Button type="submit" disabled={loading || !!uploading || isAtTotalLimit} className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
+          <Button type="submit" disabled={loading || uploading || isAtTotalLimit} className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
             {loading ? "Processing..." : (editId ? "Update Project" : "Launch Project")}
           </Button>
         </div>
