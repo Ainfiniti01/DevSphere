@@ -45,7 +45,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const processingLikes = useRef<Set<string>>(new Set());
-  const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
+  const isRefreshing = useRef({ notifications: false, chats: false });
   const refreshTimeout = useRef<any>(null);
   const initStarted = useRef(false);
   const lastActivity = useRef<number>(Date.now());
@@ -120,8 +120,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser]);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
-    if (!supabase || isRefreshing.current.projects) return;
-    isRefreshing.current.projects = true;
+    if (!supabase) return;
     const activeUser = userOverride || currentUser;
 
     try {
@@ -153,26 +152,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setProjects(transformed);
 
       if (activeUser?.id) {
-        try {
-          const { data: reqData, error: reqError } = await supabase
-            .from('join_requests')
-            .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
-          
-          if (!reqError && reqData) {
-            setRequests(reqData);
-          }
-        } catch (e) {
-          console.warn("[AppContext] Failed to fetch join requests:", e);
+        const { data: reqData, error: reqError } = await supabase
+          .from('join_requests')
+          .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
+        
+        if (!reqError && reqData) {
+          setRequests(reqData);
         }
       } else {
         setRequests([]);
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh projects error:", error.message);
-      }
-    } finally {
-      isRefreshing.current.projects = false;
+      console.error("Refresh projects error:", error.message);
     }
   }, [currentUser]);
 
@@ -191,9 +182,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh notifications error:", error.message);
-      }
+      console.error("Refresh notifications error:", error.message);
     } finally {
       isRefreshing.current.notifications = false;
     }
@@ -317,9 +306,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh chats error:", error.message);
-      }
+      console.error("Refresh chats error:", error.message);
     } finally {
       isRefreshing.current.chats = false;
     }

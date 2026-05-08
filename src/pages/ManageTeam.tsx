@@ -6,7 +6,7 @@ import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2, ChevronRight } from 'lucide-react';
+import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2, ChevronRight, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -15,12 +15,18 @@ const ManageTeam = () => {
   const navigate = useNavigate();
   const { projects, requests, currentUser, refreshProjects, resolveName } = useApp();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const project = projects.find(p => p.id === id);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshProjects();
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
-    // Refresh data on mount to ensure we have the latest requests
-    refreshProjects();
+    handleRefresh();
   }, []);
 
   if (!project || project.creator_id !== currentUser?.id) {
@@ -53,7 +59,6 @@ const ManageTeam = () => {
 
       if (status === 'accepted') {
         // 2. Add to project members
-        // This will trigger 'handle_project_chat_membership' in the DB to handle group chats
         const { error: memberError } = await supabase.from('project_members').insert({
           project_id: project.id,
           user_id: userId,
@@ -103,14 +108,25 @@ const ManageTeam = () => {
             <h3 className="font-bold text-sm truncate">{project.title}</h3>
             <p className="text-[11px] text-muted-foreground">Project Settings & Team</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="rounded-xl gap-2 font-bold border-primary/20 hover:bg-primary/5"
-            onClick={() => navigate(`/create?edit=${project.id}`)}
-          >
-            <Edit size={14} /> Edit
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-xl h-10 w-10 border-primary/20"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-xl gap-2 font-bold border-primary/20 hover:bg-primary/5"
+              onClick={() => navigate(`/create?edit=${project.id}`)}
+            >
+              <Edit size={14} /> Edit
+            </Button>
+          </div>
         </div>
 
         <section>
@@ -119,7 +135,9 @@ const ManageTeam = () => {
             <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">{projectRequests.length}</span>
           </div>
           <div className="space-y-4">
-            {projectRequests.map(req => (
+            {isRefreshing && projectRequests.length === 0 ? (
+              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" /></div>
+            ) : projectRequests.map(req => (
               <div key={req.id} className="bg-card border border-border p-5 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex gap-4 mb-4 items-center">
                   <div 
@@ -175,7 +193,7 @@ const ManageTeam = () => {
                 </div>
               </div>
             ))}
-            {projectRequests.length === 0 && (
+            {projectRequests.length === 0 && !isRefreshing && (
               <div className="text-center py-10 bg-accent/10 rounded-3xl border border-dashed border-border">
                 <p className="text-sm text-muted-foreground">No pending requests at the moment.</p>
               </div>
