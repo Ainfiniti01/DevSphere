@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
@@ -17,6 +17,11 @@ const ManageTeam = () => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   
   const project = projects.find(p => p.id === id);
+
+  useEffect(() => {
+    // Refresh data on mount to ensure we have the latest requests
+    refreshProjects();
+  }, []);
 
   if (!project || project.creator_id !== currentUser?.id) {
     return (
@@ -62,7 +67,6 @@ const ManageTeam = () => {
         toast.info("Request declined");
       }
       
-      // Notifications are now handled by database trigger 'on_join_request_status_change'
       await refreshProjects();
     } catch (err: any) {
       toast.error(err.message);

@@ -131,7 +131,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
-          project_members(user_id),
+          project_members(user_id, user:profiles(id, name, avatar_url, title, display_name)),
           comment_count:comments(count)
         `)
         .order('created_at', { ascending: false });
@@ -146,6 +146,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
         members: p.project_members?.map((m: any) => m.user_id) || [],
+        memberProfiles: p.project_members?.map((m: any) => m.user) || [],
         commentCount: p.comment_count?.[0]?.count || 0
       }));
 
