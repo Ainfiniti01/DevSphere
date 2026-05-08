@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { notificationService } from '@/utils/NotificationService';
 
 interface AppContextType {
   currentUser: any;
@@ -48,6 +49,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshTimeout = useRef<any>(null);
   const initStarted = useRef(false);
   const lastActivity = useRef<number>(Date.now());
+  const processedEventIds = useRef<Set<string>>(new Set());
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -541,19 +543,35 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (currentUser?.id) {
       const channel = supabase
         .channel('global-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-          if (payload.event === 'INSERT') {
-            const msg = payload.new as any;
-            supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
-              if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
-              refreshTimeout.current = setTimeout(() => refreshChats(), 200);
-            });
-          } else {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+          const msg = payload.new as any;
+          if (processedEventIds.current.has(msg.id)) return;
+          processedEventIds.current.add(msg.id);
+
+          // Enforce settings
+          const settings = currentUser.notification_settings || {};
+          const isMe = msg.sender_id === currentUser.id;
+          
+          if (!isMe && settings.messages !== false) {
+            notificationService.play('message', settings.sound !== false);
+          }
+
+          supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
             if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
             refreshTimeout.current = setTimeout(() => refreshChats(), 200);
-          }
+          });
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+          const notif = payload.new as any;
+          if (processedEventIds.current.has(notif.id)) return;
+          processedEventIds.current.add(notif.id);
+
+          // Enforce settings
+          const settings = currentUser.notification_settings || {};
+          if (settings.projects !== false) {
+            notificationService.play('project', settings.sound !== false);
+          }
+
           if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
           refreshTimeout.current = setTimeout(() => refreshNotifications(), 200);
         })
