@@ -154,11 +154,7 @@ const ChatScreen = () => {
         const fullMsg = { ...newMsg, sender: senderInfo };
 
         setMessages(prev => {
-          // 1. Check if this exact message ID already exists
           if (prev.some(m => m.id === fullMsg.id)) return prev;
-
-          // 2. Check for an optimistic message to replace
-          // We match by content and sender_id if it was sent very recently
           const optimisticIndex = prev.findIndex(m => 
             m.isOptimistic && 
             m.content === fullMsg.content && 
@@ -227,7 +223,6 @@ const ChatScreen = () => {
     setTimeout(() => scrollToBottom('smooth'), 50);
 
     try {
-      // Unhide chat for sender immediately
       await supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: chatId });
       refreshChats();
 
@@ -244,17 +239,6 @@ const ChatScreen = () => {
       <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center">
         <Loader2 className="animate-spin text-primary" size={32} />
         <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
-      </div>
-    );
-  }
-
-  if (!chatPartner && !loading) {
-    return (
-      <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center p-8 text-center">
-        <X size={48} className="text-muted-foreground mb-4" />
-        <h2 className="text-xl font-bold">Chat not found</h2>
-        <p className="text-sm text-muted-foreground mt-2">The user or project you are looking for doesn't exist.</p>
-        <Button onClick={() => navigate(-1)} className="mt-6 rounded-xl">Go Back</Button>
       </div>
     );
   }
@@ -289,6 +273,16 @@ const ChatScreen = () => {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
         {messages.map((m) => {
+          if (m.type === 'system') {
+            return (
+              <div key={m.id} className="flex justify-center my-4">
+                <span className="px-4 py-1.5 bg-accent/30 text-muted-foreground text-[11px] font-bold rounded-full uppercase tracking-wider border border-border/50">
+                  {m.content}
+                </span>
+              </div>
+            );
+          }
+
           const isMe = m.sender_id === currentUser?.id;
           const isSeen = m.is_read || partnerLastRead >= new Date(m.created_at).getTime();
           

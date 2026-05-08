@@ -47,6 +47,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
   const refreshTimeout = useRef<any>(null);
   const initStarted = useRef(false);
+  const lastActivity = useRef<number>(Date.now());
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -176,7 +177,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
-      // 1. Get hidden chats
       let hiddenChatIds = new Set<string>();
       try {
         const { data: hiddenData, error: hiddenError } = await supabase
@@ -188,10 +188,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           hiddenChatIds = new Set(hiddenData.map(h => h.chat_id));
         }
       } catch (e) {
-        // Silent fail for hidden chats
+        // Silent fail
       }
 
-      // 2. Get chat memberships
       const { data: chatMemberships, error: memberError } = await supabase
         .from('chat_members')
         .select(`
@@ -214,7 +213,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 3. Get last messages for all chats
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
@@ -223,7 +221,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (msgError) throw msgError;
 
-      // 4. Get read status
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
@@ -353,7 +350,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      // Step 1: Remove user from group
       const { error: memberError } = await supabase
         .from('chat_members')
         .delete()
@@ -361,7 +357,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (memberError) throw memberError;
 
-      // Step 2: Hide chat from inbox
       const { error: hideError } = await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
         chat_id: chatId
@@ -453,7 +448,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
-          // Initial load
           await Promise.allSettled([
             refreshProjects(user),
             refreshNotifications(),
@@ -479,7 +473,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
             
-            // Debounced refresh to avoid collision with initApp
             if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
             refreshTimeout.current = setTimeout(() => {
               Promise.allSettled([
@@ -510,6 +503,39 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return () => clearInterval(interval);
     }
   }, [currentUser?.id, updatePresence]);
+
+  // Auto Logout Logic
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const handleActivity = () => {
+      lastActivity.current = Date.now();
+    };
+
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('click', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+
+    const checkInterval = setInterval(() => {
+      const preference = currentUser.notification_settings?.auto_logout || 'never';
+      if (preference === 'never') return;
+
+      const timeoutMs = parseInt(preference) * 60 * 1000;
+      if (Date.now() - lastActivity.current > timeoutMs) {
+        toast.info("Logged out due to inactivity");
+        logout();
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      clearInterval(checkInterval);
+    };
+  }, [currentUser?.id, logout]);
 
   useEffect(() => {
     if (currentUser?.id) {
