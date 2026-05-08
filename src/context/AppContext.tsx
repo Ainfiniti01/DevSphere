@@ -169,11 +169,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
-      // 1. Get hidden chats
-      const { data: hiddenData } = await supabase
+      // 1. Get hidden chats with error handling
+      const { data: hiddenData, error: hiddenError } = await supabase
         .from('hidden_chats')
         .select('chat_id')
         .eq('user_id', currentUser.id);
+      
+      if (hiddenError && hiddenError.code !== 'PGRST116') {
+        console.warn("Hidden chats fetch failed (likely permissions):", hiddenError.message);
+      }
       
       const hiddenChatIds = new Set(hiddenData?.map(h => h.chat_id) || []);
 
@@ -223,9 +227,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const chat = membership.chat as any;
         if (!chat) continue;
 
-        // Skip hidden chats unless they have a message newer than the hide date
-        // For simplicity, we'll just skip them if they are in the hidden set
-        // and reappearing logic will be handled by deleting from hidden_chats on new message
         if (hiddenChatIds.has(chat.id)) continue;
 
         const isGroup = chat.type === 'group';
@@ -268,7 +269,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const lastRead = readMap.get(msg.chat_id) || 0;
         const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
 
-        // Since messages are sorted DESC, the first one we hit for a chat is the latest
         if (chat.lastTimestamp === 0) {
           chat.lastMsg = msg.content;
           chat.time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -318,7 +318,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (!chat) return;
 
       if (chat.isGroup) {
-        // Check if still a member
         const { data: membership } = await supabase
           .from('chat_members')
           .select('*')
@@ -332,7 +331,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      // Add to hidden chats
       const { error } = await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
         chat_id: chatId
@@ -423,7 +421,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
-          // Consolidate initial data fetch
           await Promise.all([
             refreshProjects(user),
             refreshNotifications(),
@@ -480,7 +477,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const channel = supabase
         .channel('global-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-          // If a new message arrives for a hidden chat, we should unhide it
           if (payload.event === 'INSERT') {
             const msg = payload.new as any;
             supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
