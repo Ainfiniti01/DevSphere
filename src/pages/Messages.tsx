@@ -46,10 +46,10 @@ const Messages = () => {
       try {
         await refreshChats();
         if (supabase && currentUser?.id) {
-          // Use profiles_public view for safe user discovery
+          // Use profiles table directly with limited columns
           const { data } = await supabase
-            .from('profiles_public')
-            .select('*')
+            .from('profiles')
+            .select('id, name, avatar_url, title, display_name')
             .neq('id', currentUser.id)
             .limit(20);
           setUsers(data || []);
@@ -148,10 +148,10 @@ const Messages = () => {
                         >
                           <Avatar className="h-12 w-12 border border-border">
                             <AvatarImage src={u.avatar_url} />
-                            <AvatarFallback><User size={20} /></AvatarFallback>
+                            <AvatarFallback>{(u.display_name || u.name || '?')[0]}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-sm truncate">{u.name}</h4>
+                            <h4 className="font-bold text-sm truncate">{u.display_name || u.name}</h4>
                             <p className="text-xs text-muted-foreground truncate">{u.title}</p>
                           </div>
                         </div>

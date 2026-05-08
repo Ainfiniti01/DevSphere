@@ -164,7 +164,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setRequests([]);
       }
     } catch (error: any) {
-      console.error("Refresh projects error:", error.message);
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
+        console.error("Refresh projects error:", error.message);
+      }
     } finally {
       isRefreshing.current.projects = false;
     }
@@ -185,7 +187,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
-      console.error("Refresh notifications error:", error.message);
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
+        console.error("Refresh notifications error:", error.message);
+      }
     } finally {
       isRefreshing.current.notifications = false;
     }
@@ -309,7 +313,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
-      console.error("Refresh chats error:", error.message);
+      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
+        console.error("Refresh chats error:", error.message);
+      }
     } finally {
       isRefreshing.current.chats = false;
     }
