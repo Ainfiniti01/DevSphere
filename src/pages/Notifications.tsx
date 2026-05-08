@@ -40,13 +40,14 @@ const Notifications = () => {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
     }
 
+    // Redirect based on notification type
     if (notif.type === 'request') {
       navigate(`/manage-team/${notif.project_id}`);
     } else if (notif.type === 'message') {
       navigate(`/chat/${notif.actor_id}`);
     } else if (notif.type === 'reply') {
       navigate(`/project/${notif.project_id}?comment=${notif.comment_id}`);
-    } else if (notif.type === 'comment' || notif.type === 'like' || notif.type === 'pause' || notif.type === 'resume') {
+    } else if (notif.type === 'comment' || notif.type === 'like' || notif.type === 'pause' || notif.type === 'resume' || notif.type === 'request_accepted' || notif.type === 'request_rejected') {
       navigate(`/project/${notif.project_id}`);
     }
   };
@@ -77,6 +78,8 @@ const Notifications = () => {
       case 'comment': return <MessageCircle size={12} className="text-blue-500" />;
       case 'reply': return <MessageSquare size={12} className="text-indigo-500" />;
       case 'request': return <UserPlus size={12} className="text-primary" />;
+      case 'request_accepted': return <Check size={12} className="text-emerald-500" />;
+      case 'request_rejected': return <X size={12} className="text-destructive" />;
       case 'pause': return <X size={12} className="text-amber-500" />;
       case 'resume': return <Rocket size={12} className="text-emerald-500" />;
       default: return <Bell size={12} className="text-muted-foreground" />;

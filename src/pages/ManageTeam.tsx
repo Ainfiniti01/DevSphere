@@ -31,6 +31,7 @@ const ManageTeam = () => {
     );
   }
 
+  // CRITICAL FIX: Scope requests strictly to this project and pending status
   const projectRequests = requests.filter(r => r.project_id === project.id && r.status === 'pending');
 
   const handleRequest = async (reqId: string, status: 'accepted' | 'rejected', userId: string) => {
@@ -47,6 +48,7 @@ const ManageTeam = () => {
 
       if (status === 'accepted') {
         // 2. Add to project members
+        // This will trigger 'handle_project_chat_membership' in the DB to handle group chats
         const { error: memberError } = await supabase.from('project_members').insert({
           project_id: project.id,
           user_id: userId,
