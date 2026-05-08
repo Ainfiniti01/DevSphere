@@ -268,7 +268,7 @@ const CreateProject = () => {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2">
             <Label className="text-sm font-bold flex items-center gap-2">
               <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
             </Label>
