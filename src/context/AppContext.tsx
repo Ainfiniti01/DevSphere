@@ -94,7 +94,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
-      // Streak Logic
       let newStreak = currentUser.activity_streak || 0;
       const lastStreakDate = currentUser.last_streak_date;
 
@@ -116,7 +115,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         })
         .eq('id', currentUser.id);
     } catch (e) {
-      // Silent fail for presence
+      // Silent fail
     }
   }, [currentUser]);
 
@@ -126,14 +125,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
+      // Simplified query: removed comments join to prevent timeouts
       const { data, error } = await supabase
         .from('projects')
         .select(`
-          *,
+          id, title, problem, solution, description, stage, skills_required, thumbnail_url, video_url, created_at, status, project_url, creator_id,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
-          comments(id, content, created_at, user:profiles(id, name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
+          project_members(user_id),
+          comment_count:comments(count)
         `)
         .order('created_at', { ascending: false });
 
@@ -146,14 +146,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
-        members: p.project_members?.map((m: any) => m.user?.id) || [],
-        memberProfiles: p.project_members?.map((m: any) => m.user) || []
+        members: p.project_members?.map((m: any) => m.user_id) || [],
+        commentCount: p.comment_count?.[0]?.count || 0
       }));
 
       setProjects(transformed);
 
       if (activeUser?.id) {
-        // FIX: Use specific columns for join_requests to avoid fetch errors
         const { data: reqData, error: reqError } = await supabase
           .from('join_requests')
           .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
@@ -165,9 +164,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setRequests([]);
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh projects error:", error);
-      }
+      console.error("Refresh projects error:", error.message);
     } finally {
       isRefreshing.current.projects = false;
     }
@@ -188,9 +185,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh notifications error:", error.message);
-      }
+      console.error("Refresh notifications error:", error.message);
     } finally {
       isRefreshing.current.notifications = false;
     }
@@ -202,17 +197,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       let hiddenChatIds = new Set<string>();
       try {
-        const { data: hiddenData, error: hiddenError } = await supabase
+        const { data: hiddenData } = await supabase
           .from('hidden_chats')
           .select('chat_id')
           .eq('user_id', currentUser.id);
         
-        if (!hiddenError && hiddenData) {
+        if (hiddenData) {
           hiddenChatIds = new Set(hiddenData.map(h => h.chat_id));
         }
-      } catch (e) {
-        // Silent fail
-      }
+      } catch (e) {}
 
       const { data: chatMemberships, error: memberError } = await supabase
         .from('chat_members')
@@ -255,9 +248,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       for (const membership of chatMemberships) {
         const chat = membership.chat as any;
-        if (!chat) continue;
-
-        if (hiddenChatIds.has(chat.id)) continue;
+        if (!chat || hiddenChatIds.has(chat.id)) continue;
 
         const isGroup = chat.type === 'group';
         const isOwner = isGroup && chat.project?.creator_id === currentUser.id;
@@ -318,9 +309,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
-      if (error.name !== 'AbortError' && error.message !== 'Fetch is aborted') {
-        console.error("Refresh chats error:", error.message);
-      }
+      console.error("Refresh chats error:", error.message);
     } finally {
       isRefreshing.current.chats = false;
     }
@@ -328,7 +317,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const markAsRead = useCallback(async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
-    
     try {
       const now = new Date().toISOString();
       await supabase.from('chat_reads').upsert({
@@ -346,7 +334,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteChat = useCallback(async (chatId: string) => {
     if (!supabase || !currentUser?.id) return;
-    
     try {
       const { error } = await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
@@ -354,24 +341,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }, { onConflict: 'user_id,chat_id' });
 
       if (error) throw error;
-
       toast.success("Chat removed from list");
       setTimeout(() => refreshChats(), 100);
     } catch (error: any) {
       toast.error("Failed to remove chat");
-      console.error(error);
     }
   }, [currentUser?.id, refreshChats]);
 
   const leaveGroup = useCallback(async (chatId: string) => {
     if (!supabase || !currentUser?.id) return;
-
     const chat = chats.find(c => c.id === chatId);
     if (chat?.isOwner) {
       toast.error("Transfer admin role before leaving the group.");
       return;
     }
-
     try {
       const { error: memberError } = await supabase
         .from('chat_members')
@@ -380,18 +363,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (memberError) throw memberError;
 
-      const { error: hideError } = await supabase.from('hidden_chats').upsert({
+      await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
         chat_id: chatId
       }, { onConflict: 'user_id,chat_id' });
-
-      if (hideError) throw hideError;
 
       toast.success("Exited group and removed chat");
       setTimeout(() => refreshChats(), 100);
     } catch (error: any) {
       toast.error("Failed to exit group");
-      console.error(error);
     }
   }, [currentUser?.id, refreshChats, chats]);
 
@@ -407,7 +387,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       toast.error("Please sign in to like projects");
       return;
     }
-
     if (processingLikes.current.has(projectId)) return;
     processingLikes.current.add(projectId);
 
@@ -423,7 +402,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
       await refreshProjects();
     } catch (error) {
-      console.error("Like error:", error);
       toast.error("Failed to update like");
     } finally {
       processingLikes.current.delete(projectId);
@@ -435,14 +413,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       toast.error("Please sign in to comment");
       return;
     }
-
     try {
       const { error } = await supabase.from('comments').insert({
         project_id: projectId,
         user_id: currentUser.id,
         content: text
       });
-
       if (error) throw error;
       await refreshProjects();
       toast.success("Comment added!");
@@ -458,9 +434,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const initApp = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
         if (sessionError) {
-          console.error("Session error:", sessionError);
           await supabase.auth.signOut();
           setAuthLoading(false);
           return;
@@ -511,7 +485,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         return () => subscription.unsubscribe();
       } catch (err) {
-        console.error("App initialization failed:", err);
         setAuthLoading(false);
       }
     };
@@ -527,14 +500,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id, updatePresence]);
 
-  // Auto Logout Logic
   useEffect(() => {
     if (!currentUser?.id) return;
-
-    const handleActivity = () => {
-      lastActivity.current = Date.now();
-    };
-
+    const handleActivity = () => { lastActivity.current = Date.now(); };
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
@@ -543,7 +511,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const checkInterval = setInterval(() => {
       const preference = currentUser.notification_settings?.auto_logout || 'never';
       if (preference === 'never') return;
-
       const timeoutMs = parseInt(preference) * 60 * 1000;
       if (Date.now() - lastActivity.current > timeoutMs) {
         toast.info("Logged out due to inactivity");
@@ -568,15 +535,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const msg = payload.new as any;
           if (processedEventIds.current.has(msg.id)) return;
           processedEventIds.current.add(msg.id);
-
-          // Enforce settings
           const settings = currentUser.notification_settings || {};
-          const isMe = msg.sender_id === currentUser.id;
-          
-          if (!isMe && settings.messages !== false) {
+          if (msg.sender_id !== currentUser.id && settings.messages !== false) {
             notificationService.play('message', settings.sound !== false);
           }
-
           supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
             if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
             refreshTimeout.current = setTimeout(() => refreshChats(), 200);
@@ -586,24 +548,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const notif = payload.new as any;
           if (processedEventIds.current.has(notif.id)) return;
           processedEventIds.current.add(notif.id);
-
-          // Enforce settings
           const settings = currentUser.notification_settings || {};
-          
-          // Determine which sound to play based on notification type and user settings
           const isProjectActivity = ['request', 'pause', 'resume', 'request_accepted', 'request_rejected'].includes(notif.type);
-          
           if (isProjectActivity) {
-            if (settings.projects !== false) {
-              notificationService.play('project', settings.sound !== false);
-            }
+            if (settings.projects !== false) notificationService.play('project', settings.sound !== false);
           } else {
-            // General push notifications (likes, comments, etc.)
-            if (settings.push !== false) {
-              notificationService.play('system', settings.sound !== false);
-            }
+            if (settings.push !== false) notificationService.play('system', settings.sound !== false);
           }
-
           if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
           refreshTimeout.current = setTimeout(() => refreshNotifications(), 200);
         })

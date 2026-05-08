@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Heart, Share2, MessageCircle, PlayCircle, Send, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, Share2, MessageCircle, PlayCircle, Send, User, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -12,16 +12,46 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
   const { toggleLike, addComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const handleAddComment = () => {
+  const fetchComments = async () => {
+    if (!supabase) return;
+    setLoadingComments(true);
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('id, content, created_at, user:profiles(id, name, avatar_url, display_name)')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setComments(data || []);
+    } catch (err) {
+      console.error("Failed to fetch comments:", err);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isDrawerOpen) {
+      fetchComments();
+    }
+  }, [isDrawerOpen]);
+
+  const handleAddComment = async () => {
     if (!commentText.trim()) return;
-    addComment(project.id, commentText);
+    await addComment(project.id, commentText);
     setCommentText('');
+    fetchComments(); // Refresh local list
   };
 
   const handleShare = async () => {
@@ -113,11 +143,11 @@ const ProjectCard = ({ project }: { project: any }) => {
             <span className="text-xs font-bold">{project.likes}</span>
           </button>
           
-          <Drawer>
+          <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
             <DrawerTrigger asChild>
               <button className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors py-2">
                 <MessageCircle size={20} />
-                <span className="text-xs font-bold">{project.comments?.length || 0}</span>
+                <span className="text-xs font-bold">{project.commentCount || 0}</span>
               </button>
             </DrawerTrigger>
             <DrawerContent className="bg-background border-border h-[80vh]">
@@ -125,22 +155,25 @@ const ProjectCard = ({ project }: { project: any }) => {
                 <DrawerTitle>Comments</DrawerTitle>
               </DrawerHeader>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {project.comments?.map((c: any) => (
-                  <div key={c.id} className="flex gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={c.user?.avatar_url} />
-                      <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
-                      <div className="flex justify-between items-center mb-1">
-                        <h5 className="text-xs font-bold">{c.user?.name}</h5>
-                        <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                {loadingComments ? (
+                  <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" /></div>
+                ) : comments.length > 0 ? (
+                  comments.map((c: any) => (
+                    <div key={c.id} className="flex gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={c.user?.avatar_url} />
+                        <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
+                        <div className="flex justify-between items-center mb-1">
+                          <h5 className="text-xs font-bold">{c.user?.name}</h5>
+                          <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-sm">{c.content}</p>
                       </div>
-                      <p className="text-sm">{c.content}</p>
                     </div>
-                  </div>
-                ))}
-                {(!project.comments || project.comments.length === 0) && (
+                  ))
+                ) : (
                   <p className="text-center text-muted-foreground py-10">No comments yet. Be the first!</p>
                 )}
               </div>
