@@ -256,7 +256,7 @@ const CreateProject = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2 sm:col-span-1">
             <Label className="text-sm font-bold">Required Skills</Label>
             <Input 
               placeholder="React, Node, UI... (comma separated)" 
