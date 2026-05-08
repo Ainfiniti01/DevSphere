@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,7 @@ const ProjectDetail = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
+  const [isDescExpanded, setIsDescExpanded] = useState(false);
 
   useEffect(() => {
     const checkRequestStatus = async () => {
@@ -140,6 +141,9 @@ const ProjectDetail = () => {
     }
   };
 
+  const descLines = project.description?.split('\n').length || 0;
+  const isLongDesc = (project.description?.length > 250) || descLines > 5;
+
   return (
     <MobileLayout title="Project Details" showBack>
       <div className="relative bg-background text-foreground pb-24">
@@ -200,7 +204,26 @@ const ProjectDetail = () => {
             
             <section>
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Description</h3>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{project.description}</p>
+              <div className="relative">
+                <p className={cn(
+                  "text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300",
+                  !isDescExpanded && isLongDesc && "line-clamp-5"
+                )}>
+                  {project.description}
+                </p>
+                {isLongDesc && (
+                  <button 
+                    onClick={() => setIsDescExpanded(!isDescExpanded)}
+                    className="text-primary text-xs font-bold mt-2 flex items-center gap-1 hover:underline"
+                  >
+                    {isDescExpanded ? (
+                      <><ChevronUp size={14} /> Show less</>
+                    ) : (
+                      <><ChevronDown size={14} /> Read more</>
+                    )}
+                  </button>
+                )}
+              </div>
             </section>
 
             <section>

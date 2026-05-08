@@ -5,11 +5,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2 } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
 import { supabase } from '@/lib/supabase';
+import { cn } from '@/lib/utils';
 
 const Profile = () => {
   const { id } = useParams();
@@ -17,6 +18,7 @@ const Profile = () => {
   const { currentUser, projects } = useApp();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -82,6 +84,9 @@ const Profile = () => {
     return url.startsWith('http') ? url : `https://${url}`;
   };
 
+  const bioLines = profile.bio?.split('\n').length || 0;
+  const isLongBio = (profile.bio?.length > 180) || bioLines > 4;
+
   return (
     <MobileLayout title={isOwnProfile ? "My Profile" : profile.name} showBack={!isOwnProfile}>
       <div className="relative">
@@ -114,7 +119,31 @@ const Profile = () => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-foreground">{profile.name || "Developer"}</h2>
             <p className="text-primary font-semibold text-lg">{profile.title || "Member"}</p>
-            <div className="flex flex-col gap-2 mt-3 text-muted-foreground text-sm">
+            
+            {profile.bio && (
+              <div className="mt-4 relative">
+                <p className={cn(
+                  "text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap transition-all duration-300",
+                  !isBioExpanded && isLongBio && "line-clamp-4"
+                )}>
+                  {profile.bio}
+                </p>
+                {isLongBio && (
+                  <button 
+                    onClick={() => setIsBioExpanded(!isBioExpanded)}
+                    className="text-primary text-xs font-bold mt-2 flex items-center gap-1 hover:underline"
+                  >
+                    {isBioExpanded ? (
+                      <><ChevronUp size={14} /> Show less</>
+                    ) : (
+                      <><ChevronDown size={14} /> Read more</>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 mt-4 text-muted-foreground text-sm">
               {profile.location && (
                 <span className="flex items-center gap-2"><MapPin size={16} className="text-primary" /> {profile.location}</span>
               )}
