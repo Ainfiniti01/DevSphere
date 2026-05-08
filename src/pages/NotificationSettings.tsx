@@ -35,7 +35,7 @@ const NotificationSettings = () => {
     if (value) {
       if (key === 'messages') notificationService.play('message', true);
       if (key === 'projects') notificationService.play('project', true);
-      if (key === 'sound') notificationService.play('system', true);
+      if (key === 'sound' || key === 'push') notificationService.play('system', true);
     }
 
     const { error } = await supabase
@@ -67,7 +67,17 @@ const NotificationSettings = () => {
                 <p className="text-[11px] text-muted-foreground">Receive notifications on your device</p>
               </div>
             </div>
-            <Switch checked={settings.push} onCheckedChange={v => updateSetting('push', v)} />
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary"
+                onClick={() => playPreview('system')}
+              >
+                <Play size={14} fill="currentColor" />
+              </Button>
+              <Switch checked={settings.push} onCheckedChange={v => updateSetting('push', v)} />
+            </div>
           </div>
 
           <div className="p-5 border-b border-border flex items-center justify-between">

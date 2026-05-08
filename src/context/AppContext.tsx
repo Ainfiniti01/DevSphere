@@ -568,8 +568,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
           // Enforce settings
           const settings = currentUser.notification_settings || {};
-          if (settings.projects !== false) {
-            notificationService.play('project', settings.sound !== false);
+          
+          // Determine which sound to play based on notification type and user settings
+          const isProjectActivity = ['request', 'pause', 'resume', 'request_accepted', 'request_rejected'].includes(notif.type);
+          
+          if (isProjectActivity) {
+            if (settings.projects !== false) {
+              notificationService.play('project', settings.sound !== false);
+            }
+          } else {
+            // General push notifications (likes, comments, etc.)
+            if (settings.push !== false) {
+              notificationService.play('system', settings.sound !== false);
+            }
           }
 
           if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
