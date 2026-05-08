@@ -33,9 +33,8 @@ const Profile = () => {
       }
 
       try {
-        // Use profiles_public view to avoid exposing sensitive columns
         const { data, error } = await supabase
-          .from('profiles_public')
+          .from('profiles')
           .select('*')
           .eq('id', id)
           .maybeSingle();

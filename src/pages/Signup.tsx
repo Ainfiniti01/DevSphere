@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, Gift, CheckCircle2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Gift, CheckCircle2, Link as LinkIcon } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -174,7 +174,6 @@ const Signup = () => {
             <Gift className={`absolute left-3 top-1/2 -translate-y-1/2 ${formData.referralCode ? 'text-primary' : 'text-muted-foreground'}`} size={18} />
             {formData.referralCode && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 text-primary" size={18} />}
           </div>
-          {formData.referralCode && <p className="text-[10px] text-primary font-bold px-1">Referral code applied!</p>}
         </div>
 
         <div className="space-y-1.5">
@@ -188,6 +187,18 @@ const Signup = () => {
         <div className="space-y-1.5">
           <Label>Location</Label>
           <Input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="San Francisco, CA" className="rounded-xl h-12" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Portfolio URL (Optional)</Label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+            <Input 
+              value={formData.portfolio_url} 
+              onChange={e => setFormData({...formData, portfolio_url: e.target.value})} 
+              placeholder="https://yourportfolio.com" 
+              className="rounded-xl h-12 pl-10" 
+            />
+          </div>
         </div>
 
         <Button type="submit" disabled={loading} className="w-full h-14 mt-6 text-lg font-bold rounded-2xl shadow-lg">

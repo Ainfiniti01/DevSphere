@@ -57,7 +57,6 @@ const ProjectDetail = () => {
 
       if (error) throw error;
 
-      // Notification is now handled by database trigger 'on_comment_created'
       toast.success("Comment added!");
       setCommentText('');
       await refreshProjects();
@@ -69,7 +68,6 @@ const ProjectDetail = () => {
   };
 
   const handleLike = async () => {
-    // Notification is now handled by database trigger 'on_like_created'
     await toggleLike(project.id);
   };
 
