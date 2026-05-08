@@ -544,10 +544,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const msg = payload.new as any;
           if (processedEventIds.current.has(msg.id)) return;
           processedEventIds.current.add(msg.id);
+          
           const settings = currentUser.notification_settings || {};
-          if (msg.sender_id !== currentUser.id && settings.messages !== false) {
-            notificationService.play('message', settings.sound !== false);
+          if (msg.sender_id !== currentUser.id) {
+            if (settings.messages !== false) notificationService.play('message', settings.sound !== false);
+            toast.info(`New message from ${msg.sender_name || 'a developer'}`);
           }
+          
           supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
             if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
             refreshTimeout.current = setTimeout(() => refreshChats(), 200);
@@ -557,13 +560,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const notif = payload.new as any;
           if (processedEventIds.current.has(notif.id)) return;
           processedEventIds.current.add(notif.id);
+          
           const settings = currentUser.notification_settings || {};
           const isProjectActivity = ['request', 'pause', 'resume', 'request_accepted', 'request_rejected'].includes(notif.type);
+          
           if (isProjectActivity) {
             if (settings.projects !== false) notificationService.play('project', settings.sound !== false);
           } else {
             if (settings.push !== false) notificationService.play('system', settings.sound !== false);
           }
+          
           if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
           refreshTimeout.current = setTimeout(() => refreshNotifications(), 200);
         })

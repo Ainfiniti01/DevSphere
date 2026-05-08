@@ -32,12 +32,11 @@ import {
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
-  const { logout, currentUser, setCurrentUser } = useApp();
+  const { logout, currentUser, setCurrentUser, refreshNotifications } = useApp();
   const [loading, setLoading] = useState(false);
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
   const [autoLogout, setAutoLogout] = useState('never');
   
-  // Modal states
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [resultModal, setResultModal] = useState<{ open: boolean, success: boolean, message: string }>({
     open: false,
@@ -45,30 +44,8 @@ const PrivacySecurity = () => {
     message: ''
   });
 
-  useEffect(() => {
-    if (currentUser?.notification_settings?.auto_logout) {
-      setAutoLogout(currentUser.notification_settings.auto_logout);
-    }
-  }, [currentUser]);
-
-  const validateAndConfirm = () => {
-    if (!passwords.new || !passwords.confirm) {
-      toast.error("Please fill all fields");
-      return;
-    }
-    if (passwords.new.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-    if (passwords.new !== passwords.confirm) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    setIsConfirmOpen(true);
-  };
-
   const handleUpdatePassword = async () => {
-    if (!supabase) return;
+    if (!supabase || !currentUser) return;
     setIsConfirmOpen(false);
     setLoading(true);
     
@@ -76,45 +53,29 @@ const PrivacySecurity = () => {
       const { error } = await supabase.auth.updateUser({ password: passwords.new });
       if (error) throw error;
       
+      // Create Notification
+      await supabase.from('notifications').insert({
+        user_id: currentUser.id,
+        actor_id: currentUser.id,
+        type: 'system',
+        content: 'Your password was recently updated.'
+      });
+
       setResultModal({
         open: true,
         success: true,
-        message: "Your password has been updated successfully. You can continue using the app with your new credentials."
+        message: "Your password has been updated successfully."
       });
       setPasswords({ new: '', confirm: '' });
+      await refreshNotifications();
     } catch (err: any) {
       setResultModal({
         open: true,
         success: false,
-        message: err.message || "We encountered an error while updating your password. Please try again later."
+        message: err.message || "Failed to update password."
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAutoLogoutChange = async (value: string) => {
-    if (!supabase || !currentUser) return;
-    
-    const newSettings = { 
-      ...(currentUser.notification_settings || {}), 
-      auto_logout: value 
-    };
-    
-    setAutoLogout(value);
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ notification_settings: newSettings })
-        .eq('id', currentUser.id);
-
-      if (error) throw error;
-      setCurrentUser({ ...currentUser, notification_settings: newSettings });
-      toast.success(`Auto logout set to ${value === 'never' ? 'Never' : value + ' min'}`);
-    } catch (err: any) {
-      toast.error("Failed to update preference");
-      setAutoLogout(currentUser?.notification_settings?.auto_logout || 'never');
     }
   };
 
@@ -146,36 +107,9 @@ const PrivacySecurity = () => {
                 placeholder="••••••••"
               />
             </div>
-            <Button onClick={validateAndConfirm} disabled={loading} className="w-full h-12 mt-2 rounded-xl font-bold">
+            <Button onClick={() => setIsConfirmOpen(true)} disabled={loading} className="w-full h-12 mt-2 rounded-xl font-bold">
               {loading ? <Loader2 className="animate-spin" /> : "Update Password"}
             </Button>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-            <Shield size={16} /> Preferences
-          </h3>
-          <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-            <div className="flex items-center justify-between">
-              <Label className="font-bold">Auto Logout</Label>
-              <Select value={autoLogout} onValueChange={handleAutoLogoutChange}>
-                <SelectTrigger className="w-[120px] h-10 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border-border">
-                  <SelectItem value="never">Never</SelectItem>
-                  <SelectItem value="5">5 min</SelectItem>
-                  <SelectItem value="15">15 min</SelectItem>
-                  <SelectItem value="30">30 min</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="pt-2 border-t border-border">
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
-              </p>
-            </div>
           </div>
         </section>
 
@@ -191,13 +125,12 @@ const PrivacySecurity = () => {
         </Button>
       </div>
 
-      {/* Confirmation Modal */}
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
           <AlertDialogHeader>
             <AlertDialogTitle>Update Password?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to change your password? You will need to use the new password for future logins.
+              Are you sure you want to change your password?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -209,28 +142,17 @@ const PrivacySecurity = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Result Modal (Success/Fail) */}
       <Dialog open={resultModal.open} onOpenChange={(open) => setResultModal(prev => ({ ...prev, open }))}>
         <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
           <DialogHeader className="flex flex-col items-center text-center">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${resultModal.success ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-              {resultModal.success ? (
-                <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={32} />
-              ) : (
-                <XCircle className="text-red-600 dark:text-red-400" size={32} />
-              )}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${resultModal.success ? 'bg-emerald-100' : 'bg-red-100'}`}>
+              {resultModal.success ? <CheckCircle2 className="text-emerald-600" size={32} /> : <XCircle className="text-red-600" size={32} />}
             </div>
-            <DialogTitle className="text-2xl font-bold">
-              {resultModal.success ? "Success!" : "Update Failed"}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground pt-2">
-              {resultModal.message}
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-bold">{resultModal.success ? "Success!" : "Update Failed"}</DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-2">{resultModal.message}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pt-4">
-            <Button onClick={() => setResultModal(prev => ({ ...prev, open: false }))} className="w-full h-12 rounded-xl font-bold text-lg">
-              Close
-            </Button>
+            <Button onClick={() => setResultModal(prev => ({ ...prev, open: false }))} className="w-full h-12 rounded-xl font-bold text-lg">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
