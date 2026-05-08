@@ -106,14 +106,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
+      // FIX: Use 'profiles' instead of 'profiles_public' for joins to avoid PGRST200 error
       const { data, error } = await supabase
         .from('projects')
         .select(`
           *,
-          creator:profiles_public(id, name, avatar_url, title, display_name),
-          comments(id, content, created_at, user:profiles_public(id, name, avatar_url, display_name)),
+          creator:profiles(id, name, avatar_url, title, display_name),
+          comments(id, content, created_at, user:profiles(id, name, avatar_url, display_name)),
           likes(user_id),
-          project_members(user:profiles_public(id, name, avatar_url, title, display_name))
+          project_members(user:profiles(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -135,7 +136,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (activeUser?.id) {
         const { data: reqData, error: reqError } = await supabase
           .from('join_requests')
-          .select('*, user:profiles_public(*)');
+          .select('*, user:profiles(*)');
         
         if (!reqError && reqData) {
           setRequests(reqData);
@@ -158,7 +159,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles_public(name, avatar_url, display_name)')
+        .select('*, actor:profiles(name, avatar_url, display_name)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -217,7 +218,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
-        .select('*, sender:profiles_public(name, avatar_url, display_name)')
+        .select('*, sender:profiles(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
         .order('created_at', { ascending: false });
 
@@ -247,7 +248,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!isGroup) {
           const { data: otherMember } = await supabase
             .from('chat_members')
-            .select('user:profiles_public(*)')
+            .select('user:profiles(*)')
             .eq('chat_id', chat.id)
             .neq('user_id', currentUser.id)
             .maybeSingle();

@@ -3,7 +3,7 @@
 import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, UserCircle } from 'lucide-react';
+import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, UserCircle, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { useTheme } from 'next-themes';
@@ -40,6 +40,21 @@ const Settings = () => {
               <div className="text-left">
                 <h4 className="font-bold text-sm">Edit Profile</h4>
                 <p className="text-[11px] text-muted-foreground">Update your personal information</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </button>
+
+          {/* Refer & Earn */}
+          <button 
+            onClick={() => navigate('/referrals')}
+            className="w-full flex items-center justify-between p-5 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Gift size={20} /></div>
+              <div className="text-left">
+                <h4 className="font-bold text-sm">Refer & Earn</h4>
+                <p className="text-[11px] text-muted-foreground">Invite friends and earn points</p>
               </div>
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />

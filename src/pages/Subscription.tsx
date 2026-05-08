@@ -3,19 +3,44 @@
 import React from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
-import { Rocket, Zap, Star, ShieldCheck, BellRing } from 'lucide-react';
+import { Rocket, Zap, Star, ShieldCheck, BellRing, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import WaitlistModal from '@/components/WaitlistModal';
+import { useApp } from '@/context/AppContext';
 
 const Subscription = () => {
+  const { currentUser } = useApp();
+  const isPremium = currentUser?.is_premium_override;
+
   return (
     <MobileLayout title="Subscription" showBack>
       <div className="px-6 py-6 space-y-8">
-        <div className="bg-primary/10 border border-primary/20 p-6 rounded-3xl text-center">
-          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2">Current Plan</h3>
-          <h2 className="text-3xl font-bold text-primary">Free</h2>
-          <p className="text-xs text-muted-foreground mt-2">Basic access to DevSphere</p>
-        </div>
+        {isPremium ? (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-[2.5rem] text-center space-y-4 shadow-xl shadow-emerald-500/5">
+            <div className="w-16 h-16 bg-emerald-500 rounded-3xl mx-auto flex items-center justify-center shadow-lg">
+              <ShieldCheck size={32} className="text-white" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-emerald-600 uppercase tracking-widest">Premium Access</h3>
+              <h2 className="text-3xl font-black text-emerald-700">Founder Status</h2>
+              <p className="text-xs text-emerald-600/70">All premium features unlocked</p>
+            </div>
+            <div className="pt-4 flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-500/5 p-3 rounded-xl">
+                <CheckCircle2 size={14} /> Unrestricted Pro Access
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-500/5 p-3 rounded-xl">
+                <CheckCircle2 size={14} /> Testing & Admin Bypass Active
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-primary/10 border border-primary/20 p-6 rounded-3xl text-center">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-2">Current Plan</h3>
+            <h2 className="text-3xl font-bold text-primary">Free</h2>
+            <p className="text-xs text-muted-foreground mt-2">Basic access to DevSphere</p>
+          </div>
+        )}
 
         <section className="space-y-6">
           <div className="flex items-center gap-3">
@@ -44,12 +69,14 @@ const Subscription = () => {
           </div>
         </section>
 
-        <Button 
-          className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
-          onClick={() => toast.info("Pro features are coming soon!")}
-        >
-          Upgrade to Pro
-        </Button>
+        {!isPremium && (
+          <Button 
+            className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg"
+            onClick={() => toast.info("Pro features are coming soon!")}
+          >
+            Upgrade to Pro
+          </Button>
+        )}
 
         <div className="relative py-4">
           <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
