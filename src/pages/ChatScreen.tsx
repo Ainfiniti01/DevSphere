@@ -33,6 +33,7 @@ const ChatScreen = () => {
   };
 
   useEffect(() => {
+    // Strict guard: check if already initializing or missing core data
     if (!id || !currentUser || !supabase || initRef.current) return;
     
     // Prevent messaging self which causes 409 Conflict in the DB function
@@ -42,8 +43,10 @@ const ChatScreen = () => {
       return;
     }
 
+    // Mark as initializing immediately to prevent duplicate calls
+    initRef.current = true;
+
     const initChat = async () => {
-      initRef.current = true;
       setLoading(true);
       try {
         let resolvedChatId = null;
@@ -74,6 +77,10 @@ const ChatScreen = () => {
             .select('*')
             .eq('id', id)
             .maybeSingle();
+          
+          if (!profile) {
+            throw new Error("The user you are trying to message does not have a profile yet.");
+          }
           
           setChatPartner(profile);
 
@@ -118,7 +125,7 @@ const ChatScreen = () => {
       } catch (err: any) {
         console.error("Chat init error:", err);
         toast.error(err.message || "Failed to load chat");
-        initRef.current = false; // Allow retry
+        initRef.current = false; // Allow retry on failure
       } finally {
         setLoading(false);
       }

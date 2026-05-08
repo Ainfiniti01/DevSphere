@@ -48,39 +48,36 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return user.display_name || user.name || user.full_name || (user.email ? user.email.split('@')[0] : `User_${user.id?.slice(0, 4)}`);
   };
 
-  const fetchProfile = async (userId: string, authUser?: any) => {
+  const ensureProfile = async (userId: string, authUser: any) => {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase
+      // Try to get existing profile first
+      const { data: existing, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
       
-      if (error) throw error;
+      if (existing) return existing;
 
-      // If profile is missing, create a basic one to prevent foreign key errors
-      if (!data && authUser) {
-        const newProfile = {
-          id: userId,
-          name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
-          avatar_url: authUser.user_metadata?.avatar_url || null,
-          updated_at: new Date().toISOString()
-        };
-        
-        const { data: created, error: createError } = await supabase
-          .from('profiles')
-          .insert(newProfile)
-          .select()
-          .single();
-        
-        if (createError) throw createError;
-        return created;
-      }
-
-      return data;
+      // If missing or error, attempt to create/upsert
+      const newProfile = {
+        id: userId,
+        name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
+        avatar_url: authUser.user_metadata?.avatar_url || null,
+        updated_at: new Date().toISOString()
+      };
+      
+      const { data: created, error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(newProfile, { onConflict: 'id' })
+        .select()
+        .single();
+      
+      if (upsertError) throw upsertError;
+      return created;
     } catch (error) {
-      console.error("Error fetching/creating profile:", error);
+      console.error("Error ensuring profile record exists:", error);
       return null;
     }
   };
@@ -303,7 +300,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
         let user = null;
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id, session.user);
+          const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
         }
@@ -321,7 +318,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             refreshProjects(null);
             setAuthLoading(false);
           } else if (session?.user) {
-            const profile = await fetchProfile(session.user.id, session.user);
+            const profile = await ensureProfile(session.user.id, session.user);
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
             refreshProjects(newUser);
