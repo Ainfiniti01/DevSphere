@@ -197,9 +197,28 @@ const ProjectDetail = () => {
                 </a>
               </section>
             )}
-            <section><h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">The Problem</h3><p className="text-sm leading-relaxed">{project.problem}</p></section>
-            <section><h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">The Solution</h3><p className="text-sm leading-relaxed">{project.solution}</p></section>
-            <section><h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Required Skills</h3><div className="flex flex-wrap gap-2">{project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}</div></section>
+            
+            <section>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Description</h3>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{project.description}</p>
+            </section>
+
+            <section>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">The Problem</h3>
+              <p className="text-sm leading-relaxed">{project.problem}</p>
+            </section>
+
+            <section>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">The Solution</h3>
+              <p className="text-sm leading-relaxed">{project.solution}</p>
+            </section>
+
+            <section>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Required Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                {project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
+              </div>
+            </section>
           </div>
         </div>
 
