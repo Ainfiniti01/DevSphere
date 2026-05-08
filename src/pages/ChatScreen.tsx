@@ -124,7 +124,8 @@ const ChatScreen = () => {
         }
       } catch (err: any) {
         console.error("Chat init error:", err);
-        toast.error(err.message || "Failed to load chat");
+        const errorMsg = err?.message || (typeof err === 'string' ? err : "Failed to load chat");
+        toast.error(errorMsg);
         initRef.current = false; // Allow retry on failure
       } finally {
         setLoading(false);

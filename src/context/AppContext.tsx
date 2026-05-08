@@ -43,15 +43,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   
   const processingLikes = useRef<Set<string>>(new Set());
 
-  const resolveName = (user: any) => {
+  const resolveName = useCallback((user: any) => {
     if (!user) return "User";
     return user.display_name || user.name || user.full_name || (user.email ? user.email.split('@')[0] : `User_${user.id?.slice(0, 4)}`);
-  };
+  }, []);
 
-  const ensureProfile = async (userId: string, authUser: any) => {
+  const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     try {
-      // Try to get existing profile first
       const { data: existing, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
@@ -60,7 +59,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (existing) return existing;
 
-      // If missing or error, attempt to create/upsert
       const newProfile = {
         id: userId,
         name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
@@ -80,7 +78,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error ensuring profile record exists:", error);
       return null;
     }
-  };
+  }, []);
 
   const updatePresence = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
@@ -94,7 +92,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id]);
 
-  const refreshProjects = async (userOverride?: any) => {
+  const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase) return;
     const activeUser = userOverride || currentUser;
 
@@ -139,9 +137,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error("Refresh projects error:", error);
     }
-  };
+  }, [currentUser]);
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
     try {
       const { data, error } = await supabase
@@ -157,9 +155,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
     }
-  };
+  }, [currentUser?.id]);
 
-  const refreshChats = async () => {
+  const refreshChats = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
     try {
       const { data: chatMemberships, error: memberError } = await supabase
@@ -264,9 +262,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
     }
-  };
+  }, [currentUser?.id, resolveName]);
 
-  const markAsRead = async (chatId: string, isGroup: boolean) => {
+  const markAsRead = useCallback(async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
     
     try {
@@ -282,7 +280,63 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("markAsRead failed:", error);
     }
-  };
+  }, [currentUser?.id]);
+
+  const logout = useCallback(async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    toast.success("Logged out successfully");
+  }, []);
+
+  const toggleLike = useCallback(async (projectId: string) => {
+    if (!supabase || !currentUser?.id) {
+      toast.error("Please sign in to like projects");
+      return;
+    }
+
+    if (processingLikes.current.has(projectId)) return;
+    processingLikes.current.add(projectId);
+
+    const project = projects.find(p => p.id === projectId);
+    const isLiked = project?.isLiked;
+
+    try {
+      if (isLiked) {
+        await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
+      } else {
+        const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+        if (error && error.code !== '23505') throw error;
+      }
+      await refreshProjects();
+    } catch (error) {
+      console.error("Like error:", error);
+      toast.error("Failed to update like");
+    } finally {
+      processingLikes.current.delete(projectId);
+    }
+  }, [currentUser?.id, projects, refreshProjects]);
+
+  const addComment = useCallback(async (projectId: string, text: string) => {
+    if (!supabase || !currentUser?.id) {
+      toast.error("Please sign in to comment");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('comments').insert({
+        project_id: projectId,
+        user_id: currentUser.id,
+        content: text
+      });
+
+      if (error) throw error;
+      await refreshProjects();
+      toast.success("Comment added!");
+    } catch (error) {
+      toast.error("Failed to add comment");
+    }
+  }, [currentUser?.id, refreshProjects]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -334,7 +388,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     initApp();
-  }, []);
+  }, [ensureProfile, refreshProjects]);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -361,63 +415,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         supabase.removeChannel(channel);
       };
     }
-  }, [currentUser?.id]);
-
-  const logout = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    toast.success("Logged out successfully");
-  };
-
-  const toggleLike = async (projectId: string) => {
-    if (!supabase || !currentUser?.id) {
-      toast.error("Please sign in to like projects");
-      return;
-    }
-
-    if (processingLikes.current.has(projectId)) return;
-    processingLikes.current.add(projectId);
-
-    const project = projects.find(p => p.id === projectId);
-    const isLiked = project?.isLiked;
-
-    try {
-      if (isLiked) {
-        await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
-      } else {
-        const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
-        if (error && error.code !== '23505') throw error;
-      }
-      await refreshProjects();
-    } catch (error) {
-      console.error("Like error:", error);
-      toast.error("Failed to update like");
-    } finally {
-      processingLikes.current.delete(projectId);
-    }
-  };
-
-  const addComment = async (projectId: string, text: string) => {
-    if (!supabase || !currentUser?.id) {
-      toast.error("Please sign in to comment");
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('comments').insert({
-        project_id: projectId,
-        user_id: currentUser.id,
-        content: text
-      });
-
-      if (error) throw error;
-      await refreshProjects();
-      toast.success("Comment added!");
-    } catch (error) {
-      toast.error("Failed to add comment");
-    }
-  };
+  }, [currentUser?.id, refreshNotifications, refreshChats, refreshProjects]);
 
   return (
     <AppContext.Provider value={{ 
