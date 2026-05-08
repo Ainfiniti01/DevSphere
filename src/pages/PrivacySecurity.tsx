@@ -234,7 +234,7 @@ const PrivacySecurity = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </MobileLayout>
   );
 };
 
