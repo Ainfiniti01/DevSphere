@@ -91,14 +91,34 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const updatePresence = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
     try {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      // Streak Logic
+      let newStreak = currentUser.activity_streak || 0;
+      const lastStreakDate = currentUser.last_streak_date;
+
+      if (!lastStreakDate || lastStreakDate < today) {
+        if (lastStreakDate === new Date(now.getTime() - 86400000).toISOString().split('T')[0]) {
+          newStreak += 1;
+        } else {
+          newStreak = 1;
+        }
+      }
+
       await supabase
         .from('profiles')
-        .update({ last_seen: new Date().toISOString() })
+        .update({ 
+          last_seen: now.toISOString(),
+          last_active_at: now.toISOString(),
+          activity_streak: newStreak,
+          last_streak_date: today
+        })
         .eq('id', currentUser.id);
     } catch (e) {
       // Silent fail for presence
     }
-  }, [currentUser?.id]);
+  }, [currentUser]);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase || isRefreshing.current.projects) return;
@@ -106,7 +126,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
-      // FIX: Specify explicit relationship names to resolve ambiguity (PGRST201)
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -157,7 +176,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
     isRefreshing.current.notifications = true;
     try {
-      // FIX: Specify explicit relationship for actor (PGRST201)
       const { data, error } = await supabase
         .from('notifications')
         .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')

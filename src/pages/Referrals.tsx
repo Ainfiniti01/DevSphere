@@ -13,9 +13,10 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Info,
-  ChevronRight,
   Loader2,
-  Gift
+  Gift,
+  Rocket,
+  Zap
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -48,10 +49,10 @@ const Referrals = () => {
       if (!currentUser || !supabase) return;
       setLoading(true);
       try {
-        // Fetch referrals
+        // Fetch referrals with milestone data
         const { data: refData } = await supabase
           .from('referrals')
-          .select('*, referred_user:profiles(name, avatar_url)')
+          .select('*, referred_user:profiles(id, name, avatar_url, activity_streak, created_at)')
           .eq('referrer_id', currentUser.id)
           .order('created_at', { ascending: false });
 
@@ -105,19 +106,9 @@ const Referrals = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'joined': return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Joined</Badge>;
-      case 'rewarded': return <Badge className="bg-primary/10 text-primary border-primary/20">Rewarded</Badge>;
-      case 'rejected': return <Badge variant="destructive">Rejected</Badge>;
-      default: return <Badge variant="outline" className="text-muted-foreground">Pending</Badge>;
-    }
-  };
-
   return (
     <MobileLayout title="Refer & Earn" showBack>
       <div className="px-6 py-6 space-y-8">
-        {/* Header Section */}
         <section className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-bold">
             <Trophy size={16} />
@@ -129,7 +120,6 @@ const Referrals = () => {
           </p>
         </section>
 
-        {/* Referral Code Card */}
         <Card className="border-2 border-primary/20 bg-primary/5 rounded-[2.5rem] overflow-hidden shadow-xl shadow-primary/5">
           <CardContent className="p-8 text-center space-y-6">
             <div className="space-y-2">
@@ -147,7 +137,6 @@ const Referrals = () => {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: 'Total Invites', value: stats.total, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
@@ -167,81 +156,45 @@ const Referrals = () => {
           ))}
         </div>
 
-        {/* Reward System Info */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">How it works</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <button className="text-[10px] font-bold text-primary flex items-center gap-1">
-                  <Info size={12} /> View Rules
-                </button>
-              </DialogTrigger>
-              <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold">Referral Rules</DialogTitle>
-                  <DialogDescription>Please follow these guidelines to ensure your rewards are valid.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <ul className="space-y-3">
-                    {[
-                      "Fake referrals are strictly prohibited",
-                      "Self-referrals using multiple accounts are not allowed",
-                      "Abuse may lead to permanent reward removal",
-                      "Rewards are subject to manual verification",
-                      "The referral system may evolve over time"
-                    ].map((rule, i) => (
-                      <li key={i} className="flex gap-3 text-sm">
-                        <AlertCircle size={16} className="text-primary shrink-0 mt-0.5" />
-                        <span>{rule}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <DialogFooter>
-                  <Button className="w-full h-12 rounded-xl font-bold" onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))}>
-                    I Understand
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="space-y-3">
-            {[
-              { title: "Friend Signs Up", points: "+10", desc: "When they create a verified account" },
-              { title: "7-Day Streak", points: "+5", desc: "When they stay active for a week" },
-              { title: "First Project", points: "+10", desc: "When they launch their first project" }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-accent/10 border border-border rounded-2xl">
-                <div>
-                  <h4 className="text-sm font-bold">{item.title}</h4>
-                  <p className="text-[10px] text-muted-foreground">{item.desc}</p>
-                </div>
-                <span className="text-sm font-black text-primary">{item.points}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Referral List */}
-        <section className="space-y-4">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Recent Referrals</h3>
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Milestone Progress</h3>
           <div className="space-y-3">
             {loading ? (
               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" /></div>
             ) : referrals.length > 0 ? (
               referrals.map((ref, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-card border border-border rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center font-bold text-primary">
-                      {ref.referred_user?.name?.[0] || '?'}
+                <div key={i} className="bg-card border border-border rounded-3xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center font-bold text-primary">
+                        {ref.referred_user?.name?.[0] || '?'}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold">{ref.referred_user?.name || 'New User'}</h4>
+                        <p className="text-[10px] text-muted-foreground">Joined {new Date(ref.created_at).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold">{ref.referred_user?.name || 'New User'}</h4>
-                      <p className="text-[10px] text-muted-foreground">{new Date(ref.created_at).toLocaleDateString()}</p>
+                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Active</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="flex flex-col items-center gap-1 p-2 bg-accent/10 rounded-xl border border-border">
+                      <CheckCircle2 size={14} className="text-emerald-500" />
+                      <span className="text-[8px] font-bold uppercase">Signed Up</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1 p-2 bg-accent/10 rounded-xl border border-border">
+                      {ref.referred_user?.activity_streak >= 7 ? (
+                        <CheckCircle2 size={14} className="text-emerald-500" />
+                      ) : (
+                        <Clock size={14} className="text-muted-foreground" />
+                      )}
+                      <span className="text-[8px] font-bold uppercase">7-Day Streak</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1 p-2 bg-accent/10 rounded-xl border border-border">
+                      <Zap size={14} className="text-muted-foreground" />
+                      <span className="text-[8px] font-bold uppercase">1st Project</span>
                     </div>
                   </div>
-                  {getStatusBadge(ref.status)}
                 </div>
               ))
             ) : (
@@ -252,7 +205,6 @@ const Referrals = () => {
           </div>
         </section>
 
-        {/* Redeem Section */}
         <section className="pt-4">
           <div className="p-6 bg-gradient-to-br from-primary to-violet-600 rounded-[2rem] text-white space-y-4 shadow-xl shadow-primary/20">
             <div className="space-y-1">
