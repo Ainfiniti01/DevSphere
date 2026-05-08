@@ -44,6 +44,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   
   const processingLikes = useRef<Set<string>>(new Set());
   const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
+  const refreshTimeout = useRef<any>(null);
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -53,7 +54,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     try {
-      const { data: existing, error: fetchError } = await supabase
+      const { data: existing } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -138,7 +139,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setRequests([]);
       }
     } catch (error: any) {
-      console.error("Refresh projects error:", error);
+      if (error.name !== 'AbortError') {
+        console.error("Refresh projects error:", error);
+      }
     } finally {
       isRefreshing.current.projects = false;
     }
@@ -159,7 +162,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
-      console.error("Refresh notifications error:", error.message);
+      if (error.name !== 'AbortError') {
+        console.error("Refresh notifications error:", error.message);
+      }
     } finally {
       isRefreshing.current.notifications = false;
     }
@@ -181,7 +186,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           hiddenChatIds = new Set(hiddenData.map(h => h.chat_id));
         }
       } catch (e) {
-        console.warn("Could not fetch hidden chats, showing all.");
+        // Silent fail for hidden chats
       }
 
       // 2. Get chat memberships
@@ -289,7 +294,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
-      console.error("Refresh chats error:", error.message);
+      if (error.name !== 'AbortError') {
+        console.error("Refresh chats error:", error.message);
+      }
     } finally {
       isRefreshing.current.chats = false;
     }
@@ -342,7 +349,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       toast.success("Chat removed from list");
-      await refreshChats();
+      // Use a small delay to avoid immediate refresh collision
+      setTimeout(() => refreshChats(), 100);
     } catch (error: any) {
       toast.error("Failed to remove chat");
       console.error(error);
@@ -424,11 +432,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
-          await Promise.all([
-            refreshProjects(user),
-            refreshNotifications(),
-            refreshChats()
-          ]);
+          // Sequential initial load to avoid collisions
+          await refreshProjects(user);
+          await refreshNotifications();
+          await refreshChats();
         } else {
           await refreshProjects(null);
         }
@@ -444,15 +451,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             setUnreadNotificationsCount(0);
             refreshProjects(null);
             setAuthLoading(false);
-          } else if (session?.user && event === 'SIGNED_IN') {
+          } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
             const profile = await ensureProfile(session.user.id, session.user);
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
-            await Promise.all([
-              refreshProjects(newUser),
-              refreshNotifications(),
-              refreshChats()
-            ]);
+            // Sequential load on auth change
+            await refreshProjects(newUser);
+            await refreshNotifications();
+            await refreshChats();
             setAuthLoading(false);
           }
         });
@@ -482,19 +488,32 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
           if (payload.event === 'INSERT') {
             const msg = payload.new as any;
+            // If it's a new message, unhide the chat
             supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
-              refreshChats();
-            }).catch(() => refreshChats());
+              if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+              refreshTimeout.current = setTimeout(() => refreshChats(), 200);
+            });
           } else {
-            refreshChats();
+            if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+            refreshTimeout.current = setTimeout(() => refreshChats(), 200);
           }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => refreshNotifications())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reads' }, () => refreshChats())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => refreshProjects())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+          if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+          refreshTimeout.current = setTimeout(() => refreshNotifications(), 200);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_reads' }, () => {
+          if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+          refreshTimeout.current = setTimeout(() => refreshChats(), 200);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => {
+          if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+          refreshTimeout.current = setTimeout(() => refreshProjects(), 200);
+        })
         .subscribe();
 
       return () => {
+        if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
         supabase.removeChannel(channel);
       };
     }
