@@ -46,7 +46,7 @@ const ManageTeam = () => {
       if (reqError) throw reqError;
 
       if (status === 'accepted') {
-        // 2. Add to project members (this automatically grants access to the group chat)
+        // 2. Add to project members
         const { error: memberError } = await supabase.from('project_members').insert({
           project_id: project.id,
           user_id: userId,
@@ -54,29 +54,13 @@ const ManageTeam = () => {
         });
         
         if (memberError && memberError.code !== '23505') throw memberError;
-
-        // 3. Notify the user
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          actor_id: currentUser.id,
-          type: 'request_accepted',
-          project_id: project.id,
-          content: `accepted your request to join ${project.title}`
-        });
         
         toast.success("Member added to team!");
       } else {
-        // Notify about rejection
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          actor_id: currentUser.id,
-          type: 'request_rejected',
-          project_id: project.id,
-          content: `declined your request to join ${project.title}`
-        });
         toast.info("Request declined");
       }
       
+      // Notifications are now handled by database trigger 'on_join_request_status_change'
       await refreshProjects();
     } catch (err: any) {
       toast.error(err.message);

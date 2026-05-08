@@ -49,25 +49,15 @@ const ProjectDetail = () => {
     if (!commentText.trim() || !currentUser) return;
     setIsSubmitting(true);
     try {
-      const { data: newComment, error } = await supabase.from('comments').insert({
+      const { error } = await supabase.from('comments').insert({
         project_id: project.id,
         user_id: currentUser.id,
         content: commentText
-      }).select().single();
+      });
 
       if (error) throw error;
 
-      if (project.creator_id !== currentUser.id) {
-        await supabase.from('notifications').insert({
-          user_id: project.creator_id,
-          actor_id: currentUser.id,
-          type: 'comment',
-          project_id: project.id,
-          comment_id: newComment.id,
-          content: 'commented on your project'
-        });
-      }
-
+      // Notification is now handled by database trigger 'on_comment_created'
       toast.success("Comment added!");
       setCommentText('');
       await refreshProjects();
@@ -79,17 +69,8 @@ const ProjectDetail = () => {
   };
 
   const handleLike = async () => {
-    const wasLiked = project.isLiked;
+    // Notification is now handled by database trigger 'on_like_created'
     await toggleLike(project.id);
-    if (!wasLiked && project.creator_id !== currentUser?.id) {
-      await supabase.from('notifications').insert({
-        user_id: project.creator_id,
-        actor_id: currentUser?.id,
-        type: 'like',
-        project_id: project.id,
-        content: 'liked your project'
-      });
-    }
   };
 
   const handleStatusChange = async (newStatus: 'ACTIVE' | 'PAUSED') => {

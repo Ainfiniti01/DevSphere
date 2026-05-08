@@ -46,8 +46,9 @@ const Messages = () => {
       try {
         await refreshChats();
         if (supabase && currentUser?.id) {
+          // Use profiles_public view for safe user discovery
           const { data } = await supabase
-            .from('profiles')
+            .from('profiles_public')
             .select('*')
             .neq('id', currentUser.id)
             .limit(20);
@@ -81,7 +82,7 @@ const Messages = () => {
 
   const handleDelete = async (chat: any) => {
     if (chat.isOwner) {
-      return; // AppContext handles the toast
+      return;
     }
     setIsDeleting(chat.id);
     if (chat.isGroup) {
