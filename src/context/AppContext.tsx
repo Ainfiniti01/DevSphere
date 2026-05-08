@@ -26,6 +26,7 @@ interface AppContextType {
   refreshChats: () => Promise<void>;
   markAsRead: (chatId: string, isGroup: boolean) => Promise<void>;
   deleteChat: (chatId: string) => Promise<void>;
+  leaveGroup: (chatId: string) => Promise<void>;
   updatePresence: () => Promise<void>;
   resolveName: (user: any) => string;
 }
@@ -174,7 +175,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
-      // 1. Get hidden chats with silent error handling
+      // 1. Get hidden chats
       let hiddenChatIds = new Set<string>();
       try {
         const { data: hiddenData, error: hiddenError } = await supabase
@@ -324,23 +325,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !currentUser?.id) return;
     
     try {
-      const chat = chats.find(c => c.id === chatId);
-      if (!chat) return;
-
-      if (chat.isGroup) {
-        const { data: membership } = await supabase
-          .from('chat_members')
-          .select('*')
-          .eq('chat_id', chatId)
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-        
-        if (membership) {
-          toast.error("You must leave the group before deleting the chat.");
-          return;
-        }
-      }
-
       const { error } = await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
         chat_id: chatId
@@ -349,13 +333,40 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       toast.success("Chat removed from list");
-      // Use a small delay to avoid immediate refresh collision
       setTimeout(() => refreshChats(), 100);
     } catch (error: any) {
       toast.error("Failed to remove chat");
       console.error(error);
     }
-  }, [currentUser?.id, chats, refreshChats]);
+  }, [currentUser?.id, refreshChats]);
+
+  const leaveGroup = useCallback(async (chatId: string) => {
+    if (!supabase || !currentUser?.id) return;
+
+    try {
+      // Step 1: Remove user from group
+      const { error: memberError } = await supabase
+        .from('chat_members')
+        .delete()
+        .match({ chat_id: chatId, user_id: currentUser.id });
+
+      if (memberError) throw memberError;
+
+      // Step 2: Hide chat from inbox
+      const { error: hideError } = await supabase.from('hidden_chats').upsert({
+        user_id: currentUser.id,
+        chat_id: chatId
+      }, { onConflict: 'user_id,chat_id' });
+
+      if (hideError) throw hideError;
+
+      toast.success("Exited group and removed chat");
+      setTimeout(() => refreshChats(), 100);
+    } catch (error: any) {
+      toast.error("Failed to exit group");
+      console.error(error);
+    }
+  }, [currentUser?.id, refreshChats]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -432,7 +443,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           const profile = await ensureProfile(session.user.id, session.user);
           user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
-          // Sequential initial load to avoid collisions
           await refreshProjects(user);
           await refreshNotifications();
           await refreshChats();
@@ -455,7 +465,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             const profile = await ensureProfile(session.user.id, session.user);
             const newUser = profile ? { ...session.user, ...profile } : session.user;
             setCurrentUser(newUser);
-            // Sequential load on auth change
             await refreshProjects(newUser);
             await refreshNotifications();
             await refreshChats();
@@ -488,7 +497,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
           if (payload.event === 'INSERT') {
             const msg = payload.new as any;
-            // If it's a new message, unhide the chat
             supabase.from('hidden_chats').delete().match({ user_id: currentUser.id, chat_id: msg.chat_id }).then(() => {
               if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
               refreshTimeout.current = setTimeout(() => refreshChats(), 200);
@@ -530,7 +538,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       unreadNotificationsCount,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
-      markAsRead, deleteChat,
+      markAsRead, deleteChat, leaveGroup,
       updatePresence, resolveName
     }}>
       {children}

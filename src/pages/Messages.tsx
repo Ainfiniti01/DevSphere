@@ -26,7 +26,7 @@ import {
 
 const Messages = () => {
   const navigate = useNavigate();
-  const { chats, refreshChats, currentUser, deleteChat } = useApp();
+  const { chats, refreshChats, currentUser, deleteChat, leaveGroup } = useApp();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
@@ -79,9 +79,13 @@ const Messages = () => {
     );
   }, [users, userSearch]);
 
-  const handleDelete = async (chatId: string) => {
-    setIsDeleting(chatId);
-    await deleteChat(chatId);
+  const handleDelete = async (chat: any) => {
+    setIsDeleting(chat.id);
+    if (chat.isGroup) {
+      await leaveGroup(chat.id);
+    } else {
+      await deleteChat(chat.id);
+    }
     setIsDeleting(null);
   };
 
@@ -213,10 +217,10 @@ const Messages = () => {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Remove Chat?</AlertDialogTitle>
+                        <AlertDialogTitle>{chat.isGroup ? "Exit Group?" : "Remove Chat?"}</AlertDialogTitle>
                         <AlertDialogDescription>
                           {chat.isGroup 
-                            ? "This will remove the chat from your list. You must leave the group first if you are still a member."
+                            ? "You are still a member of this group. To remove it from your chat list, you must exit first."
                             : "This will remove the conversation from your list. It will reappear if you receive a new message."}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -225,11 +229,11 @@ const Messages = () => {
                         <AlertDialogAction 
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(chat.id);
+                            handleDelete(chat);
                           }} 
                           className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Remove
+                          {chat.isGroup ? "Exit & Remove" : "Remove"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
