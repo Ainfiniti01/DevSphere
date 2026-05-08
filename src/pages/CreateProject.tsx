@@ -235,7 +235,7 @@ const CreateProject = () => {
         </div>
 
         {/* Configuration */}
-        <div className="grid grid-cols-2 gap-4">
+<div className="grid grid-cols-2 gap-4 items-end">
           <div className="space-y-2 col-span-2 sm:col-span-1">
             <Label className="text-sm font-bold">Project Stage</Label>
             <Select 
