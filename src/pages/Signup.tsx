@@ -177,6 +177,10 @@ const Signup = () => {
           {loading ? <Loader2 className="animate-spin" /> : "Complete Profile"}
         </Button>
       </form>
+
+      <p className="text-center text-sm text-muted-foreground mt-8">
+        Already have an account? <span onClick={() => navigate('/auth')} className="text-primary font-semibold cursor-pointer hover:underline">Log in</span>
+      </p>
     </div>
   );
 };
