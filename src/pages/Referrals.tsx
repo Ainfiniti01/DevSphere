@@ -50,10 +50,10 @@ const Referrals = () => {
       setLoading(true);
       try {
         // Fetch referrals with milestone data
-        // Explicitly naming the foreign key relationship to avoid 'Failed to fetch' / 400 errors
+        // Using updated_at as a fallback for profiles since created_at was missing
         const { data: refData, error: refError } = await supabase
           .from('referrals')
-          .select('*, referred_user:profiles!referrals_referred_user_id_fkey(id, name, avatar_url, activity_streak, created_at)')
+          .select('*, referred_user:profiles!referrals_referred_user_id_fkey(id, name, avatar_url, activity_streak, updated_at)')
           .eq('referrer_id', currentUser.id)
           .order('created_at', { ascending: false });
 
@@ -79,9 +79,8 @@ const Referrals = () => {
         });
       } catch (err: any) {
         console.error("[Referrals] Fetch error:", err);
-        // Only show toast if it's a real error, not just a 404/empty
         if (err.code !== 'PGRST116') {
-          toast.error("Failed to load referral data. Please check your connection.");
+          toast.error("Failed to load referral data.");
         }
       } finally {
         setLoading(false);
@@ -93,7 +92,7 @@ const Referrals = () => {
 
   const copyCode = () => {
     if (!currentUser?.referral_code) {
-      toast.error("Referral code not found. Please update your profile.");
+      toast.error("Referral code not found.");
       return;
     }
     navigator.clipboard.writeText(currentUser.referral_code);
