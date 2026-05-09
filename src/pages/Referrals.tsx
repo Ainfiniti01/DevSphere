@@ -52,7 +52,7 @@ const Referrals = () => {
     else setIsRefreshing(true);
 
     try {
-      // 1. Fetch Points
+      // 1. Fetch Points (This is working for you)
       const { data: pointData, error: pointError } = await supabase
         .from('referral_points')
         .select('points')
@@ -62,8 +62,7 @@ const Referrals = () => {
       const totalPoints = pointData?.reduce((acc, curr) => acc + curr.points, 0) || 0;
       setPoints(totalPoints);
 
-      // 2. Fetch Referrals with Join
-      // Using the explicit relationship name to ensure it works across all environments
+      // 2. Fetch Referrals (This was likely being blocked by Profile RLS)
       const { data: refData, error: refError } = await supabase
         .from('referrals')
         .select(`
@@ -81,12 +80,15 @@ const Referrals = () => {
 
       if (refError) throw refError;
 
-      setReferrals(refData || []);
+      const refs = refData || [];
+      setReferrals(refs);
+      
+      // Calculate stats based on the actual records found
       setStats({
-        total: refData?.length || 0,
-        joined: refData?.filter(r => r.status === 'joined').length || 0,
-        pending: refData?.filter(r => r.status === 'pending').length || 0,
-        rewarded: refData?.filter(r => r.status === 'rewarded').length || 0
+        total: refs.length,
+        joined: refs.filter(r => r.status === 'joined').length,
+        pending: refs.filter(r => r.status === 'pending').length,
+        rewarded: refs.filter(r => r.status === 'rewarded').length
       });
 
     } catch (err: any) {
