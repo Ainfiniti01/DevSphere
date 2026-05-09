@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon, Upload } from 'lucide-react';
+import { Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon, Upload, Lock } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
@@ -123,14 +123,15 @@ const CreateProject = () => {
       skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
       project_url: formData.projectUrl,
       thumbnail_url: formData.thumbnail,
-      // Explicitly remove video_url if it exists in the schema
       video_url: null 
     };
 
     try {
       let result;
       if (editId) {
-        result = await supabase.from('projects').update(projectData).eq('id', editId).select().single();
+        // Remove title from update payload as it's restricted by DB trigger
+        const { title, ...updateData } = projectData;
+        result = await supabase.from('projects').update(updateData).eq('id', editId).select().single();
       } else {
         projectData.creator_id = currentUser.id;
         projectData.status = isAtActiveLimit ? 'PAUSED' : 'ACTIVE';
@@ -139,7 +140,6 @@ const CreateProject = () => {
 
       if (result.error) throw result.error;
 
-      // Create Notification
       await supabase.from('notifications').insert({
         user_id: currentUser.id,
         actor_id: currentUser.id,
@@ -180,17 +180,35 @@ const CreateProject = () => {
         {/* Basic Info */}
         <div className="space-y-6">
           <div className="space-y-2">
-            <Label className="text-sm font-bold flex items-center gap-2">
-              <Rocket size={16} className="text-primary" /> Project Title
-            </Label>
-            <Input 
-              placeholder="e.g. EcoTrack AI" 
-              className="h-12 rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.title}
-              onChange={e => setFormData({...formData, title: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold flex items-center gap-2">
+                <Rocket size={16} className="text-primary" /> Project Title
+              </Label>
+              {editId && (
+                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
+                  <Lock size={10} /> Permanent
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <Input 
+                placeholder="e.g. EcoTrack AI" 
+                className={cn(
+                  "h-12 rounded-xl bg-accent/20 border-border",
+                  editId && "bg-muted/50 text-muted-foreground cursor-not-allowed pr-10"
+                )} 
+                required 
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+                disabled={isAtTotalLimit || !!editId}
+              />
+              {editId && (
+                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
+              )}
+            </div>
+            {editId && (
+              <p className="text-[10px] text-muted-foreground px-1">Project titles cannot be changed after creation to protect project identity.</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -235,51 +253,51 @@ const CreateProject = () => {
         </div>
 
         {/* Configuration */}
-<div className="grid grid-cols-2 gap-4 items-end">
+        <div className="grid grid-cols-2 gap-4 items-end">
           <div className="space-y-2">
-  <Label className="text-sm font-bold">Project Stage</Label>
-  <Select 
-    value={formData.stage} 
-    onValueChange={val => setFormData({...formData, stage: val})}
-    disabled={isAtTotalLimit}
-  >
-    <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
-      <SelectValue placeholder="Select stage" />
-    </SelectTrigger>
-    <SelectContent className="bg-background border-border rounded-xl">
-      <SelectItem value="Idea">Idea</SelectItem>
-      <SelectItem value="Building">Building</SelectItem>
-      <SelectItem value="MVP">MVP</SelectItem>
-      <SelectItem value="Scaling">Scaling</SelectItem>
-      <SelectItem value="Completed">Completed</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
+            <Label className="text-sm font-bold">Project Stage</Label>
+            <Select 
+              value={formData.stage} 
+              onValueChange={val => setFormData({...formData, stage: val})}
+              disabled={isAtTotalLimit}
+            >
+              <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border-border rounded-xl">
+                <SelectItem value="Idea">Idea</SelectItem>
+                <SelectItem value="Building">Building</SelectItem>
+                <SelectItem value="MVP">MVP</SelectItem>
+                <SelectItem value="Scaling">Scaling</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-2">
-  <Label className="text-sm font-bold">Required Skills</Label>
-  <Input 
-    placeholder="React, Node, UI... (comma separated)" 
-    className="h-12 rounded-xl bg-accent/20 border-border" 
-    required 
-    value={formData.skills}
-    onChange={e => setFormData({...formData, skills: e.target.value})}
-    disabled={isAtTotalLimit}
-  />
-</div>
+            <Label className="text-sm font-bold">Required Skills</Label>
+            <Input 
+              placeholder="React, Node, UI... (comma separated)" 
+              className="h-12 rounded-xl bg-accent/20 border-border" 
+              required 
+              value={formData.skills}
+              onChange={e => setFormData({...formData, skills: e.target.value})}
+              disabled={isAtTotalLimit}
+            />
+          </div>
 
           <div className="space-y-2 col-span-2">
-  <Label className="text-sm font-bold flex items-center gap-2">
-    <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
-  </Label>
-  <Input 
-    placeholder="https://github.com/..." 
-    className="h-12 rounded-xl bg-accent/20 border-border" 
-    value={formData.projectUrl}
-    onChange={e => setFormData({...formData, projectUrl: e.target.value})}
-    disabled={isAtTotalLimit}
-  />
-</div>
+            <Label className="text-sm font-bold flex items-center gap-2">
+              <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
+            </Label>
+            <Input 
+              placeholder="https://github.com/..." 
+              className="h-12 rounded-xl bg-accent/20 border-border" 
+              value={formData.projectUrl}
+              onChange={e => setFormData({...formData, projectUrl: e.target.value})}
+              disabled={isAtTotalLimit}
+            />
+          </div>
         </div>
 
         {/* Media Section */}
