@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, Info, MessageSquare, Edit, Users, Share2, Bookmark, CheckCircle2, Rocket, Loader2, Heart, Send, CornerDownRight, User, Pause, Play, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { projects, currentUser, refreshNotifications, toggleLike, refreshProjects } = useApp();
+  const { projects, requests, currentUser, refreshNotifications, toggleLike, refreshProjects } = useApp();
   
   const project = projects.find(p => p.id === id);
   
@@ -29,17 +28,13 @@ const ProjectDetail = () => {
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
-  useEffect(() => {
-    const checkRequestStatus = async () => {
-      if (!currentUser || !id || !supabase) return;
-      const { data } = await supabase.from('join_requests').select('status').eq('project_id', id).eq('user_id', currentUser.id).maybeSingle();
-      if (data) setRequestStatus(data.status as any);
-    };
-    checkRequestStatus();
-  }, [id, currentUser?.id]);
+  // Derive request status from global state instead of local state
+  const requestStatus = useMemo(() => {
+    const req = requests.find(r => r.project_id === id && r.user_id === currentUser?.id);
+    return req ? req.status : 'none';
+  }, [requests, id, currentUser?.id]);
 
   if (!project) return <MobileLayout title="Error" showBack><div className="p-8 text-center">Project Not Found</div></MobileLayout>;
 
@@ -124,13 +119,13 @@ const ProjectDetail = () => {
       if (error) {
         if (error.code === '23505') {
           toast.error("Request already sent");
-          setRequestStatus('pending');
         } else {
           throw error;
         }
       } else {
         toast.success("Application sent to founder!");
-        setRequestStatus('pending');
+        // Force a global refresh to update the UI state
+        await refreshProjects();
         await refreshNotifications();
       }
       setIsDialogOpen(false);

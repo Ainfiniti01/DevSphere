@@ -45,7 +45,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   const processingLikes = useRef<Set<string>>(new Set());
-  const isRefreshing = useRef({ notifications: false, chats: false });
+  const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
   const refreshTimeout = useRef<any>(null);
   const initStarted = useRef(false);
   const lastActivity = useRef<number>(Date.now());
@@ -152,12 +152,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setProjects(transformed);
 
       if (activeUser?.id) {
-        const { data: reqData, error: reqError } = await supabase
-          .from('join_requests')
-          .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
-        
-        if (!reqError && reqData) {
-          setRequests(reqData);
+        try {
+          const { data: reqData, error: reqError } = await supabase
+            .from('join_requests')
+            .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
+          
+          if (reqError) throw reqError;
+          if (reqData) setRequests(reqData);
+        } catch (e) {
+          console.error("[AppContext] Failed to fetch join requests:", e);
         }
       } else {
         setRequests([]);
