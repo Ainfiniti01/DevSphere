@@ -30,11 +30,14 @@ const ProjectDetail = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
-  // Derive request status from global state instead of local state
-  const requestStatus = useMemo(() => {
-    const req = requests.find(r => r.project_id === id && r.user_id === currentUser?.id);
-    return req ? req.status : 'none';
+  // Derive request status from global state
+  const latestRequest = useMemo(() => {
+    return requests
+      .filter(r => r.project_id === id && r.user_id === currentUser?.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
   }, [requests, id, currentUser?.id]);
+
+  const requestStatus = latestRequest ? latestRequest.status : 'none';
 
   if (!project) return <MobileLayout title="Error" showBack><div className="p-8 text-center">Project Not Found</div></MobileLayout>;
 
@@ -108,6 +111,8 @@ const ProjectDetail = () => {
 
     setIsSubmitting(true);
     try {
+      // If there was a previous rejected request, we can either update it or insert a new one.
+      // Inserting a new one is cleaner for history.
       const { error } = await supabase.from('join_requests').insert({
         project_id: project.id,
         user_id: currentUser.id,
@@ -116,18 +121,11 @@ const ProjectDetail = () => {
         status: 'pending'
       });
 
-      if (error) {
-        if (error.code === '23505') {
-          toast.error("Request already sent");
-        } else {
-          throw error;
-        }
-      } else {
-        toast.success("Application sent to founder!");
-        // Force a global refresh to update the UI state
-        await refreshProjects();
-        await refreshNotifications();
-      }
+      if (error) throw error;
+
+      toast.success("Application sent to founder!");
+      await refreshProjects();
+      await refreshNotifications();
       setIsDialogOpen(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to send application");
@@ -278,7 +276,7 @@ const ProjectDetail = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full h-14 bg-primary text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
-                  Join Project
+                  {requestStatus === 'rejected' ? "Re-apply to Join" : "Join Project"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">

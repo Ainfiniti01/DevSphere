@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Share2, MessageCircle, Send, User, Loader2 } from 'lucide-react';
+import { Heart, Share2, MessageCircle, Send, User, Loader2, BadgeCheck } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -28,7 +28,7 @@ const ProjectCard = ({ project }: { project: any }) => {
     try {
       const { data, error } = await supabase
         .from('comments')
-        .select('id, content, created_at, user:profiles(id, name, avatar_url, display_name)')
+        .select('id, content, created_at, user_id, user:profiles(id, name, avatar_url, display_name)')
         .eq('project_id', project.id)
         .order('created_at', { ascending: true });
       
@@ -156,21 +156,31 @@ const ProjectCard = ({ project }: { project: any }) => {
                 {loadingComments ? (
                   <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" /></div>
                 ) : comments.length > 0 ? (
-                  comments.map((c: any) => (
-                    <div key={c.id} className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={c.user?.avatar_url} />
-                        <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
-                        <div className="flex justify-between items-center mb-1">
-                          <h5 className="text-xs font-bold">{c.user?.name}</h5>
-                          <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                  comments.map((c: any) => {
+                    const isFounder = c.user_id === project.creator_id;
+                    return (
+                      <div key={c.id} className="flex gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={c.user?.avatar_url} />
+                          <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 bg-accent/30 p-3 rounded-2xl">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <h5 className="text-xs font-bold">{c.user?.name}</h5>
+                              {isFounder && (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black uppercase rounded-full border border-primary/20">
+                                  <BadgeCheck size={10} /> Founder
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-sm">{c.content}</p>
                         </div>
-                        <p className="text-sm">{c.content}</p>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-center text-muted-foreground py-10">No comments yet. Be the first!</p>
                 )}

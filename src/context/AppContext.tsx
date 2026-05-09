@@ -153,7 +153,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (activeUser?.id) {
         try {
-          // Use explicit constraint name to resolve ambiguity caused by duplicate foreign keys
           const { data: reqData, error: reqError } = await supabase
             .from('join_requests')
             .select(`
@@ -405,11 +404,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       if (isLiked) {
-        await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
+        // DELETE for unlike
+        const { error } = await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
+        if (error) throw error;
       } else {
+        // INSERT for like
         const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
         if (error && error.code !== '23505') throw error;
       }
+      // Force refresh to sync with DB truth
       await refreshProjects();
     } catch (error) {
       toast.error("Failed to update like");
