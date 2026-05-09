@@ -6,18 +6,30 @@ import MobileLayout from '@/components/layout/MobileLayout';
 import { useApp } from '@/context/AppContext';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2, ChevronRight, RefreshCw } from 'lucide-react';
+import { UserMinus, Check, X, MessageSquare, Edit, User, Loader2, ChevronRight, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ManageTeam = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { projects, requests, currentUser, refreshProjects, resolveName } = useApp();
+  const { projects, requests, currentUser, refreshProjects, resolveName, chats, dismissGroup, removeMemberFromGroup } = useApp();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const project = projects.find(p => p.id === id);
+  const projectChat = chats.find(c => c.isGroup && c.targetId === id);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -42,14 +54,12 @@ const ManageTeam = () => {
     );
   }
 
-  // CRITICAL FIX: Scope requests strictly to this project and pending status
   const projectRequests = requests.filter(r => r.project_id === project.id && r.status === 'pending');
 
   const handleRequest = async (reqId: string, status: 'accepted' | 'rejected', userId: string) => {
     if (!supabase) return;
     setIsProcessing(reqId);
     try {
-      // 1. Update the request status
       const { error: reqError } = await supabase
         .from('join_requests')
         .update({ status })
@@ -58,7 +68,6 @@ const ManageTeam = () => {
       if (reqError) throw reqError;
 
       if (status === 'accepted') {
-        // 2. Add to project members
         const { error: memberError } = await supabase.from('project_members').insert({
           project_id: project.id,
           user_id: userId,
@@ -66,7 +75,6 @@ const ManageTeam = () => {
         });
         
         if (memberError && memberError.code !== '23505') throw memberError;
-        
         toast.success("Member added to team!");
       } else {
         toast.info("Request declined");
@@ -81,23 +89,28 @@ const ManageTeam = () => {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!supabase) return;
-    setIsProcessing(memberId);
-    try {
-      const { error } = await supabase
-        .from('project_members')
-        .delete()
-        .match({ project_id: project.id, user_id: memberId });
-
-      if (error) throw error;
-      
-      toast.success("Member removed from team");
-      await refreshProjects();
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
+    if (!projectChat) {
+      // Fallback if no chat exists yet
+      setIsProcessing(memberId);
+      try {
+        await supabase?.from('project_members').delete().match({ project_id: project.id, user_id: memberId });
+        toast.success("Member removed");
+        await refreshProjects();
+      } catch (e) {}
       setIsProcessing(null);
+      return;
     }
+
+    setIsProcessing(memberId);
+    await removeMemberFromGroup(projectChat.id, memberId);
+    setIsProcessing(null);
+  };
+
+  const handleDismissGroup = async () => {
+    if (!projectChat) return;
+    setIsProcessing('dismiss');
+    await dismissGroup(projectChat.id);
+    setIsProcessing(null);
   };
 
   return (
@@ -128,6 +141,38 @@ const ManageTeam = () => {
             </Button>
           </div>
         </div>
+
+        {projectChat && (
+          <section className="bg-destructive/5 border border-destructive/10 p-5 rounded-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-destructive">Group Chat</h4>
+                <p className="text-[10px] text-muted-foreground">Dismissing the group removes all members and history.</p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="rounded-xl gap-2 h-10" disabled={isProcessing === 'dismiss'}>
+                    {isProcessing === 'dismiss' ? <Loader2 className="animate-spin" size={14} /> : <><Trash2 size={14} /> Dismiss Group</>}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Dismiss Group Chat?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all messages and remove all members from the group chat. Members will be notified. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDismissGroup} className="rounded-xl bg-destructive text-destructive-foreground">
+                      Confirm Dismissal
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </section>
+        )}
 
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
@@ -230,15 +275,32 @@ const ManageTeam = () => {
                   >
                     <MessageSquare size={18} />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/10" 
-                    onClick={() => handleRemoveMember(member.id)}
-                    disabled={isProcessing === member.id}
-                  >
-                    {isProcessing === member.id ? <Loader2 className="animate-spin" size={18} /> : <UserMinus size={18} />}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 rounded-xl text-destructive hover:bg-destructive/10" 
+                        disabled={isProcessing === member.id}
+                      >
+                        {isProcessing === member.id ? <Loader2 className="animate-spin" size={18} /> : <UserMinus size={18} />}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Member?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to remove {resolveName(member)} from the project and group chat? They will be notified.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleRemoveMember(member.id)} className="rounded-xl bg-destructive text-destructive-foreground">
+                          Confirm Removal
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}

@@ -28,6 +28,8 @@ interface AppContextType {
   markAsRead: (chatId: string, isGroup: boolean) => Promise<void>;
   deleteChat: (chatId: string) => Promise<void>;
   leaveGroup: (chatId: string) => Promise<void>;
+  dismissGroup: (chatId: string) => Promise<void>;
+  removeMemberFromGroup: (chatId: string, userId: string) => Promise<void>;
   updatePresence: () => Promise<void>;
   resolveName: (user: any) => string;
 }
@@ -384,6 +386,42 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id, refreshChats, chats]);
 
+  const dismissGroup = useCallback(async (chatId: string) => {
+    if (!supabase || !currentUser?.id) return;
+    try {
+      const { error } = await supabase.rpc('dismiss_group_chat', {
+        p_chat_id: chatId,
+        p_admin_id: currentUser.id
+      });
+
+      if (error) throw error;
+      toast.success("Group dismissed successfully");
+      setTimeout(() => refreshChats(), 100);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to dismiss group");
+    }
+  }, [currentUser?.id, refreshChats]);
+
+  const removeMemberFromGroup = useCallback(async (chatId: string, userId: string) => {
+    if (!supabase || !currentUser?.id) return;
+    try {
+      const { error } = await supabase.rpc('remove_group_member', {
+        p_chat_id: chatId,
+        p_target_user_id: userId,
+        p_admin_id: currentUser.id
+      });
+
+      if (error) throw error;
+      toast.success("Member removed from group");
+      setTimeout(() => {
+        refreshChats();
+        refreshProjects();
+      }, 100);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove member");
+    }
+  }, [currentUser?.id, refreshChats, refreshProjects]);
+
   const logout = useCallback(async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -404,15 +442,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       if (isLiked) {
-        // DELETE for unlike
         const { error } = await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
         if (error) throw error;
       } else {
-        // INSERT for like
         const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
         if (error && error.code !== '23505') throw error;
       }
-      // Force refresh to sync with DB truth
       await refreshProjects();
     } catch (error) {
       toast.error("Failed to update like");
@@ -605,7 +640,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       unreadNotificationsCount,
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
-      markAsRead, deleteChat, leaveGroup,
+      markAsRead, deleteChat, leaveGroup, dismissGroup, removeMemberFromGroup,
       updatePresence, resolveName
     }}>
       {children}
