@@ -56,27 +56,19 @@ const ManageTeam = () => {
 
   const projectRequests = requests.filter(r => r.project_id === project.id && r.status === 'pending');
 
-  const handleRequest = async (reqId: string, status: 'accepted' | 'rejected', userId: string) => {
-    if (!supabase) return;
+  const handleRequest = async (reqId: string, status: 'accepted' | 'rejected') => {
+    if (!supabase || !currentUser) return;
     setIsProcessing(reqId);
     try {
-      if (status === 'accepted') {
-        // Use atomic accept_join_request RPC
-        const { error } = await supabase.rpc('accept_join_request', {
-          p_request_id: reqId,
-          p_admin_id: currentUser.id
-        });
-        if (error) throw error;
-        toast.success("Member added to team!");
-      } else {
-        const { error } = await supabase
-          .from('join_requests')
-          .update({ status: 'rejected' })
-          .eq('id', reqId);
-        if (error) throw error;
-        toast.info("Request declined");
-      }
+      const rpcName = status === 'accepted' ? 'accept_join_request' : 'reject_join_request';
+      const { error } = await supabase.rpc(rpcName, {
+        p_request_id: reqId,
+        p_admin_id: currentUser.id
+      });
+
+      if (error) throw error;
       
+      toast.success(status === 'accepted' ? "Member added to team!" : "Request declined");
       await refreshProjects();
     } catch (err: any) {
       toast.error(err.message);
@@ -87,7 +79,6 @@ const ManageTeam = () => {
 
   const handleRemoveMember = async (memberId: string) => {
     if (!projectChat) {
-      // Fallback if no chat exists yet
       setIsProcessing(memberId);
       try {
         await supabase?.from('project_members').update({ status: 'removed' }).match({ project_id: project.id, user_id: memberId });
@@ -214,7 +205,7 @@ const ManageTeam = () => {
                   <Button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleRequest(req.id, 'accepted', req.user_id);
+                      handleRequest(req.id, 'accepted');
                     }} 
                     disabled={!!isProcessing}
                     className="flex-1 h-11 rounded-xl bg-primary text-xs font-bold gap-2 shadow-lg shadow-primary/20"
@@ -224,7 +215,7 @@ const ManageTeam = () => {
                   <Button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleRequest(req.id, 'rejected', req.user_id);
+                      handleRequest(req.id, 'rejected');
                     }} 
                     disabled={!!isProcessing}
                     variant="outline" 
