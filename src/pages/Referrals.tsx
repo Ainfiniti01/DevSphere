@@ -52,17 +52,16 @@ const Referrals = () => {
     else setIsRefreshing(true);
 
     try {
-      // 1. Fetch Points (This is working for you)
-      const { data: pointData, error: pointError } = await supabase
+      // 1. Fetch Points (For display only)
+      const { data: pointData } = await supabase
         .from('referral_points')
         .select('points')
         .eq('user_id', currentUser.id);
 
-      if (pointError) throw pointError;
       const totalPoints = pointData?.reduce((acc, curr) => acc + curr.points, 0) || 0;
       setPoints(totalPoints);
 
-      // 2. Fetch Referrals (This was likely being blocked by Profile RLS)
+      // 2. Fetch Referrals (The Source of Truth for Analytics)
       const { data: refData, error: refError } = await supabase
         .from('referrals')
         .select(`
@@ -83,7 +82,7 @@ const Referrals = () => {
       const refs = refData || [];
       setReferrals(refs);
       
-      // Calculate stats based on the actual records found
+      // Derive all dashboard stats strictly from the referrals table
       setStats({
         total: refs.length,
         joined: refs.filter(r => r.status === 'joined').length,
@@ -92,8 +91,8 @@ const Referrals = () => {
       });
 
     } catch (err: any) {
-      console.error("[Referrals] Fetch error:", err);
-      toast.error("Failed to sync referral data.");
+      console.error("[Referrals] Sync error:", err);
+      toast.error("Failed to synchronize referral data.");
     } finally {
       setLoading(false);
       setIsRefreshing(false);
