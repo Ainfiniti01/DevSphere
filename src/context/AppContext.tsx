@@ -132,7 +132,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
-          project_members(user_id, user:profiles(id, name, avatar_url, title, display_name)),
+          project_members(user_id, status, user:profiles(id, name, avatar_url, title, display_name)),
           comment_count:comments(count)
         `)
         .order('created_at', { ascending: false });
@@ -146,8 +146,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
-        members: p.project_members?.map((m: any) => m.user_id) || [],
-        memberProfiles: p.project_members?.map((m: any) => m.user) || [],
+        // Only count 'active' members
+        members: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user_id) || [],
+        memberProfiles: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user) || [],
+        // Store full membership status for the current user
+        myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none',
         commentCount: p.comment_count?.[0]?.count || 0
       }));
 
@@ -367,12 +370,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
     try {
-      const { error: memberError } = await supabase
-        .from('chat_members')
-        .delete()
-        .match({ chat_id: chatId, user_id: currentUser.id });
+      // Use atomic leave_project RPC
+      const { error } = await supabase.rpc('leave_project', {
+        p_project_id: chat.targetId,
+        p_user_id: currentUser.id
+      });
 
-      if (memberError) throw memberError;
+      if (error) throw error;
 
       await supabase.from('hidden_chats').upsert({
         user_id: currentUser.id,
@@ -380,11 +384,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }, { onConflict: 'user_id,chat_id' });
 
       toast.success("Exited group and removed chat");
-      setTimeout(() => refreshChats(), 100);
+      setTimeout(() => {
+        refreshChats();
+        refreshProjects();
+      }, 100);
     } catch (error: any) {
       toast.error("Failed to exit group");
     }
-  }, [currentUser?.id, refreshChats, chats]);
+  }, [currentUser?.id, refreshChats, refreshProjects, chats]);
 
   const dismissGroup = useCallback(async (chatId: string) => {
     if (!supabase || !currentUser?.id) return;
@@ -404,9 +411,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const removeMemberFromGroup = useCallback(async (chatId: string, userId: string) => {
     if (!supabase || !currentUser?.id) return;
+    const chat = chats.find(c => c.id === chatId);
     try {
-      const { error } = await supabase.rpc('remove_group_member', {
-        p_chat_id: chatId,
+      const { error } = await supabase.rpc('remove_project_member', {
+        p_project_id: chat.targetId,
         p_target_user_id: userId,
         p_admin_id: currentUser.id
       });
@@ -420,7 +428,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       toast.error(error.message || "Failed to remove member");
     }
-  }, [currentUser?.id, refreshChats, refreshProjects]);
+  }, [currentUser?.id, refreshChats, refreshProjects, chats]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;

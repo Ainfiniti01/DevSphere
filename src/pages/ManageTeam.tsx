@@ -60,23 +60,20 @@ const ManageTeam = () => {
     if (!supabase) return;
     setIsProcessing(reqId);
     try {
-      const { error: reqError } = await supabase
-        .from('join_requests')
-        .update({ status })
-        .eq('id', reqId);
-
-      if (reqError) throw reqError;
-
       if (status === 'accepted') {
-        const { error: memberError } = await supabase.from('project_members').insert({
-          project_id: project.id,
-          user_id: userId,
-          role: 'Member'
+        // Use atomic accept_join_request RPC
+        const { error } = await supabase.rpc('accept_join_request', {
+          p_request_id: reqId,
+          p_admin_id: currentUser.id
         });
-        
-        if (memberError && memberError.code !== '23505') throw memberError;
+        if (error) throw error;
         toast.success("Member added to team!");
       } else {
+        const { error } = await supabase
+          .from('join_requests')
+          .update({ status: 'rejected' })
+          .eq('id', reqId);
+        if (error) throw error;
         toast.info("Request declined");
       }
       
@@ -93,7 +90,7 @@ const ManageTeam = () => {
       // Fallback if no chat exists yet
       setIsProcessing(memberId);
       try {
-        await supabase?.from('project_members').delete().match({ project_id: project.id, user_id: memberId });
+        await supabase?.from('project_members').update({ status: 'removed' }).match({ project_id: project.id, user_id: memberId });
         toast.success("Member removed");
         await refreshProjects();
       } catch (e) {}

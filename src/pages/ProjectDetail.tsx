@@ -42,7 +42,7 @@ const ProjectDetail = () => {
   if (!project) return <MobileLayout title="Error" showBack><div className="p-8 text-center">Project Not Found</div></MobileLayout>;
 
   const isOwner = currentUser?.id === project.creator_id;
-  const isMember = project.members?.includes(currentUser?.id);
+  const isMember = project.myMembershipStatus === 'active';
 
   const handleAddComment = async () => {
     if (!commentText.trim() || !currentUser) return;
@@ -111,8 +111,6 @@ const ProjectDetail = () => {
 
     setIsSubmitting(true);
     try {
-      // If there was a previous rejected request, we can either update it or insert a new one.
-      // Inserting a new one is cleaner for history.
       const { error } = await supabase.from('join_requests').insert({
         project_id: project.id,
         user_id: currentUser.id,
@@ -276,7 +274,7 @@ const ProjectDetail = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full h-14 bg-primary text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
-                  {requestStatus === 'rejected' ? "Re-apply to Join" : "Join Project"}
+                  {requestStatus === 'rejected' || project.myMembershipStatus === 'left' || project.myMembershipStatus === 'removed' ? "Re-apply to Join" : "Join Project"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-background border-border max-w-[90vw] rounded-3xl">
