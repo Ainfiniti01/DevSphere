@@ -83,11 +83,12 @@ const Referrals = () => {
       setReferrals(refs);
       
       // Derive all dashboard stats strictly from the referrals table
+      // 'joined' status is considered a successful referral
       setStats({
         total: refs.length,
-        joined: refs.filter(r => r.status === 'joined').length,
+        joined: refs.filter(r => r.status === 'joined' || r.status === 'rewarded').length,
         pending: refs.filter(r => r.status === 'pending').length,
-        rewarded: refs.filter(r => r.status === 'rewarded').length
+        rewarded: refs.filter(r => (r.referred_user?.activity_streak || 0) >= 7).length
       });
 
     } catch (err: any) {
