@@ -22,6 +22,7 @@ const CreateProject = () => {
   
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isFetching, setIsFetching] = useState(!!editId);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -35,29 +36,67 @@ const CreateProject = () => {
     projectUrl: ''
   });
 
-  // Limits check
+  // Limits check for new projects
   const userProjects = projects.filter(p => p.creator_id === currentUser?.id);
   const activeProjects = userProjects.filter(p => p.status === 'ACTIVE');
   const isAtTotalLimit = userProjects.length >= 5 && !editId;
   const isAtActiveLimit = activeProjects.length >= 3 && !editId;
 
   useEffect(() => {
-    if (editId) {
-      const projectToEdit = projects.find(p => p.id === editId);
-      if (projectToEdit) {
-        setFormData({
-          title: projectToEdit.title,
-          problem: projectToEdit.problem || '',
-          solution: projectToEdit.solution || '',
-          description: projectToEdit.description || '',
-          skills: projectToEdit.skills?.join(', ') || '',
-          stage: projectToEdit.stage || 'Idea',
-          thumbnail: projectToEdit.thumbnail || '',
-          projectUrl: projectToEdit.project_url || ''
-        });
+    const loadProjectData = async () => {
+      if (!editId || !supabase) return;
+
+      setIsFetching(true);
+      try {
+        // Try to find in local state first
+        let projectToEdit = projects.find(p => p.id === editId);
+
+        // If not in local state (e.g. direct link), fetch from DB
+        if (!projectToEdit) {
+          const { data, error } = await supabase
+            .from('projects')
+            .select('*')
+            .eq('id', editId)
+            .single();
+          
+          if (error) throw error;
+          projectToEdit = {
+            ...data,
+            skills: data.skills_required || [],
+            thumbnail: data.thumbnail_url
+          };
+        }
+
+        if (projectToEdit) {
+          // Security check: Only owner can edit
+          if (projectToEdit.creator_id !== currentUser?.id) {
+            toast.error("You don't have permission to edit this project.");
+            navigate('/');
+            return;
+          }
+
+          setFormData({
+            title: projectToEdit.title,
+            problem: projectToEdit.problem || '',
+            solution: projectToEdit.solution || '',
+            description: projectToEdit.description || '',
+            skills: projectToEdit.skills?.join(', ') || '',
+            stage: projectToEdit.stage || 'Idea',
+            thumbnail: projectToEdit.thumbnail || '',
+            projectUrl: projectToEdit.project_url || ''
+          });
+        }
+      } catch (err: any) {
+        console.error("Error loading project:", err);
+        toast.error("Failed to load project data.");
+        navigate('/');
+      } finally {
+        setIsFetching(false);
       }
-    }
-  }, [editId, projects]);
+    };
+
+    loadProjectData();
+  }, [editId, projects, currentUser?.id, navigate]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,7 +155,6 @@ const CreateProject = () => {
     setLoading(true);
     
     const projectData: any = {
-      title: formData.title,
       problem: formData.problem,
       solution: formData.solution,
       description: formData.description,
@@ -124,16 +162,16 @@ const CreateProject = () => {
       skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
       project_url: formData.projectUrl,
       thumbnail_url: formData.thumbnail,
-      video_url: null 
     };
 
     try {
       let result;
       if (editId) {
-        // Remove title from update payload as it's restricted by DB trigger
-        const { title, ...updateData } = projectData;
-        result = await supabase.from('projects').update(updateData).eq('id', editId).select().single();
+        // Title is NOT included in update to respect DB triggers and security rules
+        result = await supabase.from('projects').update(projectData).eq('id', editId).select().single();
       } else {
+        // For new projects, include title and creator
+        projectData.title = formData.title;
         projectData.creator_id = currentUser.id;
         projectData.status = isAtActiveLimit ? 'PAUSED' : 'ACTIVE';
         result = await supabase.from('projects').insert(projectData).select().single();
@@ -152,13 +190,24 @@ const CreateProject = () => {
       toast.success(editId ? "Project updated!" : "Project published!");
       await refreshProjects();
       await refreshNotifications();
-      navigate('/');
+      navigate(`/project/${result.data.id}`);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  if (isFetching) {
+    return (
+      <MobileLayout title="Loading..." showBack>
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <Loader2 className="animate-spin text-primary mb-4" size={32} />
+          <p className="text-sm text-muted-foreground">Fetching project details...</p>
+        </div>
+      </MobileLayout>
+    );
+  }
 
   return (
     <MobileLayout title={editId ? "Edit Project" : "New Project"} showBack>
@@ -200,7 +249,7 @@ const CreateProject = () => {
                 )} 
                 required 
                 value={formData.title}
-                onChange={e => setFormData({...formData, title: e.target.value})}
+                onChange={e => !editId && setFormData({...formData, title: e.target.value})}
                 disabled={isAtTotalLimit || !!editId}
               />
               {editId && (
