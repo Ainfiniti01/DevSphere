@@ -80,6 +80,7 @@ const Referrals = () => {
       if (refError) throw refError;
 
       const refs = refData || [];
+      console.log("[Referrals] Raw Data:", refs); // Debugging log
       setReferrals(refs);
       
       // Derive all dashboard stats strictly from the referrals table
