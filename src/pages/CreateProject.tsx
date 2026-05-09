@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
+import { cn } from "@/lib/utils";
 
 const CreateProject = () => {
   const navigate = useNavigate();
