@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,8 @@ import {
   Loader2,
   Gift,
   Rocket,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 const Referrals = () => {
   const { currentUser } = useApp();
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [referrals, setReferrals] = useState<any[]>([]);
   const [points, setPoints] = useState(0);
   const [stats, setStats] = useState({
@@ -44,51 +46,61 @@ const Referrals = () => {
     rewarded: 0
   });
 
+  const fetchData = useCallback(async (silent = false) => {
+    if (!currentUser || !supabase) return;
+    if (!silent) setLoading(true);
+    else setIsRefreshing(true);
+
+    try {
+      // 1. Fetch Points
+      const { data: pointData, error: pointError } = await supabase
+        .from('referral_points')
+        .select('points')
+        .eq('user_id', currentUser.id);
+
+      if (pointError) throw pointError;
+      const totalPoints = pointData?.reduce((acc, curr) => acc + curr.points, 0) || 0;
+      setPoints(totalPoints);
+
+      // 2. Fetch Referrals with Join
+      // Using the explicit relationship name to ensure it works across all environments
+      const { data: refData, error: refError } = await supabase
+        .from('referrals')
+        .select(`
+          *,
+          referred_user:profiles!referrals_referred_user_id_fkey (
+            id,
+            name,
+            avatar_url,
+            activity_streak,
+            updated_at
+          )
+        `)
+        .eq('referrer_id', currentUser.id)
+        .order('created_at', { ascending: false });
+
+      if (refError) throw refError;
+
+      setReferrals(refData || []);
+      setStats({
+        total: refData?.length || 0,
+        joined: refData?.filter(r => r.status === 'joined').length || 0,
+        pending: refData?.filter(r => r.status === 'pending').length || 0,
+        rewarded: refData?.filter(r => r.status === 'rewarded').length || 0
+      });
+
+    } catch (err: any) {
+      console.error("[Referrals] Fetch error:", err);
+      toast.error("Failed to sync referral data.");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [currentUser?.id]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      if (!currentUser || !supabase) return;
-      setLoading(true);
-      try {
-        // Fetch referrals with milestone data
-        // Using updated_at as a fallback for profiles since created_at was missing
-        const { data: refData, error: refError } = await supabase
-          .from('referrals')
-          .select('*, referred_user:profiles!referrals_referred_user_id_fkey(id, name, avatar_url, activity_streak, updated_at)')
-          .eq('referrer_id', currentUser.id)
-          .order('created_at', { ascending: false });
-
-        if (refError) throw refError;
-
-        // Fetch points
-        const { data: pointData, error: pointError } = await supabase
-          .from('referral_points')
-          .select('points')
-          .eq('user_id', currentUser.id);
-
-        if (pointError) throw pointError;
-
-        const totalPoints = pointData?.reduce((acc, curr) => acc + curr.points, 0) || 0;
-        setPoints(totalPoints);
-        setReferrals(refData || []);
-
-        setStats({
-          total: refData?.length || 0,
-          joined: refData?.filter(r => r.status === 'joined').length || 0,
-          pending: refData?.filter(r => r.status === 'pending').length || 0,
-          rewarded: refData?.filter(r => r.status === 'rewarded').length || 0
-        });
-      } catch (err: any) {
-        console.error("[Referrals] Fetch error:", err);
-        if (err.code !== 'PGRST116') {
-          toast.error("Failed to load referral data.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [currentUser]);
+  }, [fetchData]);
 
   const copyCode = () => {
     if (!currentUser?.referral_code) {
@@ -122,7 +134,17 @@ const Referrals = () => {
   return (
     <MobileLayout title="Refer & Earn" showBack>
       <div className="px-6 py-6 space-y-8">
-        <section className="text-center space-y-4">
+        <section className="text-center space-y-4 relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute -top-2 -right-2 h-8 w-8 rounded-full"
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
+          >
+            <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+          </Button>
+          
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-bold">
             <Trophy size={16} />
             {points} Points Earned
