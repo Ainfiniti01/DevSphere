@@ -50,17 +50,22 @@ const Referrals = () => {
       setLoading(true);
       try {
         // Fetch referrals with milestone data
-        const { data: refData } = await supabase
+        // Explicitly naming the foreign key relationship to avoid 'Failed to fetch' / 400 errors
+        const { data: refData, error: refError } = await supabase
           .from('referrals')
-          .select('*, referred_user:profiles(id, name, avatar_url, activity_streak, created_at)')
+          .select('*, referred_user:profiles!referrals_referred_user_id_fkey(id, name, avatar_url, activity_streak, created_at)')
           .eq('referrer_id', currentUser.id)
           .order('created_at', { ascending: false });
 
+        if (refError) throw refError;
+
         // Fetch points
-        const { data: pointData } = await supabase
+        const { data: pointData, error: pointError } = await supabase
           .from('referral_points')
           .select('points')
           .eq('user_id', currentUser.id);
+
+        if (pointError) throw pointError;
 
         const totalPoints = pointData?.reduce((acc, curr) => acc + curr.points, 0) || 0;
         setPoints(totalPoints);
@@ -72,8 +77,12 @@ const Referrals = () => {
           pending: refData?.filter(r => r.status === 'pending').length || 0,
           rewarded: refData?.filter(r => r.status === 'rewarded').length || 0
         });
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("[Referrals] Fetch error:", err);
+        // Only show toast if it's a real error, not just a 404/empty
+        if (err.code !== 'PGRST116') {
+          toast.error("Failed to load referral data. Please check your connection.");
+        }
       } finally {
         setLoading(false);
       }
@@ -83,15 +92,20 @@ const Referrals = () => {
   }, [currentUser]);
 
   const copyCode = () => {
-    navigator.clipboard.writeText(currentUser?.referral_code || '');
+    if (!currentUser?.referral_code) {
+      toast.error("Referral code not found. Please update your profile.");
+      return;
+    }
+    navigator.clipboard.writeText(currentUser.referral_code);
     toast.success("Referral code copied!");
   };
 
   const handleShare = async () => {
+    const code = currentUser?.referral_code || '';
     const shareData = {
       title: 'Join DevSphere',
-      text: `Join me on DevSphere and build amazing projects! Use my code: ${currentUser?.referral_code}`,
-      url: `${window.location.origin}/signup?ref=${currentUser?.referral_code}`
+      text: `Join me on DevSphere and build amazing projects! Use my code: ${code}`,
+      url: `${window.location.origin}/signup?ref=${code}`
     };
 
     if (navigator.share) {
@@ -156,7 +170,6 @@ const Referrals = () => {
           ))}
         </div>
 
-        {/* Restored How it works section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">How it works</h3>
@@ -239,7 +252,7 @@ const Referrals = () => {
                       <span className="text-[8px] font-bold uppercase">Signed Up</span>
                     </div>
                     <div className="flex flex-col items-center gap-1 p-2 bg-accent/10 rounded-xl border border-border">
-                      {ref.referred_user?.activity_streak >= 7 ? (
+                      {(ref.referred_user?.activity_streak || 0) >= 7 ? (
                         <CheckCircle2 size={14} className="text-emerald-500" />
                       ) : (
                         <Clock size={14} className="text-muted-foreground" />
