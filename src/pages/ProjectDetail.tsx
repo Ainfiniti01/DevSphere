@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { projects, requests, currentUser, refreshNotifications, toggleLike, refreshProjects } = useApp();
+  const { projects, requests, currentUser, toggleLike, refreshProjects } = useApp();
   
   const project = projects.find(p => p.id === id);
   
@@ -123,7 +123,6 @@ const ProjectDetail = () => {
 
       toast.success("Application sent to founder!");
       await refreshProjects();
-      await refreshNotifications();
       setIsDialogOpen(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to send application");

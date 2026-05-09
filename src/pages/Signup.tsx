@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, Gift, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Gift, Link as LinkIcon } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -43,6 +43,9 @@ const Signup = () => {
         if (data) setInviterName(data.name);
       };
       fetchInviter();
+    } else {
+      const pending = localStorage.getItem('pending_referral_code');
+      if (pending) setFormData(prev => ({ ...prev, referralCode: pending }));
     }
   }, [searchParams]);
 
@@ -65,9 +68,11 @@ const Signup = () => {
       if (authError) throw authError;
 
       if (data.user) {
+        // 1. Create Profile
         await supabase.from('profiles').upsert({
           id: data.user.id,
           name: fullName,
+          display_name: fullName, // Ensure display_name is populated
           title: formData.title,
           skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
           location: formData.location,
@@ -75,36 +80,13 @@ const Signup = () => {
           updated_at: new Date().toISOString()
         });
 
+        // 2. Process Referral via Centralized RPC
         const finalRefCode = formData.referralCode || localStorage.getItem('pending_referral_code');
         if (finalRefCode) {
-          const { data: referrer } = await supabase
-            .from('profiles')
-            .select('id, name')
-            .eq('referral_code', finalRefCode)
-            .maybeSingle();
-
-          if (referrer && referrer.id !== data.user.id) {
-            await supabase.from('referrals').insert({
-              referrer_id: referrer.id,
-              referred_user_id: data.user.id,
-              referral_code: finalRefCode,
-              status: 'joined'
-            });
-
-            await supabase.from('notifications').insert({
-              user_id: referrer.id,
-              actor_id: data.user.id,
-              type: 'request',
-              content: `joined DevSphere using your referral link! You earned 10 points.`
-            });
-
-            await supabase.rpc('award_referral_points', {
-              p_referrer_id: referrer.id,
-              p_referred_user_id: data.user.id,
-              p_points: 10,
-              p_reason_key: 'Signup Reward'
-            });
-          }
+          await supabase.rpc('process_referral_signup', {
+            p_referral_code: finalRefCode,
+            p_new_user_id: data.user.id
+          });
         }
 
         localStorage.removeItem('pending_referral_code');
@@ -161,6 +143,20 @@ const Signup = () => {
           <Label>Skills (comma separated)</Label>
           <Input required value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} placeholder="React, Node.js" className="rounded-xl h-12" />
         </div>
+        
+        <div className="space-y-1.5">
+          <Label>Referral Code (Optional)</Label>
+          <div className="relative">
+            <Gift className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+            <Input 
+              value={formData.referralCode} 
+              onChange={e => setFormData({...formData, referralCode: e.target.value})} 
+              placeholder="Enter code" 
+              className="rounded-xl h-12 pl-10" 
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
           <Label>Location</Label>
           <Input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="San Francisco, CA" className="rounded-xl h-12" />
