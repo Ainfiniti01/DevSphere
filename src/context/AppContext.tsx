@@ -153,9 +153,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (activeUser?.id) {
         try {
+          // Use explicit join hint to avoid "Failed to fetch" caused by relationship ambiguity
           const { data: reqData, error: reqError } = await supabase
             .from('join_requests')
-            .select('id, project_id, user_id, status, reason, skills, created_at, user:profiles(id, name, avatar_url, title, display_name)');
+            .select(`
+              id, 
+              project_id, 
+              user_id, 
+              status, 
+              reason, 
+              skills, 
+              created_at, 
+              user:profiles!user_id(id, name, avatar_url, title, display_name)
+            `);
           
           if (reqError) throw reqError;
           if (reqData) setRequests(reqData);
