@@ -153,7 +153,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (activeUser?.id) {
         try {
-          // Use explicit join hint to avoid "Failed to fetch" caused by relationship ambiguity
+          // Use explicit constraint name to resolve ambiguity caused by duplicate foreign keys
           const { data: reqData, error: reqError } = await supabase
             .from('join_requests')
             .select(`
@@ -164,7 +164,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               reason, 
               skills, 
               created_at, 
-              user:profiles!user_id(id, name, avatar_url, title, display_name)
+              user:profiles!join_requests_user_id_fkey(id, name, avatar_url, title, display_name)
             `);
           
           if (reqError) throw reqError;
