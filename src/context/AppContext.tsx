@@ -9,6 +9,8 @@ interface AppContextType {
   currentUser: any;
   setCurrentUser: (user: any) => void;
   authLoading: boolean;
+  hasSeenOnboarding: boolean;
+  completeOnboarding: () => void;
   projects: any[];
   setProjects: React.Dispatch<React.SetStateAction<any[]>>;
   requests: any[];
@@ -39,6 +41,13 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('devsphere_onboarding_complete') === 'true';
+    }
+    return false;
+  });
+
   const [projects, setProjects] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
@@ -52,6 +61,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const initStarted = useRef(false);
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
+
+  const completeOnboarding = useCallback(() => {
+    setHasSeenOnboarding(true);
+    localStorage.setItem('devsphere_onboarding_complete', 'true');
+  }, []);
 
   const resolveName = useCallback((user: any) => {
     if (!user) return "User";
@@ -146,10 +160,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
         timestamp: p.created_at,
-        // Only count 'active' members
         members: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user_id) || [],
         memberProfiles: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user) || [],
-        // Store full membership status for the current user
         myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none',
         commentCount: p.comment_count?.[0]?.count || 0
       }));
@@ -370,7 +382,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
     try {
-      // Use atomic leave_project RPC
       const { error } = await supabase.rpc('leave_project', {
         p_project_id: chat.targetId,
         p_user_id: currentUser.id
@@ -490,16 +501,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const initApp = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
         if (sessionError) {
           await supabase.auth.signOut();
           setAuthLoading(false);
           return;
         }
 
-        let user = null;
         if (session?.user) {
           const profile = await ensureProfile(session.user.id, session.user);
-          user = profile ? { ...session.user, ...profile } : session.user;
+          const user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
           await Promise.allSettled([
             refreshProjects(user),
@@ -509,43 +520,43 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           await refreshProjects(null);
         }
-
-        setAuthLoading(false);
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_OUT') {
-            setCurrentUser(null);
-            setNotifications([]);
-            setChats([]);
-            setUnreadChatsCount(0);
-            setUnreadNotificationsCount(0);
-            refreshProjects(null);
-            setAuthLoading(false);
-          } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-            const profile = await ensureProfile(session.user.id, session.user);
-            const newUser = profile ? { ...session.user, ...profile } : session.user;
-            setCurrentUser(newUser);
-            
-            if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
-            refreshTimeout.current = setTimeout(() => {
-              Promise.allSettled([
-                refreshProjects(newUser),
-                refreshNotifications(),
-                refreshChats()
-              ]);
-            }, 500);
-            
-            setAuthLoading(false);
-          }
-        });
-
-        return () => subscription.unsubscribe();
       } catch (err) {
+        console.error("[AppContext] Init error:", err);
+      } finally {
         setAuthLoading(false);
       }
     };
 
     initApp();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setNotifications([]);
+        setChats([]);
+        setUnreadChatsCount(0);
+        setUnreadNotificationsCount(0);
+        refreshProjects(null);
+        setAuthLoading(false);
+      } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        const profile = await ensureProfile(session.user.id, session.user);
+        const newUser = profile ? { ...session.user, ...profile } : session.user;
+        setCurrentUser(newUser);
+        
+        if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+        refreshTimeout.current = setTimeout(() => {
+          Promise.allSettled([
+            refreshProjects(newUser),
+            refreshNotifications(),
+            refreshChats()
+          ]);
+        }, 500);
+        
+        setAuthLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [ensureProfile, refreshProjects, refreshNotifications, refreshChats]);
 
   useEffect(() => {
@@ -640,6 +651,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AppContext.Provider value={{ 
       currentUser, setCurrentUser, authLoading,
+      hasSeenOnboarding, completeOnboarding,
       projects, setProjects, 
       requests, setRequests,
       chats, setChats,

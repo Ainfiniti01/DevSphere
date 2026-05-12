@@ -10,14 +10,20 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { currentUser, authLoading } = useApp();
+  const { currentUser, authLoading, hasSeenOnboarding } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      navigate('/auth', { replace: true });
+    if (!authLoading) {
+      if (!currentUser) {
+        if (!hasSeenOnboarding) {
+          navigate('/welcome', { replace: true });
+        } else {
+          navigate('/auth', { replace: true });
+        }
+      }
     }
-  }, [currentUser, authLoading, navigate]);
+  }, [currentUser, authLoading, hasSeenOnboarding, navigate]);
 
   if (authLoading) {
     return <LoadingScreen />;

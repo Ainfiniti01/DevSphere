@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Github, Chrome, AlertCircle, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
+import { useApp } from '@/context/AppContext';
 import appIcon from '../../assets/images/icon.jpeg';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { currentUser, authLoading } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,12 +21,18 @@ const Auth = () => {
   const [isResetMode, setIsResetMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const REDIRECT_URL = 'https://dev-sphere-kappa.vercel.app';
+  const REDIRECT_URL = window.location.origin;
+
+  useEffect(() => {
+    if (!authLoading && currentUser) {
+      navigate('/', { replace: true });
+    }
+  }, [currentUser, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) {
-      toast.error("Server connection not established. Please rebuild the app.");
+      toast.error("Server connection not established.");
       return;
     }
 
@@ -40,11 +48,9 @@ const Auth = () => {
       if (error) {
         const msg = error.message.toLowerCase();
         if (msg.includes("rate limit") || msg.includes("too many requests")) {
-          setErrorMsg("Too many requests. Please wait a few minutes before trying again.");
+          setErrorMsg("Too many requests. Please wait a few minutes.");
         } else if (msg.includes("invalid login credentials")) {
-          setErrorMsg("Invalid email or password. Please try again.");
-        } else if (msg.includes("email not confirmed")) {
-          setErrorMsg("Please confirm your email address.");
+          setErrorMsg("Invalid email or password.");
         } else {
           setErrorMsg(error.message);
         }
@@ -54,7 +60,7 @@ const Auth = () => {
         navigate('/');
       }
     } catch (err) {
-      setErrorMsg("An unexpected error occurred. Please check your connection.");
+      setErrorMsg("An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +70,7 @@ const Auth = () => {
     e.preventDefault();
     if (!supabase) return;
     if (!email) {
-      toast.error("Please enter your email address first.");
+      toast.error("Please enter your email address.");
       return;
     }
 
@@ -75,16 +81,11 @@ const Auth = () => {
       });
 
       if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("rate limit") || msg.includes("too many requests")) {
-          toast.error("Too many requests. Please wait a few minutes before trying again.");
-        } else {
-          toast.error(error.message || "Failed to send reset link");
-        }
+        toast.error(error.message || "Failed to send reset link");
         return;
       }
       
-      toast.success("Password reset link sent to your email!");
+      toast.success("Password reset link sent!");
       setIsResetMode(false);
     } catch (error: any) {
       toast.error("An unexpected error occurred.");

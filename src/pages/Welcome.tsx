@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
+import { useApp } from '@/context/AppContext';
 
 const SLIDES = [
   {
@@ -26,10 +27,22 @@ const SLIDES = [
 const Welcome = () => {
   const [current, setCurrent] = useState(0);
   const navigate = useNavigate();
+  const { completeOnboarding, currentUser } = useApp();
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/', { replace: true });
+    }
+  }, [currentUser, navigate]);
+
+  const handleFinish = () => {
+    completeOnboarding();
+    navigate('/auth');
+  };
 
   const next = () => {
     if (current === SLIDES.length - 1) {
-      navigate('/auth');
+      handleFinish();
     } else {
       setCurrent(current + 1);
     }
@@ -65,7 +78,7 @@ const Welcome = () => {
         <Button onClick={next} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-lg font-bold rounded-2xl">
           {current === SLIDES.length - 1 ? "Get Started" : "Next"}
         </Button>
-        <button onClick={() => navigate('/auth')} className="w-full text-slate-500 font-medium py-2">
+        <button onClick={handleFinish} className="w-full text-slate-500 font-medium py-2">
           Skip
         </button>
       </div>

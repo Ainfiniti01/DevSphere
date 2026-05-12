@@ -3,17 +3,29 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useApp } from '@/context/AppContext';
 import splashIcon from '../../assets/images/splash-icon.jpeg';
 
 const Splash = () => {
   const navigate = useNavigate();
+  const { currentUser, authLoading, hasSeenOnboarding } = useApp();
 
   useEffect(() => {
+    // Minimum branding time of 1.5s
     const timer = setTimeout(() => {
-      navigate('/welcome');
-    }, 2000);
+      if (!authLoading) {
+        if (currentUser) {
+          navigate('/', { replace: true });
+        } else if (!hasSeenOnboarding) {
+          navigate('/welcome', { replace: true });
+        } else {
+          navigate('/auth', { replace: true });
+        }
+      }
+    }, 1500);
+
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [authLoading, currentUser, hasSeenOnboarding, navigate]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center">
@@ -33,6 +45,21 @@ const Splash = () => {
       >
         DevSphere
       </motion.h1>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1 }}
+        className="mt-4"
+      >
+        <div className="w-8 h-1 bg-indigo-500/30 rounded-full overflow-hidden">
+          <motion.div 
+            className="h-full bg-indigo-500"
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+          />
+        </div>
+      </motion.div>
     </div>
   );
 };
