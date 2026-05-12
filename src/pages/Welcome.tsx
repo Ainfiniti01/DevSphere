@@ -86,9 +86,12 @@ const Welcome = () => {
             />
           ))}
         </div>
-        <Button onClick={next} className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-lg font-bold rounded-2xl">
-          {current === SLIDES.length - 1 ? "Get Started" : "Next"}
-        </Button>
+        <Button
+  onClick={next}
+  className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-lg font-bold rounded-2xl"
+>
+  {current === SLIDES.length - 1 ? "Enter DevSphere" : "Continue"}
+</Button>
         <button onClick={handleFinish} className="w-full text-slate-500 font-medium py-2">
           Skip
         </button>
