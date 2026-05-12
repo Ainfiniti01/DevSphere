@@ -63,12 +63,13 @@ const Welcome = () => {
       <div className="flex-1 flex flex-col items-center justify-center text-center">
         <AnimatePresence mode="wait">
           <motion.div
-            key={current}
-            initial={{ x: 50, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -50, opacity: 0 }}
-            className="space-y-6"
-          >
+  key={current}
+  initial={{ x: 50, opacity: 0 }}
+  animate={{ x: 0, opacity: 1 }}
+  exit={{ x: -50, opacity: 0 }}
+  transition={{ duration: 0.35 }}
+  className="space-y-6"
+>
             <div className="text-8xl mb-8">{SLIDES[current].image}</div>
             <h2 className="text-3xl font-bold text-white">{SLIDES[current].title}</h2>
             <p className="text-slate-400 text-lg">{SLIDES[current].desc}</p>
