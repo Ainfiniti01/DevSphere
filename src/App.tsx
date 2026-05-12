@@ -39,44 +39,43 @@ const AppContent = () => {
   const { authLoading } = useApp();
 
   // While auth is hydrating, we show the Splash screen as the global loader
+  // Now that BrowserRouter wraps AppContent, useNavigate inside Splash will work
   if (authLoading) {
     return <Splash />;
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Entry Point Logic */}
-        <Route path="/splash" element={<Splash />} />
-        <Route path="/welcome" element={<Welcome />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        
-        {/* Protected Routes */}
-        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-        <Route path="/create" element={<ProtectedRoute><CreateProject /></ProtectedRoute>} />
-        <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-        <Route path="/chat/:id" element={<ProtectedRoute><ChatScreen /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/settings/privacy" element={<ProtectedRoute><PrivacySecurity /></ProtectedRoute>} />
-        <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-        <Route path="/settings/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
-        <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
-        <Route path="/manage-team/:id" element={<ProtectedRoute><ManageTeam /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
+    <Routes>
+      {/* Entry Point Logic */}
+      <Route path="/splash" element={<Splash />} />
+      <Route path="/welcome" element={<Welcome />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      
+      {/* Protected Routes */}
+      <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+      <Route path="/create" element={<ProtectedRoute><CreateProject /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+      <Route path="/chat/:id" element={<ProtectedRoute><ChatScreen /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/settings/privacy" element={<ProtectedRoute><PrivacySecurity /></ProtectedRoute>} />
+      <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
+      <Route path="/settings/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+      <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+      <Route path="/manage-team/:id" element={<ProtectedRoute><ManageTeam /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
 
-        {/* Publicly Accessible Routes */}
-        <Route path="/explore" element={<Explore />} />
-        <Route path="/project/:id" element={<ProjectDetail />} />
-        <Route path="/profile/:id" element={<Profile />} />
-        
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+      {/* Publicly Accessible Routes */}
+      <Route path="/explore" element={<Explore />} />
+      <Route path="/project/:id" element={<ProjectDetail />} />
+      <Route path="/profile/:id" element={<Profile />} />
+      
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 
@@ -85,12 +84,14 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark">
         <AppProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner position="top-center" />
-            <Analytics />
-            <AppContent />
-          </TooltipProvider>
+          <BrowserRouter>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner position="top-center" />
+              <Analytics />
+              <AppContent />
+            </TooltipProvider>
+          </BrowserRouter>
         </AppProvider>
       </ThemeProvider>
     </QueryClientProvider>
