@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MobileLayout from '@/components/layout/MobileLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp, Github, Linkedin, Twitter } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
@@ -157,6 +157,24 @@ const Profile = () => {
                   <LinkIcon size={16} /> {profile.portfolio_url}
                 </a>
               )}
+              
+              <div className="flex gap-3 mt-2">
+                {profile.github_url && (
+                  <a href={formatUrl(profile.github_url)} target="_blank" rel="noopener noreferrer" className="p-2 bg-accent/50 rounded-lg hover:bg-accent transition-colors">
+                    <Github size={18} />
+                  </a>
+                )}
+                {profile.linkedin_url && (
+                  <a href={formatUrl(profile.linkedin_url)} target="_blank" rel="noopener noreferrer" className="p-2 bg-accent/50 rounded-lg hover:bg-accent transition-colors">
+                    <Linkedin size={18} />
+                  </a>
+                )}
+                {profile.twitter_url && (
+                  <a href={formatUrl(profile.twitter_url)} target="_blank" rel="noopener noreferrer" className="p-2 bg-accent/50 rounded-lg hover:bg-accent transition-colors">
+                    <Twitter size={18} />
+                  </a>
+                )}
+              </div>
             </div>
           </div>
 
