@@ -8,19 +8,29 @@ import { useApp } from '@/context/AppContext';
 
 const SLIDES = [
   {
+    title: "Welcome to DevSphere",
+    desc: "A collaborative ecosystem for developers, creators, founders, and innovators.",
+    image: "🌍"
+  },
+  {
     title: "Build Together",
-    desc: "Find the perfect team for your next big idea.",
+    desc: "Find teammates, join projects, and turn ideas into real products together.",
     image: "🚀"
   },
   {
-    title: "Showcase Skills",
-    desc: "Build your portfolio and get recognized by the community.",
+    title: "Showcase Your Skills",
+    desc: "Create your developer identity with projects, experience, and tech stack.",
     image: "💻"
   },
   {
-    title: "Grow Faster",
-    desc: "Learn from experts and collaborate on real-world projects.",
-    image: "📈"
+    title: "Collaborate in Real-Time",
+    desc: "Use project group chats, team discussions, and collaboration tools built for builders.",
+    image: "💬"
+  },
+  {
+    title: "Discover Opportunities",
+    desc: "Explore startups, communities, open projects, and opportunities waiting for you.",
+    image: "✨"
   }
 ];
 
