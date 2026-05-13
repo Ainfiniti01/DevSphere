@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Input } from "@/components/ui/input";
-import { Search, Filter, X, Check } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 import ProjectCard from '@/components/ProjectCard';
 import { useApp } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -25,10 +25,8 @@ const Explore = () => {
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
-      // Only show ACTIVE projects
       if (p.status !== 'ACTIVE') return false;
 
-      // Search filter
       const matchesSearch = 
         p.title.toLowerCase().includes(search.toLowerCase()) ||
         p.skills.some((s: string) => s.toLowerCase().includes(search.toLowerCase())) ||
@@ -36,7 +34,6 @@ const Explore = () => {
       
       if (!matchesSearch) return false;
 
-      // Skills filter
       if (selectedSkills.length > 0) {
         const hasSkill = selectedSkills.some(skill => 
           p.skills.some((ps: string) => ps.toLowerCase() === skill.toLowerCase())
@@ -44,10 +41,8 @@ const Explore = () => {
         if (!hasSkill) return false;
       }
 
-      // Stage filter
       if (selectedStage && p.stage !== selectedStage) return false;
 
-      // Time filter
       if (selectedTime !== "All time") {
         const projectDate = new Date(p.timestamp || 0);
         const now = new Date();
@@ -79,14 +74,14 @@ const Explore = () => {
   const activeFilterCount = selectedSkills.length + (selectedStage ? 1 : 0) + (selectedTime !== "All time" ? 1 : 0);
 
   return (
-    <MobileLayout title="Explore">
-      <div className="px-4 py-4">
-        <div className="flex gap-2 mb-6">
+    <AppLayout title="Explore">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex flex-col md:flex-row gap-4 mb-10">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
             <Input 
-              className="pl-10 h-12 bg-accent/20 border-border rounded-xl" 
-              placeholder="Search projects, skills..." 
+              className="pl-12 h-14 bg-accent/20 border-border rounded-2xl text-lg" 
+              placeholder="Search projects, skills, or developers..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -94,16 +89,17 @@ const Explore = () => {
           
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" className="h-12 w-12 p-0 rounded-xl relative">
+              <Button variant="outline" className="h-14 px-6 rounded-2xl relative font-bold gap-2">
                 <Filter size={20} />
+                <span>Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background">
+                  <span className="w-5 h-5 bg-primary text-white text-[10px] font-bold flex items-center justify-center rounded-full">
                     {activeFilterCount}
                   </span>
                 )}
               </Button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh] rounded-t-[2rem] bg-background border-border">
+            <SheetContent side="right" className="w-full sm:max-w-md bg-background border-border">
               <SheetHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
                 <SheetTitle className="text-xl font-bold">Filters</SheetTitle>
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="text-primary font-bold">
@@ -111,9 +107,8 @@ const Explore = () => {
                 </Button>
               </SheetHeader>
               
-              <ScrollArea className="h-full py-6 pr-4">
-                <div className="space-y-8 pb-20">
-                  {/* Skills */}
+              <ScrollArea className="h-[calc(100vh-120px)] py-6 pr-4">
+                <div className="space-y-8">
                   <section>
                     <h4 className="text-sm font-bold mb-4 uppercase tracking-widest text-muted-foreground">Skills</h4>
                     <div className="flex flex-wrap gap-2">
@@ -133,7 +128,6 @@ const Explore = () => {
                     </div>
                   </section>
 
-                  {/* Project Stage */}
                   <section>
                     <h4 className="text-sm font-bold mb-4 uppercase tracking-widest text-muted-foreground">Project Stage</h4>
                     <div className="flex flex-wrap gap-2">
@@ -153,7 +147,6 @@ const Explore = () => {
                     </div>
                   </section>
 
-                  {/* Time Filter */}
                   <section>
                     <h4 className="text-sm font-bold mb-4 uppercase tracking-widest text-muted-foreground">Time Recency</h4>
                     <div className="flex flex-wrap gap-2">
@@ -175,7 +168,7 @@ const Explore = () => {
                 </div>
               </ScrollArea>
               
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background to-transparent">
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-background border-t border-border">
                 <Button className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))}>
                   Show {filteredProjects.length} Results
                 </Button>
@@ -184,33 +177,35 @@ const Explore = () => {
           </Sheet>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
               {search || activeFilterCount > 0 ? "Filtered Results" : "Discover Projects"}
             </h3>
-            <span className="text-xs font-bold text-primary">{filteredProjects.length} found</span>
+            <span className="text-xs font-bold text-primary">{filteredProjects.length} projects found</span>
           </div>
           
-          {filteredProjects.map(project => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProjects.map(project => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
           
           {filteredProjects.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 bg-accent/50 rounded-full flex items-center justify-center mb-4">
-                <X className="text-muted-foreground" size={32} />
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-20 h-20 bg-accent/50 rounded-full flex items-center justify-center mb-6">
+                <X className="text-muted-foreground" size={40} />
               </div>
-              <h4 className="text-lg font-bold">No projects found</h4>
-              <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or search terms.</p>
-              <Button variant="link" onClick={clearFilters} className="mt-4 text-primary font-bold">
+              <h4 className="text-2xl font-bold">No projects found</h4>
+              <p className="text-muted-foreground mt-2 max-w-xs mx-auto">Try adjusting your filters or search terms to find what you're looking for.</p>
+              <Button variant="link" onClick={clearFilters} className="mt-6 text-primary font-bold text-lg">
                 Clear all filters
               </Button>
             </div>
           )}
         </div>
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

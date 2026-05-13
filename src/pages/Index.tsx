@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import ProjectCard from '@/components/ProjectCard';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp } from '@/context/AppContext';
@@ -20,7 +20,6 @@ const Index = () => {
   }, [activeTab]);
 
   const sortedProjects = useMemo(() => {
-    // Only show ACTIVE projects in the feed
     const projectsCopy = projects.filter(p => p.status === 'ACTIVE');
     
     if (activeTab === 'newest') {
@@ -41,43 +40,48 @@ const Index = () => {
   }, [projects, activeTab]);
 
   return (
-    <MobileLayout title="DevSphere">
-      <div className="px-4 py-4">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-foreground">
-            {activeTab === 'newest' ? 'New Projects' : 'Trending Projects'}
-          </h2>
+    <AppLayout title="DevSphere">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black tracking-tight text-foreground">
+              {activeTab === 'newest' ? 'New Projects' : 'Trending Projects'}
+            </h2>
+            <p className="text-muted-foreground text-sm mt-1">Discover what the community is building.</p>
+          </div>
+
+          <Tabs defaultValue="newest" className="w-full md:w-auto" onValueChange={(val) => {
+            setActiveTab(val);
+            setIsLoading(true);
+          }}>
+            <TabsList className="grid w-full grid-cols-2 bg-muted/50 rounded-xl p-1 md:w-[300px]">
+              <TabsTrigger value="newest" className="rounded-lg font-bold">Newest</TabsTrigger>
+              <TabsTrigger value="trending" className="rounded-lg font-bold">Trending</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        <Tabs defaultValue="newest" className="mb-6" onValueChange={(val) => {
-          setActiveTab(val);
-          setIsLoading(true);
-        }}>
-          <TabsList className="grid w-full grid-cols-2 bg-muted/50 rounded-xl p-1">
-            <TabsTrigger value="newest" className="rounded-lg font-bold">New Projects</TabsTrigger>
-            <TabsTrigger value="trending" className="rounded-lg font-bold">Trending</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => <ProjectCardSkeleton key={i} />)
+            Array.from({ length: 8 }).map((_, i) => <ProjectCardSkeleton key={i} />)
           ) : sortedProjects.length > 0 ? (
             sortedProjects.map(project => (
               <ProjectCard key={project.id} project={project} />
             ))
           ) : (
-            <EmptyState 
-              icon={Rocket}
-              title="No projects yet"
-              description="Be the first to launch a project on DevSphere!"
-              actionLabel="Create Project"
-              actionPath="/create"
-            />
+            <div className="col-span-full">
+              <EmptyState 
+                icon={Rocket}
+                title="No projects yet"
+                description="Be the first to launch a project on DevSphere!"
+                actionLabel="Create Project"
+                actionPath="/create"
+              />
+            </div>
           )}
         </div>
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 
