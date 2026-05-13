@@ -140,14 +140,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
-      // Optimized query: Removed heavy nested joins and explicit FK hints to prevent timeouts
+      // Added explicit relationship hints to resolve ambiguity errors
       const { data, error } = await supabase
         .from('projects')
         .select(`
           id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
-          creator:profiles(id, name, avatar_url, title, display_name),
+          creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
-          project_members(user_id, status, user:profiles(id, name, avatar_url, title, display_name))
+          project_members(user_id, status, user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
