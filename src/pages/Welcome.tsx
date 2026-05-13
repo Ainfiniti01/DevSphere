@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/context/AppContext';
+import { cn } from '@/lib/utils';
 import { Rocket, Users, Code, Sparkles, ChevronRight } from 'lucide-react';
 
 const SLIDES = [
