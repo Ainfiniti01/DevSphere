@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { UserPlus, MessageSquare, Check, X, Rocket, Bell, Heart, MessageCircle, CheckCheck, Loader2 } from 'lucide-react';
@@ -40,7 +40,6 @@ const Notifications = () => {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
     }
 
-    // Redirect based on notification type
     if (notif.type === 'request') {
       navigate(`/manage-team/${notif.project_id}`);
     } else if (notif.type === 'message') {
@@ -89,8 +88,8 @@ const Notifications = () => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <MobileLayout title="Notifications" showBack>
-      <div className="px-4 py-4 space-y-6">
+    <AppLayout title="Notifications" showBack>
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Recent Activity</h3>
           {unreadCount > 0 && (
@@ -100,7 +99,7 @@ const Notifications = () => {
                   <CheckCheck size={16} /> Mark all as read
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="bg-background border-border rounded-3xl max-w-[90vw]">
+              <AlertDialogContent className="bg-background border-border rounded-3xl max-w-md">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Mark all as read?</AlertDialogTitle>
                   <AlertDialogDescription>
@@ -157,7 +156,7 @@ const Notifications = () => {
           </div>
         )}
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

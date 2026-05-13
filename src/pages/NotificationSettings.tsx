@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Switch } from "@/components/ui/switch";
 import { Bell, MessageSquare, Rocket, Volume2, Play } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
@@ -31,7 +31,6 @@ const NotificationSettings = () => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
 
-    // Play preview if turned ON
     if (value) {
       if (key === 'messages') notificationService.play('message', true);
       if (key === 'projects') notificationService.play('project', true);
@@ -45,7 +44,7 @@ const NotificationSettings = () => {
 
     if (error) {
       toast.error("Failed to update settings");
-      setSettings(settings); // Revert
+      setSettings(settings);
     } else {
       setCurrentUser({ ...currentUser, notification_settings: newSettings });
     }
@@ -56,8 +55,8 @@ const NotificationSettings = () => {
   };
 
   return (
-    <MobileLayout title="Notifications" showBack>
-      <div className="px-6 py-6 space-y-6">
+    <AppLayout title="Notifications" showBack>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
           <div className="p-5 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -144,7 +143,7 @@ const NotificationSettings = () => {
           </div>
         </div>
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

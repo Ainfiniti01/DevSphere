@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,8 +39,11 @@ const CreateProject = () => {
   // Limits check for new projects
   const userProjects = projects.filter(p => p.creator_id === currentUser?.id);
   const activeProjects = userProjects.filter(p => p.status === 'ACTIVE');
-  const isAtTotalLimit = userProjects.length >= 5 && !editId;
-  const isAtActiveLimit = activeProjects.length >= 3 && !editId;
+  
+  // Premium/Admin Bypass
+  const isPremium = currentUser?.is_premium_override || currentUser?.is_admin;
+  const isAtTotalLimit = !isPremium && userProjects.length >= 5 && !editId;
+  const isAtActiveLimit = !isPremium && activeProjects.length >= 3 && !editId;
 
   useEffect(() => {
     const loadProjectData = async () => {
@@ -48,10 +51,8 @@ const CreateProject = () => {
 
       setIsFetching(true);
       try {
-        // Try to find in local state first
         let projectToEdit = projects.find(p => p.id === editId);
 
-        // If not in local state (e.g. direct link), fetch from DB
         if (!projectToEdit) {
           const { data, error } = await supabase
             .from('projects')
@@ -68,7 +69,6 @@ const CreateProject = () => {
         }
 
         if (projectToEdit) {
-          // Security check: Only owner can edit
           if (projectToEdit.creator_id !== currentUser?.id) {
             toast.error("You don't have permission to edit this project.");
             navigate('/');
@@ -167,10 +167,8 @@ const CreateProject = () => {
     try {
       let result;
       if (editId) {
-        // Title is NOT included in update to respect DB triggers and security rules
         result = await supabase.from('projects').update(projectData).eq('id', editId).select().single();
       } else {
-        // For new projects, include title and creator
         projectData.title = formData.title;
         projectData.creator_id = currentUser.id;
         projectData.status = isAtActiveLimit ? 'PAUSED' : 'ACTIVE';
@@ -200,18 +198,18 @@ const CreateProject = () => {
 
   if (isFetching) {
     return (
-      <MobileLayout title="Loading..." showBack>
+      <AppLayout title="Loading..." showBack>
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <Loader2 className="animate-spin text-primary mb-4" size={32} />
           <p className="text-sm text-muted-foreground">Fetching project details...</p>
         </div>
-      </MobileLayout>
+      </AppLayout>
     );
   }
 
   return (
-    <MobileLayout title={editId ? "Edit Project" : "New Project"} showBack>
-      <form onSubmit={handleSubmit} className="px-4 py-6 space-y-8 pb-24">
+    <AppLayout title={editId ? "Edit Project" : "New Project"} showBack>
+      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-24">
         {isAtTotalLimit && (
           <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl flex gap-3 text-destructive text-sm">
             <AlertCircle className="shrink-0" size={20} />
@@ -227,130 +225,128 @@ const CreateProject = () => {
           onChange={handleImageUpload} 
         />
 
-        {/* Basic Info */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-bold flex items-center gap-2">
+                  <Rocket size={16} className="text-primary" /> Project Title
+                </Label>
+                {editId && (
+                  <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
+                    <Lock size={10} /> Permanent
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Input 
+                  placeholder="e.g. EcoTrack AI" 
+                  className={cn(
+                    "h-12 rounded-xl bg-accent/20 border-border",
+                    editId && "bg-muted/50 text-muted-foreground cursor-not-allowed pr-10"
+                  )} 
+                  required 
+                  value={formData.title}
+                  onChange={e => !editId && setFormData({...formData, title: e.target.value})}
+                  disabled={isAtTotalLimit || !!editId}
+                />
+                {editId && (
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label className="text-sm font-bold flex items-center gap-2">
-                <Rocket size={16} className="text-primary" /> Project Title
+                <Target size={16} className="text-primary" /> The Problem
               </Label>
-              {editId && (
-                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
-                  <Lock size={10} /> Permanent
-                </span>
-              )}
-            </div>
-            <div className="relative">
-              <Input 
-                placeholder="e.g. EcoTrack AI" 
-                className={cn(
-                  "h-12 rounded-xl bg-accent/20 border-border",
-                  editId && "bg-muted/50 text-muted-foreground cursor-not-allowed pr-10"
-                )} 
+              <Textarea 
+                placeholder="What challenge are you solving?" 
+                className="min-h-[100px] rounded-xl bg-accent/20 border-border" 
                 required 
-                value={formData.title}
-                onChange={e => !editId && setFormData({...formData, title: e.target.value})}
-                disabled={isAtTotalLimit || !!editId}
+                value={formData.problem}
+                onChange={e => setFormData({...formData, problem: e.target.value})}
+                disabled={isAtTotalLimit}
               />
-              {editId && (
-                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
-              )}
             </div>
-            {editId && (
-              <p className="text-[10px] text-muted-foreground px-1">Project titles cannot be changed after creation to protect project identity.</p>
-            )}
+
+            <div className="space-y-2">
+              <Label className="text-sm font-bold flex items-center gap-2">
+                <Lightbulb size={16} className="text-primary" /> Proposed Solution
+              </Label>
+              <Textarea 
+                placeholder="How does your project solve it?" 
+                className="min-h-[100px] rounded-xl bg-accent/20 border-border" 
+                required 
+                value={formData.solution}
+                onChange={e => setFormData({...formData, solution: e.target.value})}
+                disabled={isAtTotalLimit}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-bold flex items-center gap-2">
-              <Target size={16} className="text-primary" /> The Problem
-            </Label>
-            <Textarea 
-              placeholder="What challenge are you solving?" 
-              className="min-h-[100px] rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.problem}
-              onChange={e => setFormData({...formData, problem: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label className="text-sm font-bold">Project Description</Label>
+              <Textarea 
+                placeholder="Detailed overview of your vision..." 
+                className="min-h-[150px] rounded-xl bg-accent/20 border-border" 
+                required 
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                disabled={isAtTotalLimit}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-bold flex items-center gap-2">
-              <Lightbulb size={16} className="text-primary" /> Proposed Solution
-            </Label>
-            <Textarea 
-              placeholder="How does your project solve it?" 
-              className="min-h-[100px] rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.solution}
-              onChange={e => setFormData({...formData, solution: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Project Stage</Label>
+                <Select 
+                  value={formData.stage} 
+                  onValueChange={val => setFormData({...formData, stage: val})}
+                  disabled={isAtTotalLimit}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
+                    <SelectValue placeholder="Select stage" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border-border rounded-xl">
+                    <SelectItem value="Idea">Idea</SelectItem>
+                    <SelectItem value="Building">Building</SelectItem>
+                    <SelectItem value="MVP">MVP</SelectItem>
+                    <SelectItem value="Scaling">Scaling</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-bold">Project Description</Label>
-            <Textarea 
-              placeholder="Detailed overview of your vision..." 
-              className="min-h-[150px] rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.description}
-              onChange={e => setFormData({...formData, description: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Required Skills</Label>
+                <Input 
+                  placeholder="React, Node..." 
+                  className="h-12 rounded-xl bg-accent/20 border-border" 
+                  required 
+                  value={formData.skills}
+                  onChange={e => setFormData({...formData, skills: e.target.value})}
+                  disabled={isAtTotalLimit}
+                />
+              </div>
+            </div>
 
-        {/* Configuration */}
-        <div className="grid grid-cols-2 gap-4 items-end">
-          <div className="space-y-2">
-            <Label className="text-sm font-bold">Project Stage</Label>
-            <Select 
-              value={formData.stage} 
-              onValueChange={val => setFormData({...formData, stage: val})}
-              disabled={isAtTotalLimit}
-            >
-              <SelectTrigger className="h-12 rounded-xl bg-accent/20 border-border">
-                <SelectValue placeholder="Select stage" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border rounded-xl">
-                <SelectItem value="Idea">Idea</SelectItem>
-                <SelectItem value="Building">Building</SelectItem>
-                <SelectItem value="MVP">MVP</SelectItem>
-                <SelectItem value="Scaling">Scaling</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-bold">Required Skills</Label>
-            <Input 
-              placeholder="React, Node, UI... (comma separated)" 
-              className="h-12 rounded-xl bg-accent/20 border-border" 
-              required 
-              value={formData.skills}
-              onChange={e => setFormData({...formData, skills: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
-          </div>
-
-          <div className="space-y-2 col-span-2">
-            <Label className="text-sm font-bold flex items-center gap-2">
-              <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
-            </Label>
-            <Input 
-              placeholder="https://github.com/..." 
-              className="h-12 rounded-xl bg-accent/20 border-border" 
-              value={formData.projectUrl}
-              onChange={e => setFormData({...formData, projectUrl: e.target.value})}
-              disabled={isAtTotalLimit}
-            />
+            <div className="space-y-2">
+              <Label className="text-sm font-bold flex items-center gap-2">
+                <LinkIcon size={16} className="text-primary" /> Project URL (Optional)
+              </Label>
+              <Input 
+                placeholder="https://github.com/..." 
+                className="h-12 rounded-xl bg-accent/20 border-border" 
+                value={formData.projectUrl}
+                onChange={e => setFormData({...formData, projectUrl: e.target.value})}
+                disabled={isAtTotalLimit}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Media Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-bold flex items-center gap-2">
@@ -386,7 +382,6 @@ const CreateProject = () => {
                   <ImageIcon className="text-muted-foreground" size={32} />
                 )}
                 <p className="text-xs font-bold text-muted-foreground">Upload Project Image</p>
-                <p className="text-[10px] text-muted-foreground/60">JPG, PNG, WEBP only</p>
               </div>
             )}
           </div>
@@ -412,7 +407,7 @@ const CreateProject = () => {
           )}
         </div>
       </form>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

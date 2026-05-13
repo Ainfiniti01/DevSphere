@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from '@/context/AppContext';
 import { toast } from "sonner";
-import { Camera, Loader2, MapPin, Link as LinkIcon, User } from 'lucide-react';
+import { Camera, Loader2, MapPin, Link as LinkIcon, User, Github, Linkedin, Twitter } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const EditProfile = () => {
@@ -20,7 +20,6 @@ const EditProfile = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  // Split existing name into first and last for the UI
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
@@ -30,7 +29,10 @@ const EditProfile = () => {
     skills: currentUser?.skills?.join(', ') || '',
     location: currentUser?.location || '',
     portfolio_url: currentUser?.portfolio_url || '',
-    avatar_url: currentUser?.avatar_url || ''
+    avatar_url: currentUser?.avatar_url || '',
+    github_url: currentUser?.github_url || '',
+    linkedin_url: currentUser?.linkedin_url || '',
+    twitter_url: currentUser?.twitter_url || ''
   });
 
   useEffect(() => {
@@ -96,13 +98,15 @@ const EditProfile = () => {
         location: formData.location,
         portfolio_url: formData.portfolio_url,
         avatar_url: formData.avatar_url,
+        github_url: formData.github_url,
+        linkedin_url: formData.linkedin_url,
+        twitter_url: formData.twitter_url,
         updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
 
-      // Create Notification
       await supabase.from('notifications').insert({
         user_id: currentUser.id,
         actor_id: currentUser.id,
@@ -122,14 +126,13 @@ const EditProfile = () => {
   };
 
   return (
-    <MobileLayout title="Edit Profile" showBack>
-      <div className="px-6 py-6 space-y-8 pb-40">
-        {/* Avatar Section */}
+    <AppLayout title="Edit Profile" showBack>
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-40">
         <div className="flex flex-col items-center gap-4">
           <div className="relative group">
-            <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+            <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
               <AvatarImage src={formData.avatar_url} />
-              <AvatarFallback><User size={40} /></AvatarFallback>
+              <AvatarFallback><User size={48} /></AvatarFallback>
             </Avatar>
             <button 
               onClick={() => fileInputRef.current?.click()}
@@ -137,123 +140,105 @@ const EditProfile = () => {
             >
               {uploading ? <Loader2 className="animate-spin text-white" /> : <Camera className="text-white" size={24} />}
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleImageUpload} 
-            />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
           <p className="text-xs font-bold text-primary uppercase tracking-widest">Change Photo</p>
         </div>
 
-        <div className="space-y-6">
-          {/* Identity Section */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Identity</h3>
-            <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>First Name</Label>
-                  <Input 
-                    value={firstName} 
-                    onChange={e => setFirstName(e.target.value)} 
-                    className="rounded-xl h-12 bg-accent/10" 
-                    placeholder="John" 
-                  />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <section className="space-y-4">
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Identity</h3>
+              <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>First Name</Label>
+                    <Input value={firstName} onChange={e => setFirstName(e.target.value)} className="rounded-xl h-12 bg-accent/10" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Last Name</Label>
+                    <Input value={lastName} onChange={e => setLastName(e.target.value)} className="rounded-xl h-12 bg-accent/10" />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Last Name</Label>
-                  <Input 
-                    value={lastName} 
-                    onChange={e => setLastName(e.target.value)} 
-                    className="rounded-xl h-12 bg-accent/10" 
-                    placeholder="Doe" 
-                  />
+                  <Label>Professional Title</Label>
+                  <Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="rounded-xl h-12 bg-accent/10" />
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Professional Section */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Professional</h3>
-            <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-              <div className="space-y-1.5">
-                <Label>Professional Title</Label>
-                <Input 
-                  value={formData.title} 
-                  onChange={e => setFormData({...formData, title: e.target.value})} 
-                  className="rounded-xl h-12 bg-accent/10" 
-                  placeholder="Senior Fullstack Developer"
-                />
+            <section className="space-y-4">
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Professional</h3>
+              <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
+                <div className="space-y-1.5">
+                  <Label>Skills (comma separated)</Label>
+                  <Input value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})} className="rounded-xl h-12 bg-accent/10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Bio</Label>
+                  <Textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} className="rounded-xl min-h-[120px] bg-accent/10" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Skills (comma separated)</Label>
-                <Input 
-                  value={formData.skills} 
-                  onChange={e => setFormData({...formData, skills: e.target.value})} 
-                  className="rounded-xl h-12 bg-accent/10" 
-                  placeholder="React, Node.js, TypeScript"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Bio</Label>
-                <Textarea 
-                  value={formData.bio} 
-                  onChange={e => setFormData({...formData, bio: e.target.value})} 
-                  className="rounded-xl min-h-[100px] bg-accent/10" 
-                  placeholder="Tell us about your journey..." 
-                />
-              </div>
-            </div>
-          </section>
+            </section>
+          </div>
 
-          {/* Links & Location Section */}
-          <section className="space-y-4">
-            <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Links & Location</h3>
-            <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
-              <div className="space-y-1.5">
-                <Label>Location</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                  <Input 
-                    value={formData.location} 
-                    onChange={e => setFormData({...formData, location: e.target.value})} 
-                    className="rounded-xl h-12 bg-accent/10 pl-10" 
-                    placeholder="San Francisco, CA"
-                  />
+          <div className="space-y-6">
+            <section className="space-y-4">
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Links & Location</h3>
+              <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
+                <div className="space-y-1.5">
+                  <Label>Location</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="rounded-xl h-12 bg-accent/10 pl-10" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Portfolio URL</Label>
+                  <div className="relative">
+                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input value={formData.portfolio_url} onChange={e => setFormData({...formData, portfolio_url: e.target.value})} className="rounded-xl h-12 bg-accent/10 pl-10" />
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Portfolio URL</Label>
-                <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                  <Input 
-                    value={formData.portfolio_url} 
-                    onChange={e => setFormData({...formData, portfolio_url: e.target.value})} 
-                    className="rounded-xl h-12 bg-accent/10 pl-10" 
-                    placeholder="https://yourportfolio.com"
-                  />
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">Social Profiles</h3>
+              <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
+                <div className="space-y-1.5">
+                  <Label>GitHub URL</Label>
+                  <div className="relative">
+                    <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input value={formData.github_url} onChange={e => setFormData({...formData, github_url: e.target.value})} className="rounded-xl h-12 bg-accent/10 pl-10" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>LinkedIn URL</Label>
+                  <div className="relative">
+                    <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input value={formData.linkedin_url} onChange={e => setFormData({...formData, linkedin_url: e.target.value})} className="rounded-xl h-12 bg-accent/10 pl-10" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Twitter URL</Label>
+                  <div className="relative">
+                    <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input value={formData.twitter_url} onChange={e => setFormData({...formData, twitter_url: e.target.value})} className="rounded-xl h-12 bg-accent/10 pl-10" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
 
-        {/* Fixed button container adjusted to be above the nav bar */}
-        <div className="fixed bottom-[72px] left-0 right-0 max-w-md mx-auto p-6 bg-background/80 backdrop-blur-md border-t border-border z-50">
-          <Button 
-            onClick={handleSave} 
-            disabled={loading || uploading} 
-            className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20"
-          >
+        <div className="flex justify-center pt-8">
+          <Button onClick={handleSave} disabled={loading || uploading} className="w-full max-w-md h-14 text-lg font-bold rounded-2xl shadow-lg">
             {loading ? <Loader2 className="animate-spin mr-2" /> : "Save Changes"}
           </Button>
         </div>
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,8 +44,18 @@ const PrivacySecurity = () => {
     message: ''
   });
 
+  useEffect(() => {
+    if (currentUser?.notification_settings?.auto_logout) {
+      setAutoLogout(currentUser.notification_settings.auto_logout);
+    }
+  }, [currentUser]);
+
   const handleUpdatePassword = async () => {
     if (!supabase || !currentUser) return;
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
     setIsConfirmOpen(false);
     setLoading(true);
     
@@ -53,7 +63,6 @@ const PrivacySecurity = () => {
       const { error } = await supabase.auth.updateUser({ password: passwords.new });
       if (error) throw error;
       
-      // Create Notification
       await supabase.from('notifications').insert({
         user_id: currentUser.id,
         actor_id: currentUser.id,
@@ -79,9 +88,31 @@ const PrivacySecurity = () => {
     }
   };
 
+  const handleAutoLogoutChange = async (value: string) => {
+    if (!supabase || !currentUser) return;
+    setAutoLogout(value);
+    
+    const newSettings = { 
+      ...(currentUser.notification_settings || {}), 
+      auto_logout: value 
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ notification_settings: newSettings })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      toast.error("Failed to update preference");
+    } else {
+      setCurrentUser({ ...currentUser, notification_settings: newSettings });
+      toast.success("Auto-logout preference updated");
+    }
+  };
+
   return (
-    <MobileLayout title="Privacy & Security" showBack>
-      <div className="px-6 py-6 space-y-8">
+    <AppLayout title="Privacy & Security" showBack>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
             <Lock size={16} /> Change Password
@@ -110,6 +141,33 @@ const PrivacySecurity = () => {
             <Button onClick={() => setIsConfirmOpen(true)} disabled={loading} className="w-full h-12 mt-2 rounded-xl font-bold">
               {loading ? <Loader2 className="animate-spin" /> : "Update Password"}
             </Button>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+            <Shield size={16} /> Preferences
+          </h3>
+          <div className="space-y-4 bg-card p-4 rounded-2xl border border-border">
+            <div className="flex items-center justify-between">
+              <Label>Auto Logout</Label>
+              <Select value={autoLogout} onValueChange={handleAutoLogoutChange}>
+                <SelectTrigger className="w-[120px] rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="never">Never</SelectItem>
+                  <SelectItem value="5">5 min</SelectItem>
+                  <SelectItem value="15">15 min</SelectItem>
+                  <SelectItem value="30">30 min</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your data is used only to improve your experience on DevSphere. We do not share your personal information with third parties.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -156,7 +214,7 @@ const PrivacySecurity = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 

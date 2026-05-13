@@ -567,6 +567,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id, updatePresence]);
 
+  // Auto-Logout Logic
   useEffect(() => {
     if (!currentUser?.id) return;
     const handleActivity = () => { lastActivity.current = Date.now(); };

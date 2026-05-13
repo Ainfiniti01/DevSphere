@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import MobileLayout from '@/components/layout/MobileLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Switch } from "@/components/ui/switch";
 import { ChevronRight, Shield, Bell, Eye, CreditCard, LogOut, UserCircle, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -27,8 +27,8 @@ const Settings = () => {
   if (!mounted) return null;
 
   return (
-    <MobileLayout title="Settings" showBack>
-      <div className="px-6 py-6 space-y-6">
+    <AppLayout title="Settings" showBack>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
           {/* Edit Profile */}
           <button 
@@ -130,7 +130,7 @@ const Settings = () => {
           Sign Out
         </Button>
       </div>
-    </MobileLayout>
+    </AppLayout>
   );
 };
 
