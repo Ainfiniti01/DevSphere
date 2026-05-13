@@ -140,14 +140,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
+      // Optimized query: Removed heavy nested joins and explicit FK hints to prevent timeouts
       const { data, error } = await supabase
         .from('projects')
         .select(`
           id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
-          creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
+          creator:profiles(id, name, avatar_url, title, display_name),
           likes(user_id),
-          project_members(user_id, status, user:profiles(id, name, avatar_url, title, display_name)),
-          comment_count:comments(count)
+          project_members(user_id, status, user:profiles(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -162,8 +162,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         timestamp: p.created_at,
         members: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user_id) || [],
         memberProfiles: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user) || [],
-        myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none',
-        commentCount: p.comment_count?.[0]?.count || 0
+        myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none'
       }));
 
       setProjects(transformed);
@@ -180,7 +179,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               reason, 
               skills, 
               created_at, 
-              user:profiles!join_requests_user_id_fkey(id, name, avatar_url, title, display_name)
+              user:profiles(id, name, avatar_url, title, display_name)
             `);
           
           if (reqError) throw reqError;
@@ -202,7 +201,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')
+        .select('*, actor:profiles(name, avatar_url, display_name)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -257,7 +256,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
+        .select('*, sender:profiles(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
         .order('created_at', { ascending: false });
 

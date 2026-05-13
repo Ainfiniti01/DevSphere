@@ -30,7 +30,7 @@ const ProjectCard = ({ project }: { project: any }) => {
         .from('comments')
         .select('id, content, created_at, user_id, user:profiles(id, name, avatar_url, display_name)')
         .eq('project_id', project.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false }); // Newest at the top
       
       if (error) throw error;
       setComments(data || []);
