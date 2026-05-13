@@ -16,6 +16,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   useEffect(() => {
     if (!authLoading) {
       if (!currentUser) {
+        // If not logged in, check if they've seen onboarding
         if (!hasSeenOnboarding) {
           navigate('/welcome', { replace: true });
         } else {
@@ -29,11 +30,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <LoadingScreen />;
   }
 
-  if (!currentUser) {
-    return null;
+  // If we have a user, render the children
+  if (currentUser) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // Otherwise, render nothing while the redirect happens
+  return null;
 };
 
 export default ProtectedRoute;

@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import AppLayout from '@/components/layout/AppLayout';
 
 const ChatScreen = () => {
   const { id } = useParams(); 
@@ -24,7 +25,6 @@ const ChatScreen = () => {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
 
@@ -77,9 +77,7 @@ const ChatScreen = () => {
             .eq('id', id)
             .maybeSingle();
           
-          if (!profile) {
-            throw new Error("User profile not found.");
-          }
+          if (!profile) throw new Error("User profile not found.");
           
           setChatPartner(profile);
 
@@ -236,114 +234,127 @@ const ChatScreen = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border items-center justify-center">
-        <Loader2 className="animate-spin text-primary" size={32} />
-        <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
-      </div>
+      <AppLayout title="Chat">
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <Loader2 className="animate-spin text-primary" size={32} />
+          <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background max-w-md mx-auto border-x border-border overflow-hidden">
-      <header className="px-4 py-3 border-b border-border flex items-center gap-3 bg-background/80 backdrop-blur-md sticky top-0 z-10">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft size={24} />
-        </button>
-        <div className="relative cursor-pointer" onClick={() => setPreviewAvatar(isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url)}>
-          <Avatar className="h-10 w-10 border border-border">
-            <AvatarImage src={isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url} />
-            <AvatarFallback>{isGroup ? <Users size={20} /> : <User size={20} />}</AvatarFallback>
-          </Avatar>
-          {!isGroup && isOnline(chatPartner?.last_seen) && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 
-            className="font-bold text-foreground truncate text-sm cursor-pointer hover:text-primary transition-colors"
-            onClick={() => isGroup ? navigate(`/project/${id}`) : navigate(`/profile/${chatPartner?.id}`)}
-          >
-            {isGroup ? chatPartner?.title : resolveName(chatPartner)}
-          </h4>
-          <p className="text-[10px] text-primary font-bold uppercase tracking-widest">
-            {isGroup ? 'Group Chat' : (isOnline(chatPartner?.last_seen) ? 'Online' : 'Offline')}
-          </p>
-        </div>
-      </header>
+    <AppLayout 
+      title={isGroup ? chatPartner?.title : resolveName(chatPartner)} 
+      showBack
+    >
+      <div className="flex flex-col h-[calc(100vh-140px)] lg:h-[calc(100vh-100px)] bg-background max-w-5xl mx-auto overflow-hidden lg:border lg:border-border lg:rounded-[2.5rem] lg:shadow-xl lg:mb-8">
+        <header className="px-6 py-4 border-b border-border flex items-center gap-4 bg-card/50 backdrop-blur-md sticky top-0 z-10">
+          <div className="relative cursor-pointer" onClick={() => setPreviewAvatar(isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url)}>
+            <Avatar className="h-12 w-12 border-2 border-primary/20">
+              <AvatarImage src={isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url} />
+              <AvatarFallback>{isGroup ? <Users size={24} /> : <User size={24} />}</AvatarFallback>
+            </Avatar>
+            {!isGroup && isOnline(chatPartner?.last_seen) && (
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-background rounded-full"></div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 
+              className="font-black text-foreground truncate text-base cursor-pointer hover:text-primary transition-colors"
+              onClick={() => isGroup ? navigate(`/project/${id}`) : navigate(`/profile/${chatPartner?.id}`)}
+            >
+              {isGroup ? chatPartner?.title : resolveName(chatPartner)}
+            </h4>
+            <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em]">
+              {isGroup ? 'Group Collaboration' : (isOnline(chatPartner?.last_seen) ? 'Active Now' : 'Offline')}
+            </p>
+          </div>
+        </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
-        {messages.map((m) => {
-          if (m.type === 'system') {
-            return (
-              <div key={m.id} className="flex justify-center my-4">
-                <span className="px-4 py-1.5 bg-accent/30 text-muted-foreground text-[11px] font-bold rounded-full uppercase tracking-wider border border-border/50">
-                  {m.content}
-                </span>
-              </div>
-            );
-          }
-
-          const isMe = m.sender_id === currentUser?.id;
-          const isSeen = m.is_read || partnerLastRead >= new Date(m.created_at).getTime();
-          
-          return (
-            <div key={m.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end w-full`}>
-              {!isMe && (
-                <Avatar className="h-8 w-8 border border-border cursor-pointer shrink-0" onClick={() => navigate(`/profile/${m.sender?.id}`)}>
-                  <AvatarImage src={m.sender?.avatar_url} />
-                  <AvatarFallback><User size={14} /></AvatarFallback>
-                </Avatar>
-              )}
-              <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%] min-w-0`}>
-                {!isMe && isGroup && (
-                  <span 
-                    className="text-[10px] text-muted-foreground mb-1 ml-1 font-bold cursor-pointer hover:text-primary truncate max-w-full"
-                    onClick={() => navigate(`/profile/${m.sender?.id}`)}
-                  >
-                    {resolveName(m.sender)}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-accent/5">
+          {messages.map((m) => {
+            if (m.type === 'system') {
+              return (
+                <div key={m.id} className="flex justify-center my-6">
+                  <span className="px-6 py-2 bg-accent/30 text-muted-foreground text-[11px] font-black rounded-full uppercase tracking-widest border border-border/50">
+                    {m.content}
                   </span>
+                </div>
+              );
+            }
+
+            const isMe = m.sender_id === currentUser?.id;
+            const isSeen = m.is_read || partnerLastRead >= new Date(m.created_at).getTime();
+            
+            return (
+              <div key={m.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end w-full`}>
+                {!isMe && (
+                  <Avatar className="h-10 w-10 border border-border cursor-pointer shrink-0" onClick={() => navigate(`/profile/${m.sender?.id}`)}>
+                    <AvatarImage src={m.sender?.avatar_url} />
+                    <AvatarFallback><User size={18} /></AvatarFallback>
+                  </Avatar>
                 )}
-                <div className={`p-3 pb-6 rounded-2xl text-sm shadow-sm relative min-w-[80px] break-all whitespace-pre-wrap overflow-hidden ${
-                  isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
-                }`}>
-                  {m.content}
-                  <div className="absolute bottom-1.5 right-2.5 flex items-center gap-1 opacity-70">
-                    <span className="text-[9px]">
-                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%] lg:max-w-[70%] min-w-0`}>
+                  {!isMe && isGroup && (
+                    <span 
+                      className="text-[10px] text-muted-foreground mb-1.5 ml-1 font-black cursor-pointer hover:text-primary truncate max-w-full uppercase tracking-wider"
+                      onClick={() => navigate(`/profile/${m.sender?.id}`)}
+                    >
+                      {resolveName(m.sender)}
                     </span>
-                    {isMe && (
-                      isSeen ? (
-                        <CheckCheck size={12} className="text-blue-400" />
-                      ) : (
-                        <Check size={12} className="text-white/70" />
-                      )
-                    )}
+                  )}
+                  <div className={`p-4 pb-8 rounded-3xl text-sm shadow-sm relative min-w-[100px] break-all whitespace-pre-wrap overflow-hidden ${
+                    isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
+                  }`}>
+                    {m.content}
+                    <div className="absolute bottom-2 right-3 flex items-center gap-1.5 opacity-70">
+                      <span className="text-[9px] font-bold">
+                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {isMe && (
+                        isSeen ? (
+                          <CheckCheck size={14} className="text-blue-400" />
+                        ) : (
+                          <Check size={14} className="text-white/70" />
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-32 text-center opacity-40">
+              <div className="w-20 h-20 bg-accent/50 rounded-[2rem] flex items-center justify-center mb-6">
+                <MessageSquare size={40} />
+              </div>
+              <p className="text-lg font-bold">No messages yet</p>
+              <p className="text-sm">Start the conversation and build something great!</p>
             </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
-            <MessageSquare size={48} className="mb-4" />
-            <p className="text-sm">No messages yet. Start the conversation!</p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      <div className="p-4 border-t border-border bg-background">
-        <div className="flex items-center gap-2 bg-accent/20 border border-border rounded-2xl px-3 py-2">
-          <button className="text-muted-foreground p-1 hover:text-primary transition-colors"><Paperclip size={20} /></button>
-          <input 
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            className="flex-1 bg-transparent border-none outline-none text-sm text-foreground"
-            placeholder="Type a message..."
-          />
-          <button onClick={handleSend} disabled={!msg.trim() || !chatId} className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg disabled:opacity-50"><Send size={18} /></button>
+        <div className="p-6 border-t border-border bg-card/50 backdrop-blur-md">
+          <div className="flex items-center gap-3 bg-accent/20 border border-border rounded-[1.5rem] px-4 py-3 shadow-inner">
+            <button className="text-muted-foreground p-1.5 hover:text-primary transition-colors"><Paperclip size={22} /></button>
+            <input 
+              value={msg}
+              onChange={(e) => setMsg(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              className="flex-1 bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted-foreground/50"
+              placeholder="Type a message..."
+            />
+            <button 
+              onClick={handleSend} 
+              disabled={!msg.trim() || !chatId} 
+              className="bg-primary text-primary-foreground p-3 rounded-2xl shadow-lg shadow-primary/20 disabled:opacity-50 hover:scale-105 active:scale-95 transition-all"
+            >
+              <Send size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -354,12 +365,12 @@ const ChatScreen = () => {
             <DialogDescription>Full size view of the profile picture</DialogDescription>
           </DialogHeader>
           <div className="relative group">
-            <img src={previewAvatar || ''} className="max-w-[90vw] max-h-[80vh] rounded-3xl shadow-2xl border-4 border-white/10 object-contain" />
-            <button onClick={() => setPreviewAvatar(null)} className="absolute -top-4 -right-4 bg-white text-black p-2 rounded-full shadow-xl"><X size={20} /></button>
+            <img src={previewAvatar || ''} className="max-w-[90vw] max-h-[80vh] rounded-[2.5rem] shadow-2xl border-4 border-white/10 object-contain" />
+            <button onClick={() => setPreviewAvatar(null)} className="absolute -top-4 -right-4 bg-white text-black p-2.5 rounded-full shadow-xl hover:scale-110 transition-transform"><X size={24} /></button>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 };
 

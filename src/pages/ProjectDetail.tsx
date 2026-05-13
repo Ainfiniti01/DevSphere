@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { useApp } from '@/context/AppContext';
@@ -26,9 +26,33 @@ const ProjectDetail = () => {
   const [joinReason, setJoinReason] = useState('');
   const [joinContribution, setJoinContribution] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDescExpanded, setIsDescExpanded] = useState(false);
+
+  const fetchComments = async () => {
+    if (!supabase || !id) return;
+    setLoadingComments(true);
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('id, content, created_at, user_id, user:profiles(id, name, avatar_url, display_name)')
+        .eq('project_id', id)
+        .order('created_at', { ascending: false }); // Newest at the top
+      
+      if (error) throw error;
+      setComments(data || []);
+    } catch (err) {
+      console.error("Failed to fetch comments:", err);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [id]);
 
   const latestRequest = useMemo(() => {
     return requests
@@ -57,6 +81,7 @@ const ProjectDetail = () => {
 
       toast.success("Comment added!");
       setCommentText('');
+      await fetchComments();
       await refreshProjects();
     } catch (err: any) {
       toast.error(err.message);
@@ -321,7 +346,7 @@ const ProjectDetail = () => {
                 <MessageSquare size={20} className="text-primary" />
                 Discussion
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="flex gap-3">
                   <Input 
                     placeholder="Add a comment..." 
@@ -334,7 +359,30 @@ const ProjectDetail = () => {
                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                   </Button>
                 </div>
-                <p className="text-xs text-center text-muted-foreground">Join the conversation and share your thoughts.</p>
+                
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  {loadingComments ? (
+                    <div className="flex justify-center py-4"><Loader2 className="animate-spin text-primary" /></div>
+                  ) : comments.length > 0 ? (
+                    comments.map((c) => (
+                      <div key={c.id} className="flex gap-3">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarImage src={c.user?.avatar_url} />
+                          <AvatarFallback>{c.user?.name?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 bg-accent/20 p-3 rounded-2xl">
+                          <div className="flex justify-between items-center mb-1">
+                            <h5 className="text-xs font-bold">{c.user?.name}</h5>
+                            <span className="text-[9px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-xs leading-relaxed">{c.content}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-xs text-muted-foreground py-4">No comments yet. Start the conversation!</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

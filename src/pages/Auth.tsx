@@ -24,6 +24,7 @@ const Auth = () => {
   const REDIRECT_URL = window.location.origin;
 
   useEffect(() => {
+    // Only redirect if we are absolutely sure the user is logged in and auth is not loading
     if (!authLoading && currentUser) {
       navigate('/', { replace: true });
     }
@@ -40,7 +41,7 @@ const Auth = () => {
     setErrorMsg(null);
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -55,9 +56,10 @@ const Auth = () => {
           setErrorMsg(error.message);
         }
         toast.error("Login failed");
-      } else {
+      } else if (data.user) {
         toast.success("Welcome back!");
-        navigate('/');
+        // The AppContext will pick up the session change and update currentUser
+        // The useEffect above will handle the navigation to '/'
       }
     } catch (err) {
       setErrorMsg("An unexpected error occurred.");

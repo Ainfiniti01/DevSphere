@@ -11,14 +11,17 @@ const Splash = () => {
   const { currentUser, authLoading, hasSeenOnboarding } = useApp();
 
   useEffect(() => {
-    // Minimum branding time of 1.5s
+    // Minimum branding time of 1.5s to ensure smooth transition
     const timer = setTimeout(() => {
       if (!authLoading) {
         if (currentUser) {
+          // Returning user who is already logged in
           navigate('/', { replace: true });
         } else if (!hasSeenOnboarding) {
+          // Truly new user who hasn't seen onboarding
           navigate('/welcome', { replace: true });
         } else {
+          // Returning user who needs to log in
           navigate('/auth', { replace: true });
         }
       }
