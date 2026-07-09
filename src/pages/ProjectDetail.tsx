@@ -12,9 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import AIProjectManager from '@/components/AIProjectManager';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -199,34 +201,50 @@ const ProjectDetail = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                <section className="space-y-3">
-                  <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">The Problem</h3>
-                  <p className="text-base leading-relaxed text-foreground/80">{project.problem}</p>
-                </section>
-                <section className="space-y-3">
-                  <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">The Solution</h3>
-                  <p className="text-base leading-relaxed text-foreground/80">{project.solution}</p>
-                </section>
-              </div>
+              <Tabs defaultValue="overview" className="w-full space-y-6">
+                <TabsList className="grid w-full grid-cols-2 bg-muted/50 rounded-xl p-1 max-w-[400px]">
+                  <TabsTrigger value="overview" className="rounded-lg font-bold">Overview</TabsTrigger>
+                  <TabsTrigger value="ai-manager" className="rounded-lg font-bold flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-primary" />
+                    AI Manager
+                  </TabsTrigger>
+                </TabsList>
 
-              <section className="space-y-4">
-                <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Description</h3>
-                <p className="text-base leading-relaxed whitespace-pre-wrap text-foreground/80">
-                  {project.description}
-                </p>
-              </section>
+                <TabsContent value="overview" className="space-y-6 mt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                    <section className="space-y-3">
+                      <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">The Problem</h3>
+                      <p className="text-base leading-relaxed text-foreground/80">{project.problem}</p>
+                    </section>
+                    <section className="space-y-3">
+                      <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">The Solution</h3>
+                      <p className="text-base leading-relaxed text-foreground/80">{project.solution}</p>
+                    </section>
+                  </div>
 
-              <section className="space-y-4">
-                <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Required Skills</h3>
-                <div className="flex flex-wrap gap-2">
-                  {project.skills?.map((skill: string) => (
-                    <span key={skill} className="px-4 py-2 bg-accent/50 text-foreground text-sm font-bold rounded-xl border border-border">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </section>
+                  <section className="space-y-4">
+                    <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Description</h3>
+                    <p className="text-base leading-relaxed whitespace-pre-wrap text-foreground/80">
+                      {project.description}
+                    </p>
+                  </section>
+
+                  <section className="space-y-4">
+                    <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Required Skills</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {project.skills?.map((skill: string) => (
+                        <span key={skill} className="px-4 py-2 bg-accent/50 text-foreground text-sm font-bold rounded-xl border border-border">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                </TabsContent>
+
+                <TabsContent value="ai-manager" className="mt-0">
+                  <AIProjectManager projectId={project.id} projectTitle={project.title} />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 
