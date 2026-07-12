@@ -74,9 +74,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     
-    // Create a promise that rejects after 2 seconds to prevent hanging
+    // Increased timeout to 5 seconds to allow database recovery
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Timeout fetching profile")), 2000)
+      setTimeout(() => reject(new Error("Timeout fetching profile")), 5000)
     );
 
     try {
@@ -534,6 +534,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     let isMounted = true;
 
+    // Trigger self-healing database repair immediately on mount
+    fetch('https://xzmewvnjjljzigkcrezf.supabase.co/functions/v1/project-manager', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: 'repair', message: 'repair' })
+    }).then(() => {
+      console.log("[AppContext] Self-healing database repair triggered");
+    }).catch(err => {
+      console.error("[AppContext] Failed to trigger self-healing:", err);
+    });
+
     const handleUserSession = async (session: any) => {
       console.log("[AppContext] handleUserSession called with session:", session);
       if (!session?.user) {
@@ -562,9 +573,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     console.log("[AppContext] Getting initial session...");
-    // Get initial session with a robust timeout to prevent hanging on splash screen
+    // Increased session timeout to 5 seconds to allow database recovery
     const sessionTimeout = new Promise<any>((_, reject) => 
-      setTimeout(() => reject(new Error("Session timeout")), 2000)
+      setTimeout(() => reject(new Error("Session timeout")), 5000)
     );
 
     Promise.race([
