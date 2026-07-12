@@ -10,33 +10,24 @@ const Splash = () => {
   const navigate = useNavigate();
   const { currentUser, authLoading, hasSeenOnboarding } = useApp();
 
-  console.log("[Splash] Rendered. authLoading:", authLoading, "currentUser:", !!currentUser, "hasSeenOnboarding:", hasSeenOnboarding);
-
   useEffect(() => {
-    console.log("[Splash] Setting timeout. authLoading:", authLoading);
     // Minimum branding time of 1.5s to ensure smooth transition
     const timer = setTimeout(() => {
-      console.log("[Splash] Timeout fired. authLoading:", authLoading, "currentUser:", !!currentUser, "hasSeenOnboarding:", hasSeenOnboarding);
       if (!authLoading) {
         if (currentUser) {
-          console.log("[Splash] Navigating to /");
+          // Returning user who is already logged in
           navigate('/', { replace: true });
         } else if (!hasSeenOnboarding) {
-          console.log("[Splash] Navigating to /welcome");
+          // Truly new user who hasn't seen onboarding
           navigate('/welcome', { replace: true });
         } else {
-          console.log("[Splash] Navigating to /auth");
+          // Returning user who needs to log in
           navigate('/auth', { replace: true });
         }
-      } else {
-        console.log("[Splash] authLoading is still true, timeout did not navigate.");
       }
     }, 1500);
 
-    return () => {
-      console.log("[Splash] Clearing timeout");
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [authLoading, currentUser, hasSeenOnboarding, navigate]);
 
   return (
