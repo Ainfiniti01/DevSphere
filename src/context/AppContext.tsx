@@ -74,14 +74,22 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
+    console.log("[AppContext] ensureProfile started for", userId);
     try {
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
       
-      if (existing) return existing;
+      if (fetchError) {
+        console.error("[AppContext] ensureProfile fetch error:", fetchError);
+      }
+      
+      if (existing) {
+        console.log("[AppContext] ensureProfile found existing profile:", existing);
+        return existing;
+      }
 
       const newProfile = {
         id: userId,
@@ -90,6 +98,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         updated_at: new Date().toISOString()
       };
       
+      console.log("[AppContext] ensureProfile creating new profile:", newProfile);
       const { data: created, error: upsertError } = await supabase
         .from('profiles')
         .upsert(newProfile, { onConflict: 'id' })
@@ -97,9 +106,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (upsertError) throw upsertError;
+      console.log("[AppContext] ensureProfile created profile successfully:", created);
       return created;
     } catch (error) {
-      console.error("Error ensuring profile record exists:", error);
+      console.error("[AppContext] Error ensuring profile record exists:", error);
       return null;
     }
   }, []);
@@ -138,6 +148,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase) return;
     const activeUser = userOverride || currentUser;
+    console.log("[AppContext] refreshProjects started. activeUser:", activeUser?.id);
 
     try {
       // Added explicit relationship hints to resolve ambiguity errors
@@ -151,7 +162,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[AppContext] refreshProjects query error:", error);
+        throw error;
+      }
+
+      console.log("[AppContext] refreshProjects query succeeded. Count:", data?.length);
 
       const transformed = data.map(p => ({
         ...p,
@@ -191,13 +207,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setRequests([]);
       }
     } catch (error: any) {
-      console.error("Refresh projects error:", error.message);
+      console.error("[AppContext] Refresh projects error:", error.message);
     }
   }, [currentUser]);
 
   const refreshNotifications = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
     isRefreshing.current.notifications = true;
+    console.log("[AppContext] refreshNotifications started");
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -209,8 +226,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
       setNotifications(data || []);
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
+      console.log("[AppContext] refreshNotifications succeeded. Count:", data?.length);
     } catch (error: any) {
-      console.error("Refresh notifications error:", error.message);
+      console.error("[AppContext] Refresh notifications error:", error.message);
     } finally {
       isRefreshing.current.notifications = false;
     }
@@ -219,6 +237,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshChats = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
+    console.log("[AppContext] refreshChats started");
     try {
       let hiddenChatIds = new Set<string>();
       try {
@@ -251,6 +270,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (chatIds.length === 0) {
         setChats([]);
         setUnreadChatsCount(0);
+        console.log("[AppContext] refreshChats: No chats found");
         return;
       }
 
@@ -333,8 +353,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       setChats(sortedChats);
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
+      console.log("[AppContext] refreshChats succeeded. Count:", sortedChats.length);
     } catch (error: any) {
-      console.error("Refresh chats error:", error.message);
+      console.error("[AppContext] Refresh chats error:", error.message);
     } finally {
       isRefreshing.current.chats = false;
     }
@@ -498,30 +519,38 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     initStarted.current = true;
 
     const initApp = async () => {
+      console.log("[AppContext] initApp started");
       try {
+        console.log("[AppContext] Fetching session...");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
+          console.error("[AppContext] Session error:", sessionError);
           await supabase.auth.signOut();
           setAuthLoading(false);
           return;
         }
 
+        console.log("[AppContext] Session fetched successfully. User:", session?.user?.id);
+
         if (session?.user) {
           const profile = await ensureProfile(session.user.id, session.user);
           const user = profile ? { ...session.user, ...profile } : session.user;
           setCurrentUser(user);
+          console.log("[AppContext] User profile loaded. Refreshing data...");
           await Promise.allSettled([
             refreshProjects(user),
             refreshNotifications(),
             refreshChats()
           ]);
         } else {
+          console.log("[AppContext] No active session. Refreshing public projects...");
           await refreshProjects(null);
         }
       } catch (err) {
         console.error("[AppContext] Init error:", err);
       } finally {
+        console.log("[AppContext] initApp finished. Setting authLoading to false");
         setAuthLoading(false);
       }
     };
@@ -529,6 +558,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AppContext] onAuthStateChange event:", event, "User:", session?.user?.id);
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setNotifications([]);
