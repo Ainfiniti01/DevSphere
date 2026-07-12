@@ -58,7 +58,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const processingLikes = useRef<Set<string>>(new Set());
   const isRefreshing = useRef({ projects: false, notifications: false, chats: false });
   const refreshTimeout = useRef<any>(null);
-  const initStarted = useRef(false);
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
 
@@ -140,7 +139,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     const activeUser = userOverride || currentUser;
 
     try {
-      // Added explicit relationship hints to resolve ambiguity errors
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -493,69 +491,80 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id, refreshProjects]);
 
+  // Robust Auth Initialization & State Monitoring
   useEffect(() => {
-    if (!supabase || initStarted.current) return;
-    initStarted.current = true;
+    if (!supabase) return;
 
-    const initApp = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          await supabase.auth.signOut();
+    let isMounted = true;
+
+    const handleUserSession = async (session: any) => {
+      if (!session?.user) {
+        if (isMounted) {
+          setCurrentUser(null);
+          setNotifications([]);
+          setChats([]);
+          setUnreadChatsCount(0);
+          setUnreadNotificationsCount(0);
+          await refreshProjects(null);
           setAuthLoading(false);
-          return;
         }
+        return;
+      }
 
-        if (session?.user) {
-          const profile = await ensureProfile(session.user.id, session.user);
-          const user = profile ? { ...session.user, ...profile } : session.user;
+      try {
+        const profile = await ensureProfile(session.user.id, session.user);
+        const user = profile ? { ...session.user, ...profile } : session.user;
+        
+        if (isMounted) {
           setCurrentUser(user);
           await Promise.allSettled([
             refreshProjects(user),
             refreshNotifications(),
             refreshChats()
           ]);
-        } else {
-          await refreshProjects(null);
+          setAuthLoading(false);
         }
       } catch (err) {
-        console.error("[AppContext] Init error:", err);
-      } finally {
-        setAuthLoading(false);
+        console.error("[AppContext] Error handling user session:", err);
+        if (isMounted) setAuthLoading(false);
       }
     };
 
-    initApp();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("[AppContext] Get session error:", error);
+        supabase.auth.signOut();
+        if (isMounted) setAuthLoading(false);
+        return;
+      }
+      handleUserSession(session);
+    }).catch(() => {
+      if (isMounted) setAuthLoading(false);
+    });
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AppContext] Auth state change event:", event);
       if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setNotifications([]);
-        setChats([]);
-        setUnreadChatsCount(0);
-        setUnreadNotificationsCount(0);
-        refreshProjects(null);
-        setAuthLoading(false);
-      } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        const profile = await ensureProfile(session.user.id, session.user);
-        const newUser = profile ? { ...session.user, ...profile } : session.user;
-        setCurrentUser(newUser);
-        
-        if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
-        refreshTimeout.current = setTimeout(() => {
-          Promise.allSettled([
-            refreshProjects(newUser),
-            refreshNotifications(),
-            refreshChats()
-          ]);
-        }, 500);
-        
-        setAuthLoading(false);
+        if (isMounted) {
+          setCurrentUser(null);
+          setNotifications([]);
+          setChats([]);
+          setUnreadChatsCount(0);
+          setUnreadNotificationsCount(0);
+          await refreshProjects(null);
+          setAuthLoading(false);
+        }
+      } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+        await handleUserSession(session);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [ensureProfile, refreshProjects, refreshNotifications, refreshChats]);
 
   useEffect(() => {
