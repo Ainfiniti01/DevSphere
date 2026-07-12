@@ -226,7 +226,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles(name, avatar_url, display_name)')
+        .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -281,7 +281,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       const { data: lastMessages, error: msgError } = await supabase
         .from('messages')
-        .select('*, sender:profiles(name, avatar_url, display_name)')
+        .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
         .order('created_at', { ascending: false });
 
