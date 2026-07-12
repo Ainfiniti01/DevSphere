@@ -119,8 +119,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       })();
 
       return await Promise.race([upsertPromise, timeoutPromise]);
-    } catch (error) {
-      console.error("[AppContext] Error ensuring profile record exists:", error);
+    } catch (error: any) {
+      console.error("[AppContext] Error ensuring profile record exists:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        error
+      });
       // Fallback to basic auth user info so we don't block the app
       return {
         id: userId,
@@ -518,10 +524,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser?.id, refreshProjects]);
 
-  // Robust Auth Initialization & State Monitoring
+  // Robust Auth Initialization & State Monitoring (Runs once on mount)
   useEffect(() => {
     if (!supabase) {
       console.log("[AppContext] Supabase client not initialized");
+      setAuthLoading(false);
       return;
     }
 
@@ -533,11 +540,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (isMounted) {
           console.log("[AppContext] No user session found, setting authLoading to false");
           setCurrentUser(null);
-          setNotifications([]);
-          setChats([]);
-          setUnreadChatsCount(0);
-          setUnreadNotificationsCount(0);
-          await refreshProjects(null);
           setAuthLoading(false);
         }
         return;
@@ -549,22 +551,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const user = profile ? { ...session.user, ...profile } : session.user;
         
         if (isMounted) {
-          console.log("[AppContext] Profile ensured, setting current user and loading data");
+          console.log("[AppContext] Profile ensured, setting current user");
           setCurrentUser(user);
-          
-          // Set authLoading to false immediately so the user is not stuck on the splash screen!
           setAuthLoading(false);
-
-          // Load the rest of the data in the background
-          Promise.allSettled([
-            refreshProjects(user),
-            refreshNotifications(),
-            refreshChats()
-          ]).then(() => {
-            console.log("[AppContext] Background data loaded successfully");
-          }).catch(err => {
-            console.error("[AppContext] Error loading background data:", err);
-          });
         }
       } catch (err) {
         console.error("[AppContext] Error handling user session:", err);
@@ -594,11 +583,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (event === 'SIGNED_OUT') {
         if (isMounted) {
           setCurrentUser(null);
-          setNotifications([]);
-          setChats([]);
-          setUnreadChatsCount(0);
-          setUnreadNotificationsCount(0);
-          await refreshProjects(null);
           setAuthLoading(false);
         }
       } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
@@ -610,7 +594,28 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureProfile, refreshProjects, refreshNotifications, refreshChats]);
+  }, [ensureProfile]);
+
+  // Separate Effect to handle data fetching when currentUser changes (Prevents infinite loops)
+  useEffect(() => {
+    if (currentUser) {
+      console.log("[AppContext] currentUser changed, loading user data in background");
+      Promise.allSettled([
+        refreshProjects(currentUser),
+        refreshNotifications(),
+        refreshChats()
+      ]).then(() => {
+        console.log("[AppContext] Background user data loaded successfully");
+      });
+    } else {
+      console.log("[AppContext] currentUser is null, clearing user data");
+      refreshProjects(null);
+      setNotifications([]);
+      setChats([]);
+      setUnreadChatsCount(0);
+      setUnreadNotificationsCount(0);
+    }
+  }, [currentUser, refreshProjects, refreshNotifications, refreshChats]);
 
   useEffect(() => {
     if (currentUser?.id) {
