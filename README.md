@@ -1,124 +1,76 @@
-# 🚀 DevSphere
+# ⚓ Anchor — Behavioral MemoryAgent
 
-DevSphere is a developer collaboration platform where builders can discover projects, form teams, and collaborate in real time to turn ideas into working products.
+**A Private, Memory-Powered Accountability Companion built with Alibaba Cloud Qwen-Max.**
 
-## 🌟 Core Features
+![Anchor Logo](assets/images/createimg-ai.png)
 
-- **Project Discovery**
-  Explore trending and newly created projects across different tech stacks.
-- **Team Collaboration**
-  Create projects, manage join requests, and build developer teams.
-- **Real-time Messaging**
-  Chat with individuals or project-based groups instantly.
-- **Skill-based Matching**
-  Connect with collaborators based on required skills and interests.
-- **Notifications System**
-  Stay updated with project invites, approvals, and platform activity.
-- **Pro (Coming Soon)**
-  - Priority project visibility
-  - Advanced search & filtering
-  - Enhanced developer profiles
+Anchor helps people regain control over their habits by combining long-term behavioral memory, real-time risk evaluation, and adaptive AI support. Unlike standard tracking apps, Anchor distinguishes between staying well, experiencing an urge, and resisting challenges.
 
-## 🧠 User Flow
+---
 
-### New User
+## 🌍 Global AI Hackathon
 
-`Splash → Onboarding → Authentication (Sign Up / Sign In) → Home`
+**Track:** MemoryAgent
 
-### Returning User
+Anchor demonstrates how persistent AI memory can create a more psychologically accurate and supportive recovery experience.
 
-`Splash → Auto-login → Home`
+---
 
-or
+## ✨ Features
 
-`Splash → Authentication (if session expired)`
+- 🧠 **Persistent Behavioral Memory:** Remembers goals, triggers, and identity statements across sessions.
+- ⚓ **Redefined Urge Logging:** Distinguishes between wellness check-ins ("No urge") and actual urge events (Intensity 1-5).
+- 🤖 **Qwen-Max Intelligence:** Powered by Alibaba Cloud’s high-performance models via the DashScope API.
+- 📈 **Segregated Metrics:** Separate tracking for Days Checked In, Urges Experienced, Urges Resisted, and Relapses.
+- 🔒 **Security-First Design:** Features an inactivity-based PIN Lock and strict Row-Level Security (RLS).
+- 🔔 **Discreet Support:** Custom notification chimes and personalized companion styles (Supportive, Neutral, or Coaching).
 
-## 🔐 Authentication
+---
 
-- Email & Password (Supabase Auth)
-- OAuth (Google & GitHub)
-- Password Reset via Email
-- Persistent sessions (auto-login support)
+## 🏗️ Technical Architecture
 
-## 🛠 Tech Stack
+Anchor uses a **Tri-Stage Intelligence Loop**:
 
-### Web App
+1. **Log Collection:** User logs wellness or urges via a redefined logic gate.
+2. **Behavioral Reasoning:** Supabase Edge Functions (Qwen-Max) analyze the logs, factoring in intensity, frequency, and time of day.
+3. **State Synthesis:** The AI updates the user's `recovery_score` and `risk_level`, providing a fresh "Weekly Insight" and "Recommended Action" on the dashboard.
 
-- React (Vite) + TypeScript
-- Tailwind CSS
-- shadcn/ui components
-- TanStack Query
+---
 
-### Backend
+## 🧠 MemoryAgent Implementation
 
-- Supabase (PostgreSQL, Auth, Storage, Realtime)
+Anchor satisfies the MemoryAgent requirements through four core capabilities:
 
-### Additional Tools
+### Persistent Memory
+The AI remembers goals, triggers, and achievements. These are stored in `user_memories` with importance scores.
 
-- Framer Motion (animations)
-- Lucide Icons
-- Vercel (deployment)
+### Intelligent Retrieval
+Anchor retrieves only the most relevant memories for chat context using a custom RAG-style prioritization engine.
 
-## 📁 Project Structure
+### Memory Reinforcement & Decay
+Memories strengthen when confirmed by the user and gradually decay if they are no longer relevant to the user's current behavioral patterns.
 
-```text
-src/
-  components/   # Reusable UI components
-  context/      # Global state management
-  hooks/        # Custom React hooks
-  pages/        # Application screens/routes
-  utils/        # Helper functions
-```
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend:** React + TypeScript + Tailwind CSS
+- **Database/Auth:** Supabase (PostgreSQL + RLS)
+- **AI Engine:** Alibaba Cloud Qwen-Max (DashScope Workspace Endpoint)
+- **Deployment:** Vercel
+
+---
 
 ## 🚀 Getting Started
 
-### 1) Clone the project
+1. Set up your Supabase project.
+2. Configure the `QWEN_API_KEY` in your Supabase Edge Function secrets.
+3. Use the integrated SQL tools to set up the `profiles`, `user_memories`, and `urge_logs` schema.
 
-```bash
-git clone <your-repo-url>
-cd DevSphere
-```
+---
 
-### 2) Install dependencies
+## 🔒 Security
+- **Inactivity PIN Lock:** Automatically secures the app after a customizable period of idle time.
+- **Privacy Mode:** Notification text is kept discreet to protect user privacy in public spaces.
 
-```bash
-npm install
-```
-
-### 3) Setup environment variables
-
-Create a `.env` file in the project root:
-
-```env
-VITE_SUPABASE_URL=your_url
-VITE_SUPABASE_ANON_KEY=your_key
-```
-
-### 4) Run the development server
-
-```bash
-npm run dev
-```
-
-## 🌐 Live Demo
-
-👉 https://dev-sphere-kappa.vercel.app/
-
-## 📱 Future Vision
-
-- Mobile application (React Native / Expo)
-- AI-powered team and project matching
-- Developer marketplace for collaboration
-- Investor discovery and project funding layer
-- Advanced analytics for project growth
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Open a pull request
-
-## 📄 License
-
-MIT License
+Built for the Global AI Hackathon 2026.
