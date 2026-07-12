@@ -159,7 +159,7 @@ When suggesting features, consider DevSphere's long-term vision (developer colla
     messages.push({ role: "user", content: message })
 
     console.log("[project-manager] Calling Qwen API...")
-    const response = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+    const response = await fetch("https://ws-12c4bsjrjqxy8v2b.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
