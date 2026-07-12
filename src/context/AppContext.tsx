@@ -562,19 +562,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     console.log("[AppContext] Getting initial session...");
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log("[AppContext] getSession resolved. Session:", session, "Error:", error);
-      if (error) {
-        console.error("[AppContext] Get session error:", error);
-        supabase.auth.signOut();
-        if (isMounted) setAuthLoading(false);
-        return;
-      }
+    // Get initial session with a robust timeout to prevent hanging on splash screen
+    const sessionTimeout = new Promise<any>((_, reject) => 
+      setTimeout(() => reject(new Error("Session timeout")), 2000)
+    );
+
+    Promise.race([
+      supabase.auth.getSession(),
+      sessionTimeout
+    ]).then((result) => {
+      console.log("[AppContext] getSession resolved. Result:", result);
+      const session = result?.data?.session || null;
       handleUserSession(session);
     }).catch((err) => {
-      console.error("[AppContext] getSession rejected:", err);
-      if (isMounted) setAuthLoading(false);
+      console.error("[AppContext] getSession failed or timed out:", err);
+      if (isMounted) {
+        setCurrentUser(null);
+        setAuthLoading(false);
+      }
     });
 
     // Listen for auth state changes
