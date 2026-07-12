@@ -19,16 +19,15 @@ serve(async (req) => {
       console.log("[project-manager] Attempting database permissions repair...")
       const sql = postgres(dbUrl, { ssl: 'require' })
       
-      // Grant usage on public schema and all tables/sequences/functions to API roles
-      await sql`
-        GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-        GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-        GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-        GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
-      `
+      // Execute each grant statement individually to avoid prepared statement errors
+      await sql`GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;`
+      await sql`GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;`
+      await sql`GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;`
+      await sql`GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;`
+      await sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;`
+      await sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;`
+      await sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;`
+      
       console.log("[project-manager] Database permissions repair completed successfully!")
       await sql.end()
     } catch (dbErr) {
