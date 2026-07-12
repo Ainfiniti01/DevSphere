@@ -60,6 +60,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshTimeout = useRef<any>(null);
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
+  const hasShownPauseWarning = useRef(false);
 
   const completeOnboarding = useCallback(() => {
     setHasSeenOnboarding(true);
@@ -71,10 +72,25 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return user.display_name || user.name || user.full_name || (user.email ? user.email.split('@')[0] : `User_${user.id?.slice(0, 4)}`);
   }, []);
 
+  const handleConnectionFailure = useCallback(() => {
+    if (!hasShownPauseWarning.current) {
+      hasShownPauseWarning.current = true;
+      toast.error(
+        "Unable to connect to Supabase. Your database project might be paused or sleeping. Please log into your Supabase Dashboard to wake it up.",
+        {
+          duration: 10000,
+          action: {
+            label: "Supabase Console",
+            onClick: () => window.open("https://supabase.com/dashboard", "_blank")
+          }
+        }
+      );
+    }
+  }, []);
+
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     
-    // Increased timeout to 5 seconds to allow database recovery
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error("Timeout fetching profile")), 5000)
     );
@@ -127,6 +143,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         code: error?.code,
         error
       });
+      
+      handleConnectionFailure();
+
       // Fallback to basic auth user info so we don't block the app
       return {
         id: userId,
@@ -134,7 +153,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         avatar_url: authUser.user_metadata?.avatar_url || null
       };
     }
-  }, []);
+  }, [handleConnectionFailure]);
 
   const updatePresence = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
@@ -153,7 +172,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ 
           last_seen: now.toISOString(),
@@ -162,10 +181,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           last_streak_date: today
         })
         .eq('id', currentUser.id);
+
+      if (error) throw error;
     } catch (e) {
-      // Silent fail
+      console.warn("[AppContext] Presence update failed:", e);
+      handleConnectionFailure();
     }
-  }, [currentUser]);
+  }, [currentUser, handleConnectionFailure]);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase) return;
@@ -223,8 +245,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error.message);
+      handleConnectionFailure();
     }
-  }, [currentUser]);
+  }, [currentUser, handleConnectionFailure]);
 
   const refreshNotifications = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
@@ -242,10 +265,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
+      handleConnectionFailure();
     } finally {
       isRefreshing.current.notifications = false;
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, handleConnectionFailure]);
 
   const refreshChats = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
@@ -366,10 +390,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
+      handleConnectionFailure();
     } finally {
       isRefreshing.current.chats = false;
     }
-  }, [currentUser?.id, resolveName]);
+  }, [currentUser?.id, resolveName, handleConnectionFailure]);
 
   const markAsRead = useCallback(async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
@@ -573,7 +598,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     console.log("[AppContext] Getting initial session...");
-    // Increased session timeout to 5 seconds to allow database recovery
     const sessionTimeout = new Promise<any>((_, reject) => 
       setTimeout(() => reject(new Error("Session timeout")), 5000)
     );
@@ -587,6 +611,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       handleUserSession(session);
     }).catch((err) => {
       console.error("[AppContext] getSession failed or timed out:", err);
+      handleConnectionFailure();
       if (isMounted) {
         setCurrentUser(null);
         setAuthLoading(false);
@@ -610,7 +635,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureProfile]);
+  }, [ensureProfile, handleConnectionFailure]);
 
   // Separate Effect to handle data fetching when currentUser changes (Prevents infinite loops)
   useEffect(() => {
