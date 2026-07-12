@@ -493,13 +493,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Robust Auth Initialization & State Monitoring
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      console.log("[AppContext] Supabase client not initialized");
+      return;
+    }
 
     let isMounted = true;
 
     const handleUserSession = async (session: any) => {
+      console.log("[AppContext] handleUserSession called with session:", session);
       if (!session?.user) {
         if (isMounted) {
+          console.log("[AppContext] No user session found, setting authLoading to false");
           setCurrentUser(null);
           setNotifications([]);
           setChats([]);
@@ -512,16 +517,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
+        console.log("[AppContext] User session found, ensuring profile for:", session.user.id);
         const profile = await ensureProfile(session.user.id, session.user);
         const user = profile ? { ...session.user, ...profile } : session.user;
         
         if (isMounted) {
+          console.log("[AppContext] Profile ensured, setting current user and loading data");
           setCurrentUser(user);
           await Promise.allSettled([
             refreshProjects(user),
             refreshNotifications(),
             refreshChats()
           ]);
+          console.log("[AppContext] Data loaded, setting authLoading to false");
           setAuthLoading(false);
         }
       } catch (err) {
@@ -530,8 +538,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
+    console.log("[AppContext] Getting initial session...");
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log("[AppContext] getSession resolved. Session:", session, "Error:", error);
       if (error) {
         console.error("[AppContext] Get session error:", error);
         supabase.auth.signOut();
@@ -539,7 +549,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       handleUserSession(session);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error("[AppContext] getSession rejected:", err);
       if (isMounted) setAuthLoading(false);
     });
 
