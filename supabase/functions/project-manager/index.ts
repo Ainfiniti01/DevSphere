@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.8'
 import postgres from "https://esm.sh/postgres@3.4.4"
 
 const corsHeaders = {
@@ -159,7 +159,7 @@ When suggesting features, consider DevSphere's long-term vision (developer colla
     messages.push({ role: "user", content: message })
 
     console.log("[project-manager] Calling Qwen API...")
-    const response = await fetch("https://ws-12c4bsjrjqxy8v2b.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions", {
+    const response = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
