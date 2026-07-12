@@ -73,15 +73,33 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
-    try {
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (existing) return existing;
+    
+    // Create a promise that rejects after 2 seconds to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Timeout fetching profile")), 2000)
+    );
 
+    try {
+      console.log("[AppContext] ensureProfile: Fetching existing profile for", userId);
+      const fetchPromise = (async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .limit(1);
+        
+        if (error) throw error;
+        return data && data.length > 0 ? data[0] : null;
+      })();
+
+      const existing = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      
+      if (existing) {
+        console.log("[AppContext] ensureProfile: Found existing profile");
+        return existing;
+      }
+
+      console.log("[AppContext] ensureProfile: Profile not found, creating new profile");
       const newProfile = {
         id: userId,
         name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
@@ -89,17 +107,26 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         updated_at: new Date().toISOString()
       };
       
-      const { data: created, error: upsertError } = await supabase
-        .from('profiles')
-        .upsert(newProfile, { onConflict: 'id' })
-        .select()
-        .single();
-      
-      if (upsertError) throw upsertError;
-      return created;
+      const upsertPromise = (async () => {
+        const { data, error: upsertError } = await supabase
+          .from('profiles')
+          .upsert(newProfile, { onConflict: 'id' })
+          .select()
+          .limit(1);
+        
+        if (upsertError) throw upsertError;
+        return data && data.length > 0 ? data[0] : null;
+      })();
+
+      return await Promise.race([upsertPromise, timeoutPromise]);
     } catch (error) {
-      console.error("Error ensuring profile record exists:", error);
-      return null;
+      console.error("[AppContext] Error ensuring profile record exists:", error);
+      // Fallback to basic auth user info so we don't block the app
+      return {
+        id: userId,
+        name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
+        avatar_url: authUser.user_metadata?.avatar_url || null
+      };
     }
   }, []);
 
@@ -524,13 +551,20 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (isMounted) {
           console.log("[AppContext] Profile ensured, setting current user and loading data");
           setCurrentUser(user);
-          await Promise.allSettled([
+          
+          // Set authLoading to false immediately so the user is not stuck on the splash screen!
+          setAuthLoading(false);
+
+          // Load the rest of the data in the background
+          Promise.allSettled([
             refreshProjects(user),
             refreshNotifications(),
             refreshChats()
-          ]);
-          console.log("[AppContext] Data loaded, setting authLoading to false");
-          setAuthLoading(false);
+          ]).then(() => {
+            console.log("[AppContext] Background data loaded successfully");
+          }).catch(err => {
+            console.error("[AppContext] Error loading background data:", err);
+          });
         }
       } catch (err) {
         console.error("[AppContext] Error handling user session:", err);
