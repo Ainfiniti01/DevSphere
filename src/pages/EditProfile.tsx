@@ -107,6 +107,18 @@ const EditProfile = () => {
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
 
+      // Update auth user metadata so they stay in sync!
+      await supabase.auth.updateUser({
+        data: {
+          full_name: fullName,
+          title: formData.title,
+          avatar_url: formData.avatar_url
+        }
+      });
+
+      // Update local cache
+      localStorage.setItem(`devsphere_profile_${currentUser.id}`, JSON.stringify(updates));
+
       await supabase.from('notifications').insert({
         user_id: currentUser.id,
         actor_id: currentUser.id,

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
+import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 
 interface Message {
@@ -28,6 +29,7 @@ const SUGGESTIONS = [
 ];
 
 const AIManager = ({ projectId }: AIManagerProps) => {
+  const { currentUser, projects, requests } = useApp();
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = localStorage.getItem(`devsphere_ai_chat_${projectId}`);
     if (saved) {
@@ -42,6 +44,33 @@ const AIManager = ({ projectId }: AIManagerProps) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const project = projects.find(p => p.id === projectId);
+
+  const userRole = React.useMemo(() => {
+    if (!project || !currentUser) return 'visitor';
+    if (currentUser.is_admin) return 'admin';
+    if (project.creator_id === currentUser.id) return 'owner';
+    if (project.myMembershipStatus === 'active') return 'member';
+    const req = requests.find(r => r.project_id === projectId && r.user_id === currentUser.id);
+    if (req?.status === 'pending') return 'applicant';
+    return 'visitor';
+  }, [project, currentUser, requests, projectId]);
+
+  const membershipStatus = project?.myMembershipStatus || 'none';
+
+  const permissions = React.useMemo(() => {
+    const isOwner = userRole === 'owner';
+    const isAdmin = userRole === 'admin';
+    const isMember = userRole === 'member';
+    const isApplicant = userRole === 'applicant';
+    
+    return {
+      canManage: isOwner || isAdmin,
+      canJoin: !isOwner && !isAdmin && !isMember && !isApplicant,
+      canInvite: isOwner || isAdmin || isMember
+    };
+  }, [userRole]);
 
   useEffect(() => {
     localStorage.setItem(`devsphere_ai_chat_${projectId}`, JSON.stringify(messages));
@@ -74,7 +103,10 @@ const AIManager = ({ projectId }: AIManagerProps) => {
         body: JSON.stringify({
           projectId,
           message: messageText.trim(),
-          chatHistory: messages
+          chatHistory: messages,
+          userRole,
+          membershipStatus,
+          permissions
         })
       });
 

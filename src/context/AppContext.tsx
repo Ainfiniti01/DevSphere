@@ -112,6 +112,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (existing) {
         console.log("[AppContext] ensureProfile: Found existing profile");
+        localStorage.setItem(`devsphere_profile_${userId}`, JSON.stringify(existing));
         return existing;
       }
 
@@ -134,7 +135,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return data && data.length > 0 ? data[0] : null;
       })();
 
-      return await Promise.race([upsertPromise, timeoutPromise]);
+      const created = await Promise.race([upsertPromise, timeoutPromise]) as any;
+      if (created) {
+        localStorage.setItem(`devsphere_profile_${userId}`, JSON.stringify(created));
+      }
+      return created;
     } catch (error: any) {
       console.error("[AppContext] Error ensuring profile record exists:", {
         message: error?.message,
@@ -145,6 +150,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       handleConnectionFailure();
+
+      // Try to load from cache first to prevent reversing back to stale auth metadata
+      const cached = localStorage.getItem(`devsphere_profile_${userId}`);
+      if (cached) {
+        try {
+          console.log("[AppContext] ensureProfile: Falling back to cached profile");
+          return JSON.parse(cached);
+        } catch (e) {}
+      }
 
       // Fallback to basic auth user info so we don't block the app
       return {
