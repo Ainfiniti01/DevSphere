@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import postgres from "https://deno.land/x/postgresjs@v3.4.4/mod.js"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,30 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  // 1. Self-healing database permissions repair
+  const dbUrl = Deno.env.get('SUPABASE_DB_URL')
+  if (dbUrl) {
+    try {
+      console.log("[project-manager] Attempting database permissions repair...")
+      const sql = postgres(dbUrl, { ssl: 'require' })
+      
+      // Grant usage on public schema and all tables/sequences/functions to API roles
+      await sql`
+        GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+        GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+        GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+        GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+      `
+      console.log("[project-manager] Database permissions repair completed successfully!")
+      await sql.end()
+    } catch (dbErr) {
+      console.error("[project-manager] Database repair failed:", dbErr)
+    }
   }
 
   try {
