@@ -348,7 +348,7 @@ To ensure maximum security and performance, all communication with Alibaba Cloud
 
 ---
 
-## 🏆 Hackathon Enhancements
+## 🚀 What Was Built During the Hackathon
 
 During the Global AI Hackathon, During the Global AI Hackathon, DevSphere gained:
 
