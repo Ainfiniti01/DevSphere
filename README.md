@@ -20,15 +20,9 @@
 
 ## 🌍 The Problem
 
-Modern software development is highly fragmented. Developers constantly switch between multiple disconnected platforms—GitHub for code, Discord or Slack for chat, WhatsApp for quick updates, Notion or Trello for task tracking, and LinkedIn for recruiting teammates. This fragmentation leads to several critical challenges:
+Modern software development is highly fragmented. Developers constantly switch between disconnected platforms—GitHub for code, Discord/Slack for chat, Notion/Trello for task tracking, and LinkedIn for recruiting. This fragmentation causes critical friction: finding reliable collaborators is difficult, promising startup ideas are abandoned when teams lose momentum, project knowledge is scattered, and onboarding new contributors is highly inefficient. Without structured guidance, teams suffer from scope creep and poor technical decisions. 
 
-* **Collaborator Friction:** Finding reliable, skilled collaborators who share the same vision is incredibly difficult.
-* **Abandoned Ideas:** Countless promising startup and open-source ideas are abandoned simply because teams never form or lose momentum.
-* **Scattered Knowledge:** Project context, decisions, and planning are scattered across multiple tools, leading to misalignment.
-* **Inefficient Onboarding:** New contributors face a steep learning curve trying to understand the project's architecture, goals, and current status.
-* **Lack of Guidance:** Teams often lack structured project management, leading to scope creep, poor technical decisions, and project stagnation.
-
-DevSphere solves these problems by bringing project discovery, team formation, real-time communication, task management, and context-aware AI assistance into a single, unified platform.
+DevSphere solves these challenges by unifying project discovery, team formation, real-time communication, task management, and context-aware AI assistance into a single, integrated platform.
 
 ---
 
@@ -38,15 +32,14 @@ DevSphere is an intelligent developer collaboration platform that combines real-
 
 ---
 
-## 🧠 Context-Aware AI Project Manager Engine
+## 🧠 Context-Aware AI Project Manager
 
 Every project interaction follows a complete project management lifecycle:
-
-• Retrieve project details (Problem, Solution, Stage, Skills)
-• Retrieve creator and team context
-• Identify the user's project role (Visitor, Applicant, Member, Owner)
-• Reason with Alibaba Cloud Qwen-Plus
-• Return actionable recommendations tailored to the current project
+1. Retrieve project details (Problem, Solution, Stage, Skills)
+2. Retrieve creator and team context
+3. Identify the user's project role (Visitor, Applicant, Member, Owner)
+4. Reason with Alibaba Cloud Qwen-Plus
+5. Return actionable recommendations tailored to the current project
 
 This ensures responses remain highly relevant instead of behaving like a generic chatbot.
 
@@ -56,14 +49,11 @@ The Context-Aware AI Project Manager provides deep, actionable assistance across
 
 * **Context-Aware Project Reasoning:** Answers questions about the project's core vision, problem statement, and proposed solution.
 * **Role-Aware Recommendations:** Tailors advice based on whether the user is a visitor, applicant, team member, or project owner.
-* **Sprint Planning:** Helps organize development cycles, prioritize features, and set realistic milestones.
-* **Roadmap Generation:** Creates structured 1-month, 3-month, or 6-month product roadmaps based on the project's current stage.
-* **Task Breakdown:** Deconstructs high-level features into granular, actionable development tasks.
-* **Architecture Guidance:** Recommends scalable folder structures, database schemas, and API designs.
+* **Sprint Planning & Roadmaps:** Helps organize development cycles, prioritize features, and set realistic milestones.
+* **Task Breakdown & Architecture Guidance:** Deconstructs high-level features into granular tasks and recommends scalable folder structures, database schemas, and API designs.
 * **Feature Prioritization:** Evaluates user-proposed ideas and provides objective technical reasoning on what to build first.
-* **Technical Decision Support:** Explains the advantages and disadvantages of different technologies, libraries, and frameworks.
-* **Onboarding Assistance:** Generates customized onboarding guides and setup instructions for new contributors.
-* **Risk Analysis:** Identifies potential technical risks, security vulnerabilities, and scalability bottlenecks.
+* **Onboarding & Contributor Assistance:** Generates customized onboarding guides and setup instructions for new contributors.
+* **Risk Analysis & Technical Support:** Identifies potential technical risks, security vulnerabilities, and scalability bottlenecks.
 
 ### 🧠 How the AI Thinks
 
@@ -112,13 +102,9 @@ Every interaction with the Context-Aware AI Project Manager triggers a structure
 └─────────────────────────────────────────────────────────┘
 ```
 
-The AI gathers this multi-dimensional context before generating recommendations, making responses deeply relevant to the current project instead of generic.
-
 ### Why Context Matters
 
-Traditional AI assistants operate on isolated prompts, requiring users to repeatedly copy-paste project details, explain their tech stack, and describe their goals. This leads to generic, repetitive, and often irrelevant advice.
-
-DevSphere's Context-Aware AI Project Manager reasons over an evolving software project. It continuously factors in the project's goals, development stage, team structure, and user permissions. This creates a continuous, personalized guidance loop that adapts as the project grows—providing the right advice to the right person at the right time.
+Traditional AI assistants answer isolated prompts, requiring users to repeatedly copy-paste project details and explain their goals. DevSphere's Context-Aware AI Project Manager reasons over an evolving software project, continuously factoring in project goals, development stage, team structure, and user permissions to provide continuous, personalized guidance.
 
 ---
 
@@ -291,13 +277,11 @@ DevSphere's end-to-end AI and collaboration architecture is illustrated below:
 
 ## 🛠️ Engineering Challenges Solved
 
-Building a context-aware, real-time collaboration platform presented several complex engineering challenges:
-
-* **State Synchronization across AI Conversations:** Ensuring the AI always has access to the latest project metadata, team memberships, and user roles without overloading the context window. This was solved by designing a server-side context assembly layer in Supabase Edge Functions that queries the database in real-time before invoking the AI.
-* **Role-Aware AI Reasoning:** Designing a system prompt that dynamically adapts the AI's persona, permissions, and output style based on the user's relationship to the project (e.g., preventing visitors from seeing private planning details while giving owners advanced sprint planning tools).
-* **Grounding AI Responses to Prevent Hallucination:** Restricting the AI from fabricating project details, team members, or deadlines. We implemented strict grounding rules in the system prompt, instructing the AI to explicitly state when information is unavailable rather than inventing it.
-* **Real-Time Event Synchronization:** Keeping chat messages, read receipts, join requests, and notifications synchronized across multiple clients instantly. This was achieved by leveraging Supabase Realtime PostgreSQL replication and custom database triggers.
-* **Secure AI Integration:** Protecting sensitive project information, database credentials, and the Alibaba Cloud API key. All AI reasoning is performed server-side within protected Supabase Edge Functions, ensuring the client never has direct access to the API keys or raw database secrets.
+* **State Synchronization across AI Conversations:** Solved by designing a server-side context assembly layer in Supabase Edge Functions that queries the database in real-time before invoking the AI. This ensures the AI always has access to the latest project metadata, team memberships, and user roles without overloading the context window.
+* **Role-Aware AI Reasoning:** Designed a system prompt that dynamically adapts the AI's persona, permissions, and output style based on the user's relationship to the project. This prevents visitors from seeing private planning details while giving owners advanced sprint planning tools.
+* **Grounding AI Responses to Prevent Hallucination:** Implemented strict grounding rules in the system prompt, instructing the AI to explicitly state when information is unavailable rather than inventing it. This restricts the AI from fabricating project details, team members, or deadlines.
+* **Real-Time Event Synchronization:** Kept chat messages, read receipts, join requests, and notifications synchronized across multiple clients instantly. This was achieved by leveraging Supabase Realtime PostgreSQL replication and custom database triggers.
+* **Secure AI Integration:** Protected sensitive project information, database credentials, and the Alibaba Cloud API key. All AI reasoning is performed server-side within protected Supabase Edge Functions, ensuring the client never has direct access to the API keys or raw database secrets.
 
 ---
 
@@ -328,21 +312,10 @@ devsphere/
 
 DevSphere satisfies the AI Application requirements through four core capabilities:
 
-### Project Awareness
-The AI understands the project title, description, problem statement, proposed solution, development stage, required skills, team members, and founder information.
-
-### Role-Based Intelligence
-Responses adapt depending on who is interacting:
-- **Visitors:** Learn what the project is about, understand required skills, and decide whether to join.
-- **Applicants:** Receive onboarding guidance, learn project expectations, and identify preparation steps.
-- **Team Members:** Receive implementation advice, task breakdowns, architecture recommendations, and debugging assistance.
-- **Project Owners:** Sprint planning, roadmaps, milestones, hiring recommendations, scaling strategies, MVP planning, and release planning.
-
-### Contextual Reasoning
-The AI remains focused on the current project instead of acting as a general-purpose assistant. It avoids inventing missing project details and recommends scalable engineering practices whenever possible.
-
-### Secure Design
-Sensitive information such as authentication tokens, API keys, and private backend details are never exposed through AI responses.
+* **Project Awareness:** The AI understands the project title, description, problem statement, proposed solution, development stage, required skills, team members, and founder information.
+* **Role-Based Intelligence:** Responses adapt depending on who is interacting (Visitors, Applicants, Team Members, or Project Owners).
+* **Contextual Reasoning:** The AI remains focused on the current project instead of acting as a general-purpose assistant, avoiding inventing missing project details.
+* **Secure Design:** Sensitive information such as authentication tokens, API keys, and private backend details are never exposed through AI responses.
 
 ---
 
@@ -453,19 +426,13 @@ DevSphere is designed with security in mind:
 
 ## ❤️ Why DevSphere?
 
-Most collaboration platforms record tasks.
-
-DevSphere builds teams.
+Most collaboration platforms record tasks. DevSphere builds teams.
 
 By combining intelligent AI assistance, real-time collaboration, project discovery, and startup-focused team formation, DevSphere lowers the barrier between having an idea and launching a successful product.
 
 ## 🚀 What Makes DevSphere Different?
 
-Unlike traditional project management tools that require manual updates, DevSphere continuously builds a contextual understanding of the project.
-
-It learns from team activity, adapts its guidance based on the user's role, and provides objective technical reasoning using Alibaba Cloud Qwen as its reasoning engine.
-
-The result is an AI Project Manager that becomes more personalized with every interaction.
+Unlike traditional project management tools that require manual updates, DevSphere continuously builds a contextual understanding of the project. It learns from team activity, adapts its guidance based on the user's role, and provides objective technical reasoning using Alibaba Cloud Qwen as its reasoning engine.
 
 ---
 
