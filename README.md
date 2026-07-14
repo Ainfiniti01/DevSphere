@@ -104,7 +104,7 @@ Every interaction with the Context-Aware AI Project Manager triggers a structure
 
 ### Why Context Matters
 
-Traditional AI assistants answer isolated prompts, requiring users to repeatedly copy-paste project details and explain their goals. DevSphere's Context-Aware AI Project Manager reasons over an evolving software project, continuously factoring in project goals, development stage, team structure, and user permissions to provide continuous, personalized guidance.
+Traditional AI assistants respond to isolated prompts. DevSphere instead assembles project metadata, team context, user roles, and recent conversations before invoking Qwen-Plus, producing recommendations that remain grounded in the current project rather than generic advice.
 
 ---
 
