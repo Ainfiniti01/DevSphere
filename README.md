@@ -356,7 +356,7 @@ During the Global AI Hackathon, During the Global AI Hackathon, DevSphere gained
 * **Alibaba Cloud Qwen Integration:** Built the Supabase Edge Function (`project-manager`) to securely connect with Alibaba Cloud's Qwen-Plus model via the DashScope API.
 * **Role-Aware Reasoning Engine:** Developed the multi-role prompt engineering architecture that adapts AI responses based on user permissions (Visitor, Applicant, Member, Owner).
 * **Real-Time Team Workflows:** Built the join request system, team management dashboard, and real-time group chat synchronization.
-* **Notification Architecture:** Implemented database triggers and real-time subscriptions to notify users of project updates, join requests, and messages instantly.
+* **Smart notification Architecture:** Implemented database triggers and real-time subscriptions to notify users of project updates, join requests, and messages instantly.
 * **Referral System Foundation:** Created the referral code generation, tracking, and points system to incentivize community growth.
 
 ---
