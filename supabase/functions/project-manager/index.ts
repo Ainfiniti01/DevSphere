@@ -12,14 +12,62 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // 1. Self-healing database permissions repair
+  // 1. Self-healing database permissions and schema repair
   const dbUrl = Deno.env.get('SUPABASE_DB_URL')
   if (dbUrl) {
     try {
-      console.log("[project-manager] Attempting database permissions repair...")
+      console.log("[project-manager] Attempting database schema and permissions repair...")
       const sql = postgres(dbUrl, { ssl: 'require' })
       
-      // Execute each grant statement individually to avoid prepared statement errors
+      // Execute schema updates
+      await sql`ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS documentation TEXT;`
+      await sql`ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS documentation_filename TEXT;`
+
+      // Create ai_messages table if it doesn't exist
+      await sql`
+        CREATE TABLE IF NOT EXISTS public.ai_messages (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+          sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+          sender_role TEXT NOT NULL,
+          text TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `
+
+      // Enable RLS on ai_messages
+      await sql`ALTER TABLE public.ai_messages ENABLE ROW LEVEL SECURITY;`
+
+      // Create secure policies for ai_messages
+      await sql`DROP POLICY IF EXISTS ai_messages_select_policy ON public.ai_messages;`
+      await sql`
+        CREATE POLICY ai_messages_select_policy ON public.ai_messages
+        FOR SELECT TO authenticated USING (
+          auth.uid() = (SELECT creator_id FROM public.projects WHERE id = project_id)
+          OR EXISTS (
+            SELECT 1 FROM public.project_members 
+            WHERE project_id = ai_messages.project_id 
+            AND user_id = auth.uid() 
+            AND status = 'active'
+          )
+        );
+      `
+
+      await sql`DROP POLICY IF EXISTS ai_messages_insert_policy ON public.ai_messages;`
+      await sql`
+        CREATE POLICY ai_messages_insert_policy ON public.ai_messages
+        FOR INSERT TO authenticated WITH CHECK (
+          auth.uid() = (SELECT creator_id FROM public.projects WHERE id = project_id)
+          OR EXISTS (
+            SELECT 1 FROM public.project_members 
+            WHERE project_id = ai_messages.project_id 
+            AND user_id = auth.uid() 
+            AND status = 'active'
+          )
+        );
+      `
+
+      // Execute grants
       await sql`GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;`
       await sql`GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;`
       await sql`GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;`
@@ -72,7 +120,72 @@ serve(async (req) => {
         $$;
       `
 
-      console.log("[project-manager] Database permissions repair completed successfully!")
+      // Redefine accept_join_request to automatically insert a system message into the group chat
+      await sql`
+        CREATE OR REPLACE FUNCTION public.accept_join_request(p_request_id uuid, p_admin_id uuid)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        DECLARE
+            v_project_id UUID;
+            v_user_id UUID;
+            v_chat_id UUID;
+            v_project_title TEXT;
+            v_user_name TEXT;
+        BEGIN
+            -- 1. Verify admin and get details
+            SELECT r.project_id, r.user_id, p.title 
+            INTO v_project_id, v_user_id, v_project_title
+            FROM public.join_requests r
+            JOIN public.projects p ON r.project_id = p.id
+            WHERE r.id = p_request_id AND p.creator_id = p_admin_id;
+
+            IF v_project_id IS NULL THEN
+                RAISE EXCEPTION 'Unauthorized or request not found.';
+            END IF;
+
+            -- Get user name
+            SELECT name INTO v_user_name FROM public.profiles WHERE id = v_user_id;
+
+            -- 2. Safety Guard: Prevent duplicate processing
+            IF EXISTS (
+              SELECT 1 FROM public.project_members 
+              WHERE project_id = v_project_id AND user_id = v_user_id AND status = 'active'
+            ) THEN
+              RETURN;
+            END IF;
+
+            -- 3. Update request status
+            UPDATE public.join_requests SET status = 'accepted' WHERE id = p_request_id;
+
+            -- 4. Update membership status
+            INSERT INTO public.project_members (project_id, user_id, role, status)
+            VALUES (v_project_id, v_user_id, 'Member', 'active')
+            ON CONFLICT (project_id, user_id) DO UPDATE SET status = 'active';
+
+            -- 5. Handle Chat Membership
+            SELECT id INTO v_chat_id FROM public.chats WHERE project_id = v_project_id AND type = 'group';
+            IF v_chat_id IS NULL THEN
+                INSERT INTO public.chats (project_id, type) VALUES (v_project_id, 'group') RETURNING id INTO v_chat_id;
+            END IF;
+
+            INSERT INTO public.chat_members (chat_id, user_id)
+            VALUES (v_chat_id, v_user_id), (v_chat_id, p_admin_id)
+            ON CONFLICT DO NOTHING;
+
+            -- 6. Insert system message into group chat
+            INSERT INTO public.messages (chat_id, sender_id, content, type, status)
+            VALUES (v_chat_id, p_admin_id, v_user_name || ' joined the project.', 'system', 'sent');
+
+            -- 7. Notify
+            INSERT INTO public.notifications (user_id, actor_id, type, content, project_id)
+            VALUES (v_user_id, p_admin_id, 'request_accepted', 'Your request to join "' || v_project_title || '" was accepted!', v_project_id);
+        END;
+        $$;
+      `
+
+      console.log("[project-manager] Database schema and permissions repair completed successfully!")
       await sql.end()
     } catch (dbErr) {
       console.error("[project-manager] Database repair failed:", dbErr)
@@ -94,11 +207,11 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ""
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Fetch project details
+    // Fetch project details including documentation
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select(`
-        id, title, problem, solution, description, stage, skills_required, creator_id,
+        id, title, problem, solution, description, stage, skills_required, creator_id, documentation,
         creator:profiles!projects_creator_id_fkey(name, title),
         project_members(user_id, status, user:profiles!project_members_user_id_fkey(name))
       `)
@@ -113,6 +226,7 @@ serve(async (req) => {
       )
     }
 
+    const isVisitor = userRole === 'visitor';
     const creatorName = project.creator?.name || "Unknown"
     const creatorTitle = project.creator?.title || "Founder"
     const skills = project.skills_required?.join(', ') || "None specified"
@@ -136,6 +250,9 @@ Project Details (Source of Truth):
 - Problem: ${project.problem || "Not specified"}
 - Solution: ${project.solution || "Not specified"}
 - Description: ${project.description || "Not specified"}
+
+${project.documentation ? `Project Documentation (Primary Knowledge Source - Prioritize this!):
+${project.documentation}` : ''}
 
 User Context:
 - The current user's role is: ${userRole || 'visitor'}

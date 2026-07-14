@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -228,6 +228,17 @@ const ProjectDetail = () => {
                       {project.description}
                     </p>
                   </section>
+
+                  {project.documentation && (
+                    <section className="space-y-4 bg-accent/10 border border-border p-6 rounded-3xl">
+                      <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                        <FileText size={16} className="text-primary" /> Project Documentation
+                      </h3>
+                      <p className="text-xs text-muted-foreground font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto bg-background/50 p-4 rounded-2xl border border-border/50">
+                        {project.documentation}
+                      </p>
+                    </section>
+                  )}
 
                   <section className="space-y-4">
                     <h3 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Required Skills</h3>

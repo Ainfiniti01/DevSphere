@@ -175,9 +175,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase
         .from('projects')
         .select(`
-          id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id,
+          id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id, documentation, documentation_filename,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
+          comments(id),
           project_members(user_id, status, user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
@@ -187,6 +188,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const transformed = data.map(p => ({
         ...p,
         likes: p.likes?.length || 0,
+        commentCount: p.comments?.length || 0,
         isLiked: p.likes?.some((l: any) => l.user_id === activeUser?.id),
         skills: p.skills_required || [],
         thumbnail: p.thumbnail_url,
@@ -708,6 +710,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests' }, () => {
           if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
           refreshTimeout.current = setTimeout(() => refreshProjects(), 200);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_members' }, () => {
+          if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+          refreshTimeout.current = setTimeout(() => {
+            refreshProjects();
+            refreshChats();
+          }, 200);
         })
         .subscribe();
 

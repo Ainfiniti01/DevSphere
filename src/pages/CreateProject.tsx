@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon, Upload, Lock } from 'lucide-react';
+import { Plus, X, Rocket, Target, Lightbulb, Image as ImageIcon, Loader2, AlertCircle, Link as LinkIcon, Upload, Lock, FileText, Sparkles } from 'lucide-react';
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
@@ -24,6 +24,7 @@ const CreateProject = () => {
   const [uploading, setUploading] = useState(false);
   const [isFetching, setIsFetching] = useState(!!editId);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -33,7 +34,9 @@ const CreateProject = () => {
     skills: '',
     stage: 'Idea',
     thumbnail: '',
-    projectUrl: ''
+    projectUrl: '',
+    documentation: '',
+    documentation_filename: ''
   });
 
   // Limits check for new projects
@@ -47,9 +50,42 @@ const CreateProject = () => {
 
   const canEditTitle = !editId || currentUser?.is_admin || currentUser?.name === 'Abdulazeez Adam.A';
 
+  // Draft Persistence Key
+  const draftKey = `devsphere_draft_project_${editId || 'new'}`;
+
+  // Load project data or restore draft
   useEffect(() => {
     const loadProjectData = async () => {
-      if (!editId || !supabase) return;
+      if (!editId || !supabase) {
+        // Check for new project draft
+        const savedDraft = localStorage.getItem(draftKey);
+        if (savedDraft) {
+          try {
+            setFormData(JSON.parse(savedDraft));
+            toast.success("Restored draft from auto-save", {
+              action: {
+                label: "Discard",
+                onClick: () => {
+                  localStorage.removeItem(draftKey);
+                  setFormData({
+                    title: '',
+                    problem: '',
+                    solution: '',
+                    description: '',
+                    skills: '',
+                    stage: 'Idea',
+                    thumbnail: '',
+                    projectUrl: '',
+                    documentation: '',
+                    documentation_filename: ''
+                  });
+                }
+              }
+            });
+          } catch (e) {}
+        }
+        return;
+      }
 
       setIsFetching(true);
       try {
@@ -77,6 +113,36 @@ const CreateProject = () => {
             return;
           }
 
+          // Check for edit draft first
+          const savedDraft = localStorage.getItem(draftKey);
+          if (savedDraft) {
+            try {
+              setFormData(JSON.parse(savedDraft));
+              toast.success("Restored unsaved changes from auto-save", {
+                action: {
+                  label: "Discard",
+                  onClick: () => {
+                    localStorage.removeItem(draftKey);
+                    setFormData({
+                      title: projectToEdit.title,
+                      problem: projectToEdit.problem || '',
+                      solution: projectToEdit.solution || '',
+                      description: projectToEdit.description || '',
+                      skills: projectToEdit.skills?.join(', ') || '',
+                      stage: projectToEdit.stage || 'Idea',
+                      thumbnail: projectToEdit.thumbnail || '',
+                      projectUrl: projectToEdit.project_url || '',
+                      documentation: projectToEdit.documentation || '',
+                      documentation_filename: projectToEdit.documentation_filename || ''
+                    });
+                  }
+                }
+              });
+              setIsFetching(false);
+              return;
+            } catch (e) {}
+          }
+
           setFormData({
             title: projectToEdit.title,
             problem: projectToEdit.problem || '',
@@ -85,7 +151,9 @@ const CreateProject = () => {
             skills: projectToEdit.skills?.join(', ') || '',
             stage: projectToEdit.stage || 'Idea',
             thumbnail: projectToEdit.thumbnail || '',
-            projectUrl: projectToEdit.project_url || ''
+            projectUrl: projectToEdit.project_url || '',
+            documentation: projectToEdit.documentation || '',
+            documentation_filename: projectToEdit.documentation_filename || ''
           });
         }
       } catch (err: any) {
@@ -99,6 +167,31 @@ const CreateProject = () => {
 
     loadProjectData();
   }, [editId, projects, currentUser?.id, navigate]);
+
+  // Auto-save draft on change
+  useEffect(() => {
+    if (isFetching) return;
+    
+    // Only save if there is actual content
+    const hasContent = Object.values(formData).some(val => val !== '' && val !== 'Idea');
+    if (hasContent) {
+      localStorage.setItem(draftKey, JSON.stringify(formData));
+    }
+  }, [formData, draftKey, isFetching]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasContent = Object.values(formData).some(val => val !== '' && val !== 'Idea');
+      if (hasContent) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formData]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,11 +228,51 @@ const CreateProject = () => {
     }
   };
 
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedExtensions = ['md', 'txt', 'pdf'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      toast.error("Only Markdown (.md), Text (.txt), or PDF (.pdf) files are allowed");
+      return;
+    }
+
+    // Read file content
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      
+      // Enforce freemium limits
+      const charLimit = isPremium ? 100000 : 5000;
+      if (text.length > charLimit) {
+        toast.error(`File is too large. Free tier limit is 5,000 characters. Upgrade to Pro for up to 100,000 characters!`);
+        return;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        documentation: text,
+        documentation_filename: file.name
+      }));
+      toast.success(`Loaded documentation from ${file.name}!`);
+    };
+    reader.readAsText(file);
+  };
+
   const removeImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     setFormData(prev => ({ ...prev, thumbnail: '' }));
     if (imageInputRef.current) imageInputRef.current.value = '';
     toast.info("Image removed");
+  };
+
+  const removeDoc = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData(prev => ({ ...prev, documentation: '', documentation_filename: '' }));
+    if (docInputRef.current) docInputRef.current.value = '';
+    toast.info("Documentation removed");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,6 +297,8 @@ const CreateProject = () => {
       skills_required: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ""),
       project_url: formData.projectUrl,
       thumbnail_url: formData.thumbnail,
+      documentation: formData.documentation,
+      documentation_filename: formData.documentation_filename
     };
 
     if (canEditTitle) {
@@ -191,6 +326,9 @@ const CreateProject = () => {
         project_id: result.data.id
       });
 
+      // Clear draft on successful submit
+      localStorage.removeItem(draftKey);
+
       toast.success(editId ? "Project updated!" : "Project published!");
       await refreshProjects();
       await refreshNotifications();
@@ -201,17 +339,6 @@ const CreateProject = () => {
       setLoading(false);
     }
   };
-
-  if (isFetching) {
-    return (
-      <AppLayout title="Loading..." showBack>
-        <div className="flex flex-col items-center justify-center h-[60vh]">
-          <Loader2 className="animate-spin text-primary mb-4" size={32} />
-          <p className="text-sm text-muted-foreground">Fetching project details...</p>
-        </div>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout title={editId ? "Edit Project" : "New Project"} showBack>
@@ -229,6 +356,14 @@ const CreateProject = () => {
           className="hidden" 
           accept="image/jpeg,image/png,image/webp" 
           onChange={handleImageUpload} 
+        />
+
+        <input 
+          type="file" 
+          ref={docInputRef} 
+          className="hidden" 
+          accept=".md,.txt" 
+          onChange={handleDocUpload} 
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -347,6 +482,75 @@ const CreateProject = () => {
                 className="h-12 rounded-xl bg-accent/20 border-border" 
                 value={formData.projectUrl}
                 onChange={e => setFormData({...formData, projectUrl: e.target.value})}
+                disabled={isAtTotalLimit}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Project Documentation Section */}
+        <div className="space-y-4 bg-card border border-border p-6 rounded-3xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-sm font-bold flex items-center gap-2">
+                <FileText size={16} className="text-primary" /> Project Documentation (Optional)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                This documentation is used by the AI Project Manager to better understand your project.
+              </p>
+            </div>
+            {formData.documentation && (
+              <button 
+                type="button" 
+                onClick={removeDoc}
+                className="text-xs font-bold text-destructive flex items-center gap-1 hover:underline"
+              >
+                <X size={14} /> Remove Doc
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="rounded-xl h-12 gap-2 border-primary/20 hover:bg-primary/5"
+                onClick={() => docInputRef.current?.click()}
+              >
+                <Upload size={16} /> Upload .md / .txt
+              </Button>
+              {formData.documentation_filename && (
+                <div className="flex items-center gap-2 px-3 bg-primary/10 text-primary text-xs font-bold rounded-xl border border-primary/20">
+                  <FileText size={14} /> {formData.documentation_filename}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <Label className="text-xs text-muted-foreground">Or paste documentation directly below:</Label>
+                <span className={cn(
+                  "text-[10px] font-bold",
+                  formData.documentation.length > (isPremium ? 100000 : 5000) ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  {formData.documentation.length} / {isPremium ? "100,000" : "5,000"} chars
+                  {!isPremium && " (Free Limit)"}
+                </span>
+              </div>
+              <Textarea 
+                placeholder="# Architecture Roadmap&#10;Describe your folder structure, database schema, API endpoints, or sprint plans here..." 
+                className="min-h-[200px] rounded-xl bg-accent/20 border-border font-mono text-xs leading-relaxed" 
+                value={formData.documentation}
+                onChange={e => {
+                  const text = e.target.value;
+                  const limit = isPremium ? 100000 : 5000;
+                  if (text.length <= limit) {
+                    setFormData({...formData, documentation: text});
+                  } else {
+                    toast.error(`Character limit reached. Upgrade to Pro for up to 100,000 characters!`);
+                  }
+                }}
                 disabled={isAtTotalLimit}
               />
             </div>
