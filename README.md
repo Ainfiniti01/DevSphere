@@ -24,6 +24,7 @@ Modern software development is highly fragmented. Developers constantly switch b
 
 DevSphere solves these challenges by unifying project discovery, team formation, real-time communication, task management, and context-aware AI assistance into a single, integrated platform.
 
+> *"DevSphere communicates with Alibaba Cloud Qwen models through the DashScope Workspace OpenAI-compatible API."*
 ---
 
 ## 🌍 Global AI Hackathon — Track 2: AI Application
