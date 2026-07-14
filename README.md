@@ -357,7 +357,7 @@ During the Global AI Hackathon, During the Global AI Hackathon, DevSphere gained
 * **Role-Aware Reasoning Engine:** Developed the multi-role prompt engineering architecture that adapts AI responses based on user permissions (Visitor, Applicant, Member, Owner).
 * **Real-Time Team Workflows:** Built the join request system, team management dashboard, and real-time group chat synchronization.
 * **Smart notification Architecture:** Implemented database triggers and real-time subscriptions to notify users of project updates, join requests, and messages instantly.
-* **Referral & Reward Foundation:** Created the referral code generation, tracking, and points system to incentivize community growth.
+* **Referral & Rewards Foundation:** Created the referral code generation, tracking, and points system to incentivize community growth.
 
 ---
 
