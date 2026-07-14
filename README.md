@@ -217,7 +217,7 @@ The typical lifecycle of a developer on DevSphere follows a structured, collabor
 
 ---
 
-## 🏗️ Technical Architecture
+## 🏗️ AI System Architecture
 
 DevSphere's end-to-end AI and collaboration architecture is illustrated below:
 
