@@ -113,12 +113,12 @@ Traditional AI assistants answer isolated prompts, requiring users to repeatedly
 ### 🏠 Home Dashboard & 🤖 Context-Aware AI Project Manager
 | Home Dashboard | AI Project Manager |
 | :---: | :---: |
-| ![Home Page](.dyad/screenshot/8c1d7ae2237ff17b250f3d602ad95e449bc923a6.png) | ![AI Manager Page](.dyad/screenshot/36ace0317ba48f4705003ff3bebf309796920fe5.png) |
+| ![Home Page](.dyad/scrhot/8c1d7ae2237ff17b250f3d602ad95e449bc923a6.png) | ![AI Manager Page](.dyad/scrnshot/36ace0317ba48f4705003ff3bebf309796920fe5.png) |
 
 ### 🔍 Explore Projects & 👥 Team Management
 | Explore Projects | Team Management |
 | :---: | :---: |
-| ![Explore Page](.dyad/screenshot/bfac52a98498e73393d6a07ec5168ae0a5fb7ec5.png) | ![Manage Team Page](.dyad/screenshot/87e3c9a8d2a7f438d15173586fae6a306b7a6c67.png) |
+| ![Explore Page](.dyad/screhot/bfac52a98498e73393d6a07ec5168ae0a5fb7ec5.png) | ![Manage Team Page](.dyad/scrot/87e3c9a8d2a7f438d15173586fae6a306b7a6c67.png) |
 
 ## 🎥 Demo
 
