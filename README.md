@@ -1,140 +1,181 @@
 # 🚀 DevSphere — Build Together. Ship Together.
 
-An AI-powered developer collaboration platform built with Alibaba Cloud Qwen.
+**An AI-Powered Developer Collaboration Platform built with Alibaba Cloud Qwen-Plus.**
 
-DevSphere helps developers discover projects, build teams, collaborate in real time, and transform ideas into successful products. Instead of working alone or abandoning great ideas, developers can find teammates, manage projects, communicate, and receive AI-powered project guidance—all within one platform.
+> *"DevSphere doesn't simply showcase ideas, it helps teams build them together."*
+
+> *"DevSphere communicates with Alibaba Cloud Qwen models through the DashScope Workspace OpenAI-compatible API."*
+
+![DevSphere Logo](assets/images/icon.jpeg)
+
+## 🛡️ Badges
+
+### Global AI Hackathon_AI Application & Alibaba Cloud_Qwen
+
+| Global AI Hackathon_AI Application | Alibaba Cloud_Qwen |
+| :---: | :---: |
+| ![Track](https://img.shields.io/badge/Global_AI_Hackathon-AI_Application-blue) | ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-Qwen-orange) |
 
 ---
 
-## 🌍 Global AI Hackathon
+## 🌍 Global AI Hackathon — Track 2: AI Application
 
-**Track:** AI Application
+DevSphere is an intelligent developer collaboration platform that combines real-time team formation, project discovery, and contextual AI assistance to help software teams build better products together. Instead of working alone or abandoning great ideas, developers can find teammates, manage projects, communicate, and receive AI-powered project guidance—all within one platform.
 
-DevSphere showcases how AI can become an intelligent project manager that understands a project's context, team structure, development stage, and goals to help software teams build better products together.
+## 🧠 AI Project Manager Engine
+
+Every project interaction follows a complete project management lifecycle:
+
+• Retrieve project details (Problem, Solution, Stage, Skills)
+• Retrieve creator and team context
+• Identify the user's project role (Visitor, Applicant, Member, Owner)
+• Reason with Alibaba Cloud Qwen-Plus
+• Return actionable recommendations tailored to the current project
+
+This ensures responses remain highly relevant instead of behaving like a generic chatbot.
+
+### Contextual Reasoning Loop
+
+DevSphere continuously:
+
+- Analyzes project metadata and development stages
+- Adapts responses based on the user's role and permissions
+- Generates roadmaps, task lists, and sprint plans
+- Recommends scalable engineering practices and architectures
+
+This enables long-term personalized project guidance while maintaining an efficient context window.
 
 ---
 
-## ✨ Features
+## 📱 Application Interface
 
-### 🤝 Project Discovery
-- Browse community projects
-- Discover startup ideas
-- Search by skills and technologies
-- View project stages and requirements
+### 🏠 Home Dashboard & 🤖 AI Project Manager
+| Home Dashboard | AI Project Manager |
+| :---: | :---: |
+| ![Home Page](.dyad/screenshot/8c1d7ae2237ff17b250f3d602ad95e449bc923a6.png) | ![AI Manager Page](.dyad/screenshot/36ace0317ba48f4705003ff3bebf309796920fe5.png) |
 
-### 👥 Team Formation
-- Request to join projects
-- Accept or reject applicants
-- Project member management
-- Team role organization
-- Group collaboration
+### 🔍 Explore Projects & 👥 Team Management
+| Explore Projects | Team Management |
+| :---: | :---: |
+| ![Explore Page](.dyad/screenshot/bfac52a98498e73393d6a07ec5168ae0a5fb7ec5.png) | ![Manage Team Page](.dyad/screenshot/87e3c9a8d2a7f438d15173586fae6a306b7a6c67.png) |
 
-### 🤖 AI Project Manager (Powered by Qwen)
-Every project includes an intelligent AI Project Manager that understands the project before responding.
+## 🎥 Demo
 
-The AI can:
-- Explain the project
-- Suggest features
-- Generate development roadmaps
-- Break features into tasks
-- Recommend technologies
-- Suggest architecture improvements
-- Assist with debugging
-- Help onboard new contributors
-- Generate sprint plans
-- Identify technical risks
-- Recommend best practices
+Live Demo:
+https://dev-sphere-kappa.vercel.app/
 
-Unlike a general chatbot, the AI responds using the project's context, current team information, development stage, and user role.
+Demo Video:
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
-### 💬 Real-Time Collaboration
-- One-to-one messaging
-- Project group chats
-- System events for team activity
-- Read receipts
-- Chat management
-- Notification integration
+---
 
-### 🔔 Smart Notifications
-Receive notifications for:
-- Project join requests
-- Request approvals
-- Team activity
-- Messages
-- Project updates
-- System events
+## ✨ Core Features
 
-Includes customizable notification preferences and optional notification sounds.
-
-### 👤 Developer Profiles
-Create a professional developer profile featuring:
-- Skills
-- Bio
-- Portfolio
-- Experience
-- Title
-- Profile picture
-
-Helping teams identify the right contributors quickly.
-
-### 🎁 Referral System
-Invite developers to join DevSphere and earn referral points toward future platform rewards.
-
-Current implementation includes:
-- Referral codes
-- Referral tracking
-- Points system
-- Progress statistics
-- Future-ready reward architecture
+- 🤝 **Project Discovery:** Browse community projects, discover startup ideas, and search by skills, technologies, and stages.
+- 👥 **Team Formation:** Request to join projects, accept or reject applicants, and manage project members and roles.
+- 🤖 **AI Project Manager (Powered by Qwen):** Every project includes an intelligent AI PM that understands the project context before responding.
+- 💬 **Real-Time Collaboration:** One-to-one messaging, project group chats, read receipts, and system events for team activity.
+- 🔔 **Smart Notifications:** Receive alerts for join requests, approvals, team activity, messages, and project updates.
+- 👤 **Developer Profiles:** Create a professional developer profile featuring skills, bio, portfolio, experience, and title.
+- 🎁 **Referral System:** Invite developers to join DevSphere and earn referral points toward future platform rewards.
 
 ---
 
 ## 🏗️ Technical Architecture
 
-DevSphere combines real-time collaboration with contextual AI assistance.
+DevSphere's end-to-end AI and collaboration architecture is illustrated below:
 
-### Collaboration Layer
-- User authentication
-- Project management
-- Team management
-- Messaging
-- Notifications
-- Referral system
+```text
+┌──────────────────────────────────────────┐
+│             React Frontend               │
+│   Home • Explore • Create • Chat • Team  │
+└──────────────────┬───────────────────────┘
+                   │
+                   ▼
+        ┌────────────────────────┐
+        │  Supabase Auth (JWT)   │
+        └───────────┬────────────┘
+                    │
+                    ▼
+        ┌────────────────────────┐
+        │ PostgreSQL Database    │
+        │ • Profiles             │
+        │ • Projects             │
+        │ • Join Requests        │
+        │ • Messages             │
+        │ • Notifications        │
+        │ • Referral Points      │
+        └───────────┬────────────┘
+                    │
+                    ▼
+      ┌────────────────────────────────┐
+      │ Supabase Edge Functions        │
+      │ • project-manager              │
+      └───────────────┬────────────────┘
+                      │
+                      ▼
+      ┌────────────────────────────────┐
+      │ Alibaba Cloud DashScope API    │
+      └───────────────┬────────────────┘
+                      │
+                      ▼
+      ┌────────────────────────────────┐
+      │ Qwen-Plus AI Reasoning         │
+      │ • Project Awareness            │
+      │ • Role-Based Intelligence      │
+      │ • Contextual Reasoning         │
+      │ • Secure Design                │
+      └───────────────┬────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│      Live Dashboard & AI Project PM      │
+│  Roadmaps • Task Lists • Chat • UI       │
+└──────────────────────────────────────────┘
+```
 
-### Intelligence Layer
-The AI Project Manager follows a contextual reasoning workflow:
-1. Retrieve project information
-2. Retrieve creator and team context
-3. Identify the user's project role
-4. Build a project-aware system prompt
-5. Generate responses using Alibaba Cloud Qwen
-6. Return actionable recommendations tailored to the current project
+1. **Project Setup:** Users create or join projects, establishing their roles and permissions.
+2. **Contextual Reasoning:** Supabase Edge Functions (Qwen-Plus) analyze the project metadata, factoring in the user's role and permissions.
+3. **State Synthesis:** The AI updates the project's roadmap, task lists, and sprint plans, providing fresh insights and recommended actions on the dashboard.
 
-This ensures responses remain relevant instead of behaving like a generic chatbot.
+---
+
+## 📂 Project Structure
+
+```text
+devsphere/
+├── assets/
+│   ├── images/             # App screenshots and brand logos
+│   └── sounds/             # Custom notification chimes
+├── supabase/
+│   └── functions/          # Qwen-powered Edge Functions
+│       └── project-manager/# AI Project Manager chat reasoning
+└── src/
+    ├── components/         # Reusable UI components (ProjectCard, AIManager, etc.)
+    ├── context/            # Global state management (AppContext)
+    ├── hooks/              # Custom React hooks (useIsMobile, useToast)
+    ├── integrations/       # Supabase client & SQL logic
+    ├── pages/              # App pages (Index, Explore, CreateProject, ChatScreen, etc.)
+    ├── utils/              # Helper utilities (NotificationService, toasts)
+    ├── App.tsx             # Main router and layout controller
+    └── main.tsx            # Application entry point
+```
 
 ---
 
 ## 🧠 AI Project Manager Implementation
 
-The AI Project Manager provides contextual assistance through four core capabilities.
+DevSphere satisfies the AI Application requirements through four core capabilities:
 
 ### Project Awareness
-The AI understands:
-- Project title
-- Description
-- Problem statement
-- Proposed solution
-- Development stage
-- Required skills
-- Team members
-- Founder information
+The AI understands the project title, description, problem statement, proposed solution, development stage, required skills, team members, and founder information.
 
 ### Role-Based Intelligence
 Responses adapt depending on who is interacting:
-- **Visitors:** Learn what the project is about, understand required skills, decide whether to join.
-- **Applicants:** Receive onboarding guidance, learn project expectations, identify preparation steps.
-- **Team Members:** Receive implementation advice, task breakdowns, architecture recommendations, debugging assistance.
-- **Project Owners:** Sprint planning, roadmaps, milestones, hiring recommendations, scaling strategies, MVP planning, release planning.
+- **Visitors:** Learn what the project is about, understand required skills, and decide whether to join.
+- **Applicants:** Receive onboarding guidance, learn project expectations, and identify preparation steps.
+- **Team Members:** Receive implementation advice, task breakdowns, architecture recommendations, and debugging assistance.
+- **Project Owners:** Sprint planning, roadmaps, milestones, hiring recommendations, scaling strategies, MVP planning, and release planning.
 
 ### Contextual Reasoning
 The AI remains focused on the current project instead of acting as a general-purpose assistant. It avoids inventing missing project details and recommends scalable engineering practices whenever possible.
@@ -146,63 +187,74 @@ Sensitive information such as authentication tokens, API keys, and private backe
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- React
-- TypeScript
-- Tailwind CSS
-- Vite
+- **Frontend:** React + TypeScript + Tailwind CSS
+- **Database/Auth:** Supabase (PostgreSQL + RLS)
+- **AI Engine:** Alibaba Cloud Qwen-Plus (DashScope Workspace Endpoint)
+- **Deployment:** Vercel
+- **Backend:** Supabase Edge Functions
 
-### Backend
-- Supabase
-- PostgreSQL
-- Row-Level Security (RLS)
-- Supabase Edge Functions
+## ☁️ Alibaba Cloud Integration
 
-### AI
-- Alibaba Cloud Qwen Plus
-- Workspace OpenAI-Compatible API
+DevSphere communicates with Alibaba Cloud Qwen through the official DashScope Workspace OpenAI-compatible endpoint:
 
-### Realtime
-- Supabase Realtime
+https://ws-12c4bsjrjqxy8v2b.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions
 
-### Deployment
-- Vercel
+The application performs AI reasoning using Alibaba Cloud Qwen models via Supabase Edge Functions.
 
 ---
 
 ## 🚀 Getting Started
 
-1. Clone the repository.
-2. Create a Supabase project.
-3. Configure the required database schema and RLS policies.
-4. Deploy the Supabase Edge Functions.
-5. Configure the following environment variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `SUPABASE_DB_URL`
-   - `QWEN_API_KEY`
-6. Configure the Alibaba Cloud Qwen Workspace endpoint.
-7. Start the development server.
+1. Set up your Supabase project.
+2. Configure the `QWEN_API_KEY` in your Supabase Edge Function secrets.
+3. Use the integrated SQL tools to set up the `profiles`, `projects`, `join_requests`, `messages`, and `notifications` schema.
 
+```text
+Clone Repository
+      │
+      ▼
+Install Dependencies
+      │
+      ▼
+Configure Supabase
+      │
+      ▼
+Set QWEN_API_KEY
+      │
+      ▼
+Deploy Edge Functions
+      │
+      ▼
+npm install
+      │
+      ▼
+npm run dev
+
+```
 ---
 
-## 🔒 Security
+## ❤️ Why DevSphere?
 
-DevSphere is designed with security in mind:
-- Row-Level Security (RLS)
-- Secure authentication
-- Backend authorization
-- Role-based project permissions
-- Protected Edge Functions
-- Secure AI integration using server-side API keys
+Most collaboration platforms record tasks.
 
----
-
-## 🌱 Vision
-
-DevSphere aims to become the platform where developers don't just showcase ideas—they build them together.
+DevSphere builds teams.
 
 By combining intelligent AI assistance, real-time collaboration, project discovery, and startup-focused team formation, DevSphere lowers the barrier between having an idea and launching a successful product.
 
-Built for the Global AI Hackathon 2026. 🚀
+## 🚀 What Makes DevSphere Different?
+
+Unlike traditional project management tools that require manual updates, DevSphere continuously builds a contextual understanding of the project.
+
+It learns from team activity, adapts its guidance based on the user's role, and provides objective technical reasoning using Alibaba Cloud Qwen as its reasoning engine.
+
+The result is an AI Project Manager that becomes more personalized with every interaction.
+
+---
+
+## 📄 License
+
+MIT License
+
+Built with Alibaba Cloud Qwen
+
+Built for Global AI Hackathon 2026
