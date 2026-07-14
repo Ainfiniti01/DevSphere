@@ -74,7 +74,8 @@ const AIManager = ({ projectId }: AIManagerProps) => {
 
   useEffect(() => {
     localStorage.setItem(`devsphere_ai_chat_${projectId}`, JSON.stringify(messages));
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Use block: 'nearest' to prevent the entire browser window from scrolling up
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, projectId]);
 
   const handleSend = async (textToSend?: string) => {

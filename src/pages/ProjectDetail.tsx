@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -293,6 +293,13 @@ const ProjectDetail = () => {
                 <div className="space-y-4 pt-4">
                   {isOwner ? (
                     <div className="flex flex-col gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="h-14 rounded-2xl gap-3 font-black text-lg border-primary/20 hover:bg-primary/5" 
+                        onClick={() => navigate(`/create?edit=${project.id}`)}
+                      >
+                        <Edit size={20} /> Edit Project
+                      </Button>
                       <Button 
                         variant={project.status === 'ACTIVE' ? "outline" : "default"}
                         className="h-14 rounded-2xl gap-3 font-black text-lg shadow-lg"
