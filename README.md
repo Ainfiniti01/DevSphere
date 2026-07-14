@@ -1,4 +1,4 @@
-# 🚀 DevSphere — Build Together. Ship Together.
+# 🚀 DevSphere -- Build Together. Ship Together.
 
 **An AI-Powered Developer Collaboration Platform built with Alibaba Cloud Qwen-Plus.**
 
