@@ -441,6 +441,6 @@ Unlike traditional project management tools that require manual updates, DevSphe
 
 MIT License
 
-Built with Alibaba Cloud Qwen
+Built with ❤️ using Alibaba Cloud Qwen-Plus
 
 Built for Global AI Hackathon 2026
