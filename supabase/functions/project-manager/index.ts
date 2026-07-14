@@ -120,7 +120,115 @@ serve(async (req) => {
         $$;
       `
 
-      // Redefine accept_join_request to automatically insert a system message into the group chat
+      // Drop old triggers to avoid conflicts
+      await sql`DROP TRIGGER IF EXISTS on_project_member_added ON public.project_members;`
+      await sql`DROP TRIGGER IF EXISTS on_project_member_change ON public.project_members;`
+
+      // Create the comprehensive project member change trigger function
+      await sql`
+        CREATE OR REPLACE FUNCTION public.handle_project_member_change()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        DECLARE
+            v_chat_id UUID;
+            v_creator_id UUID;
+            v_creator_name TEXT;
+            v_user_name TEXT;
+            v_is_new_chat BOOLEAN := FALSE;
+            v_member RECORD;
+        BEGIN
+            -- Get project creator details
+            SELECT creator_id INTO v_creator_id FROM public.projects WHERE id = COALESCE(NEW.project_id, OLD.project_id);
+            SELECT name INTO v_creator_name FROM public.profiles WHERE id = v_creator_id;
+            
+            -- Get the user's name
+            SELECT name INTO v_user_name FROM public.profiles WHERE id = COALESCE(NEW.user_id, OLD.user_id);
+
+            -- Case 1: Member joins or becomes active
+            IF (TG_OP = 'INSERT' AND NEW.status = 'active') OR (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status AND NEW.status = 'active') THEN
+                -- Find or create the group chat for this project
+                SELECT id INTO v_chat_id FROM public.chats WHERE project_id = NEW.project_id AND type = 'group';
+                
+                IF v_chat_id IS NULL THEN
+                    v_is_new_chat := TRUE;
+                    INSERT INTO public.chats (project_id, type)
+                    VALUES (NEW.project_id, 'group')
+                    RETURNING id INTO v_chat_id;
+                END IF;
+
+                -- Ensure the project owner is in the chat
+                INSERT INTO public.chat_members (chat_id, user_id)
+                VALUES (v_chat_id, v_creator_id)
+                ON CONFLICT DO NOTHING;
+
+                -- If it's a new chat, add all existing active members and send the creation message
+                IF v_is_new_chat THEN
+                    -- Add all other active members
+                    FOR v_member IN 
+                        SELECT user_id FROM public.project_members 
+                        WHERE project_id = NEW.project_id AND status = 'active' AND user_id != v_creator_id
+                    LOOP
+                        INSERT INTO public.chat_members (chat_id, user_id)
+                        VALUES (v_chat_id, v_member.user_id)
+                        ON CONFLICT DO NOTHING;
+                    END LOOP;
+
+                    -- Send creation message: "<Founder> created the project group."
+                    INSERT INTO public.messages (chat_id, sender_id, content, type, status)
+                    VALUES (v_chat_id, v_creator_id, COALESCE(v_creator_name, 'Founder') || ' created the project group.', 'system', 'sent');
+                END IF;
+
+                -- Add the newly active member to the chat_members table
+                INSERT INTO public.chat_members (chat_id, user_id)
+                VALUES (v_chat_id, NEW.user_id)
+                ON CONFLICT DO NOTHING;
+
+                -- Send join message: "<User> joined the project."
+                -- Only send if the user is not the creator (to avoid duplicate messages during creation)
+                IF NOT v_is_new_chat OR NEW.user_id != v_creator_id THEN
+                    INSERT INTO public.messages (chat_id, sender_id, content, type, status)
+                    VALUES (v_chat_id, v_creator_id, COALESCE(v_user_name, 'A developer') || ' joined the project.', 'system', 'sent');
+                END IF;
+
+            -- Case 2: Member leaves or is removed
+            ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'active' AND NEW.status IN ('left', 'removed')) OR (TG_OP = 'DELETE' AND OLD.status = 'active') THEN
+                -- Find the group chat for this project
+                SELECT id INTO v_chat_id FROM public.chats WHERE project_id = COALESCE(NEW.project_id, OLD.project_id) AND type = 'group';
+                
+                IF v_chat_id IS NOT NULL THEN
+                    -- Remove from chat_members
+                    DELETE FROM public.chat_members WHERE chat_id = v_chat_id AND user_id = COALESCE(NEW.user_id, OLD.user_id);
+                    
+                    -- Send leave message: "<User> left the project."
+                    INSERT INTO public.messages (chat_id, sender_id, content, type, status)
+                    VALUES (v_chat_id, v_creator_id, COALESCE(v_user_name, 'A developer') || ' left the project.', 'system', 'sent');
+                    
+                    -- Clean empty chats (If no members left, delete chat)
+                    IF NOT EXISTS (SELECT 1 FROM public.chat_members WHERE chat_id = v_chat_id) THEN
+                        DELETE FROM public.chats WHERE id = v_chat_id;
+                    END IF;
+                END IF;
+            END IF;
+
+            IF TG_OP = 'DELETE' THEN
+                RETURN OLD;
+            ELSE
+                RETURN NEW;
+            END IF;
+        END;
+        $$;
+      `
+
+      // Create the trigger on project_members
+      await sql`
+        CREATE TRIGGER on_project_member_change
+        AFTER INSERT OR UPDATE OR DELETE ON public.project_members
+        FOR EACH ROW EXECUTE FUNCTION public.handle_project_member_change();
+      `
+
+      // Redefine accept_join_request to delegate chat membership and system messages to the trigger
       await sql`
         CREATE OR REPLACE FUNCTION public.accept_join_request(p_request_id uuid, p_admin_id uuid)
         RETURNS void
@@ -130,9 +238,7 @@ serve(async (req) => {
         DECLARE
             v_project_id UUID;
             v_user_id UUID;
-            v_chat_id UUID;
             v_project_title TEXT;
-            v_user_name TEXT;
         BEGIN
             -- 1. Verify admin and get details
             SELECT r.project_id, r.user_id, p.title 
@@ -145,9 +251,6 @@ serve(async (req) => {
                 RAISE EXCEPTION 'Unauthorized or request not found.';
             END IF;
 
-            -- Get user name
-            SELECT name INTO v_user_name FROM public.profiles WHERE id = v_user_id;
-
             -- 2. Safety Guard: Prevent duplicate processing
             IF EXISTS (
               SELECT 1 FROM public.project_members 
@@ -159,28 +262,85 @@ serve(async (req) => {
             -- 3. Update request status
             UPDATE public.join_requests SET status = 'accepted' WHERE id = p_request_id;
 
-            -- 4. Update membership status
+            -- 4. Update membership status (This will trigger handle_project_member_change)
             INSERT INTO public.project_members (project_id, user_id, role, status)
             VALUES (v_project_id, v_user_id, 'Member', 'active')
             ON CONFLICT (project_id, user_id) DO UPDATE SET status = 'active';
 
-            -- 5. Handle Chat Membership
-            SELECT id INTO v_chat_id FROM public.chats WHERE project_id = v_project_id AND type = 'group';
-            IF v_chat_id IS NULL THEN
-                INSERT INTO public.chats (project_id, type) VALUES (v_project_id, 'group') RETURNING id INTO v_chat_id;
-            END IF;
-
-            INSERT INTO public.chat_members (chat_id, user_id)
-            VALUES (v_chat_id, v_user_id), (v_chat_id, p_admin_id)
-            ON CONFLICT DO NOTHING;
-
-            -- 6. Insert system message into group chat
-            INSERT INTO public.messages (chat_id, sender_id, content, type, status)
-            VALUES (v_chat_id, p_admin_id, v_user_name || ' joined the project.', 'system', 'sent');
-
-            -- 7. Notify
+            -- 5. Notify
             INSERT INTO public.notifications (user_id, actor_id, type, content, project_id)
             VALUES (v_user_id, p_admin_id, 'request_accepted', 'Your request to join "' || v_project_title || '" was accepted!', v_project_id);
+        END;
+        $$;
+      `
+
+      // Redefine leave_project to delegate chat removal and system messages to the trigger
+      await sql`
+        CREATE OR REPLACE FUNCTION public.leave_project(p_project_id uuid, p_user_id uuid)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        BEGIN
+            -- Update membership status (This will trigger handle_project_member_change)
+            UPDATE public.project_members SET status = 'left' WHERE project_id = p_project_id AND user_id = p_user_id;
+        END;
+        $$;
+      `
+
+      // Redefine remove_project_member to delegate chat removal and system messages to the trigger
+      await sql`
+        CREATE OR REPLACE FUNCTION public.remove_project_member(p_project_id uuid, p_target_user_id uuid, p_admin_id uuid)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        DECLARE
+            v_project_title TEXT;
+        BEGIN
+            -- 1. Verify admin
+            SELECT title INTO v_project_title FROM public.projects WHERE id = p_project_id AND creator_id = p_admin_id;
+            IF v_project_title IS NULL THEN
+                RAISE EXCEPTION 'Unauthorized.';
+            END IF;
+
+            -- 2. Update membership status (This will trigger handle_project_member_change)
+            UPDATE public.project_members SET status = 'removed' WHERE project_id = p_project_id AND user_id = p_target_user_id;
+
+            -- 3. Notify AFTER successful state change
+            INSERT INTO public.notifications (user_id, actor_id, type, content, project_id)
+            VALUES (p_target_user_id, p_admin_id, 'system', 'You were removed from the group "' || v_project_title || '" by the admin.', p_project_id);
+        END;
+        $$;
+      `
+
+      // Redefine remove_group_member to delegate chat removal and system messages to the trigger
+      await sql`
+        CREATE OR REPLACE FUNCTION public.remove_group_member(p_chat_id uuid, p_target_user_id uuid, p_admin_id uuid)
+        RETURNS void
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        AS $$
+        DECLARE
+            v_project_id UUID;
+            v_project_title TEXT;
+        BEGIN
+            -- Verify admin is the project owner
+            SELECT c.project_id, p.title INTO v_project_id, v_project_title
+            FROM public.chats c
+            JOIN public.projects p ON c.project_id = p.id
+            WHERE c.id = p_chat_id AND p.creator_id = p_admin_id;
+
+            IF v_project_id IS NULL THEN
+                RAISE EXCEPTION 'Unauthorized: Only project owners can remove members.';
+            END IF;
+
+            -- Notify user BEFORE removal
+            INSERT INTO public.notifications (user_id, actor_id, type, content, project_id)
+            VALUES (p_target_user_id, p_admin_id, 'system', 'You were removed from the "' || v_project_title || '" group by the admin.', v_project_id);
+
+            -- Update membership status (This will trigger handle_project_member_change)
+            UPDATE public.project_members SET status = 'removed' WHERE project_id = v_project_id AND user_id = p_target_user_id;
         END;
         $$;
       `
