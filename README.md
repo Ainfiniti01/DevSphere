@@ -350,7 +350,7 @@ To ensure maximum security and performance, all communication with Alibaba Cloud
 
 ## 🏆 Hackathon Enhancements
 
-During the Global AI Hackathon, DevSphere underwent significant engineering upgrades to transition from a basic project showcase into a fully-fledged, AI-powered collaboration ecosystem:
+During the Global AI Hackathon, During the Global AI Hackathon, DevSphere gained:
 
 * **Context-Aware AI Project Manager:** Designed and implemented the entire AI Project Manager interface (`AIManager.tsx`) and backend reasoning engine.
 * **Alibaba Cloud Qwen Integration:** Built the Supabase Edge Function (`project-manager`) to securely connect with Alibaba Cloud's Qwen-Plus model via the DashScope API.
