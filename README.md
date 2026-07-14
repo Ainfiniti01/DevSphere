@@ -352,7 +352,7 @@ To ensure maximum security and performance, all communication with Alibaba Cloud
 
 During the Global AI Hackathon, During the Global AI Hackathon, DevSphere gained:
 
-* **Context-Aware AI Project Manager:** Designed and implemented the entire AI Project Manager interface (`AIManager.tsx`) and backend reasoning engine.
+* **Context-Aware AI Project Manager
 * **Alibaba Cloud Qwen Integration
 * **Role-Aware Reasoning Engine
 * **Real-Time Team Workflows
