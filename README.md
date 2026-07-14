@@ -443,4 +443,4 @@ MIT License
 
 Built with ❤️ using Alibaba Cloud Qwen-Plus
 
-Built for Global AI Hackathon 2026
+Created for the Global AI Hackathon 2026
