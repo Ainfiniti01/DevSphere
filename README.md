@@ -109,6 +109,7 @@ Traditional AI assistants answer isolated prompts, requiring users to repeatedly
 ---
 
 ## 📱 Application Interface
+> *"Screenshots only showcace Desktop interface."*
 
 ### 🏠 Home Dashboard & 🤖 Context-Aware AI Project Manager
 | Home Dashboard | AI Project Manager |
