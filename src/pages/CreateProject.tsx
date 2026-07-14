@@ -45,6 +45,8 @@ const CreateProject = () => {
   const isAtTotalLimit = !isPremium && userProjects.length >= 5 && !editId;
   const isAtActiveLimit = !isPremium && activeProjects.length >= 3 && !editId;
 
+  const canEditTitle = !editId || currentUser?.is_admin || currentUser?.name === 'Abdulazeez Adam.A';
+
   useEffect(() => {
     const loadProjectData = async () => {
       if (!editId || !supabase) return;
@@ -164,6 +166,10 @@ const CreateProject = () => {
       thumbnail_url: formData.thumbnail,
     };
 
+    if (canEditTitle) {
+      projectData.title = formData.title;
+    }
+
     try {
       let result;
       if (editId) {
@@ -232,7 +238,7 @@ const CreateProject = () => {
                 <Label className="text-sm font-bold flex items-center gap-2">
                   <Rocket size={16} className="text-primary" /> Project Title
                 </Label>
-                {editId && (
+                {editId && !canEditTitle && (
                   <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
                     <Lock size={10} /> Permanent
                   </span>
@@ -243,14 +249,14 @@ const CreateProject = () => {
                   placeholder="e.g. EcoTrack AI" 
                   className={cn(
                     "h-12 rounded-xl bg-accent/20 border-border",
-                    editId && "bg-muted/50 text-muted-foreground cursor-not-allowed pr-10"
+                    !canEditTitle && "bg-muted/50 text-muted-foreground cursor-not-allowed pr-10"
                   )} 
                   required 
                   value={formData.title}
-                  onChange={e => !editId && setFormData({...formData, title: e.target.value})}
-                  disabled={isAtTotalLimit || !!editId}
+                  onChange={e => canEditTitle && setFormData({...formData, title: e.target.value})}
+                  disabled={isAtTotalLimit || !canEditTitle}
                 />
-                {editId && (
+                {editId && !canEditTitle && (
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
                 )}
               </div>

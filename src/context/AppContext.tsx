@@ -60,7 +60,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshTimeout = useRef<any>(null);
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
-  const hasShownPauseWarning = useRef(false);
 
   const completeOnboarding = useCallback(() => {
     setHasSeenOnboarding(true);
@@ -72,27 +71,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     return user.display_name || user.name || user.full_name || (user.email ? user.email.split('@')[0] : `User_${user.id?.slice(0, 4)}`);
   }, []);
 
-  const handleConnectionFailure = useCallback(() => {
-    if (!hasShownPauseWarning.current) {
-      hasShownPauseWarning.current = true;
-      toast.error(
-        "Unable to connect to Supabase. Your database project might be paused or sleeping. Please log into your Supabase Dashboard to wake it up.",
-        {
-          duration: 10000,
-          action: {
-            label: "Supabase Console",
-            onClick: () => window.open("https://supabase.com/dashboard", "_blank")
-          }
-        }
-      );
-    }
-  }, []);
-
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     
+    // Create a promise that rejects after 2 seconds to prevent hanging
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Timeout fetching profile")), 5000)
+      setTimeout(() => reject(new Error("Timeout fetching profile")), 2000)
     );
 
     try {
@@ -112,7 +96,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (existing) {
         console.log("[AppContext] ensureProfile: Found existing profile");
-        localStorage.setItem(`devsphere_profile_${userId}`, JSON.stringify(existing));
         return existing;
       }
 
@@ -135,11 +118,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         return data && data.length > 0 ? data[0] : null;
       })();
 
-      const created = await Promise.race([upsertPromise, timeoutPromise]) as any;
-      if (created) {
-        localStorage.setItem(`devsphere_profile_${userId}`, JSON.stringify(created));
-      }
-      return created;
+      return await Promise.race([upsertPromise, timeoutPromise]);
     } catch (error: any) {
       console.error("[AppContext] Error ensuring profile record exists:", {
         message: error?.message,
@@ -148,18 +127,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         code: error?.code,
         error
       });
-      
-      handleConnectionFailure();
-
-      // Try to load from cache first to prevent reversing back to stale auth metadata
-      const cached = localStorage.getItem(`devsphere_profile_${userId}`);
-      if (cached) {
-        try {
-          console.log("[AppContext] ensureProfile: Falling back to cached profile");
-          return JSON.parse(cached);
-        } catch (e) {}
-      }
-
       // Fallback to basic auth user info so we don't block the app
       return {
         id: userId,
@@ -167,7 +134,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         avatar_url: authUser.user_metadata?.avatar_url || null
       };
     }
-  }, [handleConnectionFailure]);
+  }, []);
 
   const updatePresence = useCallback(async () => {
     if (!supabase || !currentUser?.id) return;
@@ -186,7 +153,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      const { error } = await supabase
+      await supabase
         .from('profiles')
         .update({ 
           last_seen: now.toISOString(),
@@ -195,13 +162,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           last_streak_date: today
         })
         .eq('id', currentUser.id);
-
-      if (error) throw error;
     } catch (e) {
-      console.warn("[AppContext] Presence update failed:", e);
-      handleConnectionFailure();
+      // Silent fail
     }
-  }, [currentUser, handleConnectionFailure]);
+  }, [currentUser]);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase) return;
@@ -259,9 +223,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error: any) {
       console.error("Refresh projects error:", error.message);
-      handleConnectionFailure();
     }
-  }, [currentUser, handleConnectionFailure]);
+  }, [currentUser]);
 
   const refreshNotifications = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
@@ -279,11 +242,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadNotificationsCount(data?.filter(n => !n.is_read).length || 0);
     } catch (error: any) {
       console.error("Refresh notifications error:", error.message);
-      handleConnectionFailure();
     } finally {
       isRefreshing.current.notifications = false;
     }
-  }, [currentUser?.id, handleConnectionFailure]);
+  }, [currentUser?.id]);
 
   const refreshChats = useCallback(async () => {
     if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
@@ -404,11 +366,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       setUnreadChatsCount(sortedChats.filter(c => c.unread > 0).length);
     } catch (error: any) {
       console.error("Refresh chats error:", error.message);
-      handleConnectionFailure();
     } finally {
       isRefreshing.current.chats = false;
     }
-  }, [currentUser?.id, resolveName, handleConnectionFailure]);
+  }, [currentUser?.id, resolveName]);
 
   const markAsRead = useCallback(async (chatId: string, isGroup: boolean) => {
     if (!supabase || !currentUser?.id) return;
@@ -612,24 +573,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     console.log("[AppContext] Getting initial session...");
-    const sessionTimeout = new Promise<any>((_, reject) => 
-      setTimeout(() => reject(new Error("Session timeout")), 5000)
-    );
-
-    Promise.race([
-      supabase.auth.getSession(),
-      sessionTimeout
-    ]).then((result) => {
-      console.log("[AppContext] getSession resolved. Result:", result);
-      const session = result?.data?.session || null;
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log("[AppContext] getSession resolved. Session:", session, "Error:", error);
+      if (error) {
+        console.error("[AppContext] Get session error:", error);
+        supabase.auth.signOut();
+        if (isMounted) setAuthLoading(false);
+        return;
+      }
       handleUserSession(session);
     }).catch((err) => {
-      console.error("[AppContext] getSession failed or timed out:", err);
-      handleConnectionFailure();
-      if (isMounted) {
-        setCurrentUser(null);
-        setAuthLoading(false);
-      }
+      console.error("[AppContext] getSession rejected:", err);
+      if (isMounted) setAuthLoading(false);
     });
 
     // Listen for auth state changes
@@ -649,7 +605,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureProfile, handleConnectionFailure]);
+  }, [ensureProfile]);
 
   // Separate Effect to handle data fetching when currentUser changes (Prevents infinite loops)
   useEffect(() => {

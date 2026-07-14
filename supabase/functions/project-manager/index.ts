@@ -28,6 +28,50 @@ serve(async (req) => {
       await sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;`
       await sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;`
       
+      // Grant full admin and premium status to Abdulazeez Adam.A
+      await sql`UPDATE public.profiles SET is_admin = true, is_premium_override = true WHERE name = 'Abdulazeez Adam.A';`
+
+      // Re-define protect_project_identity to allow title edits for admins or Abdulazeez Adam.A
+      await sql`
+        CREATE OR REPLACE FUNCTION public.protect_project_identity()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        DECLARE
+          v_is_admin BOOLEAN;
+          v_name TEXT;
+        BEGIN
+          -- Get user profile info
+          SELECT is_admin, name INTO v_is_admin, v_name 
+          FROM public.profiles 
+          WHERE id = auth.uid();
+
+          -- If it's an update, check if restricted fields are being changed
+          IF (TG_OP = 'UPDATE') THEN
+            -- Allow "Abdulazeez Adam.A" or admins to edit title
+            IF (NEW.title IS DISTINCT FROM OLD.title) THEN
+              IF NOT (COALESCE(v_is_admin, false) OR v_name = 'Abdulazeez Adam.A') THEN
+                RAISE EXCEPTION 'INVALID_PROJECT_UPDATE';
+              END IF;
+            END IF;
+            
+            IF (NEW.creator_id IS DISTINCT FROM OLD.creator_id) THEN
+              RAISE EXCEPTION 'INVALID_PROJECT_UPDATE';
+            END IF;
+          END IF;
+          
+          -- Validate URL if present
+          IF (NEW.project_url IS NOT NULL AND NEW.project_url != '') THEN
+            IF NOT (NEW.project_url ~* '^https?://.+') THEN
+              RAISE EXCEPTION 'INVALID_PROJECT_URL';
+            END IF;
+          END IF;
+
+          RETURN NEW;
+        END;
+        $$;
+      `
+
       console.log("[project-manager] Database permissions repair completed successfully!")
       await sql.end()
     } catch (dbErr) {
