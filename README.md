@@ -115,12 +115,12 @@ Traditional AI assistants respond to isolated prompts. DevSphere instead assembl
 ### 🏠 Home Dashboard & 🤖 Context-Aware AI Project Manager
 | Home Dashboard | AI Project Manager |
 | :---: | :---: |
-| ![Home Page](assets/images/home.png) | ![AI Manager Page](assets/images/icon.jpeg) |
+| ![Home Page](assets/images/home.png) | ![AI Manager Page](assets/images/AI.png) |
 
 ### 🔍 Explore Projects & 👥 Team Management
 | Explore Projects | Team Management |
 | :---: | :---: |
-| ![Explore Page](assets/images/icon.jpeg) | ![Manage Team Page](assets/images/icon.jpeg) |
+| ![Explore Page](assets/images/icon.png) | ![Manage Team Page](assets/images/icon.png) |
 
 ## 🎥 Demo
 
