@@ -34,6 +34,7 @@ interface AppContextType {
   removeMemberFromGroup: (chatId: string, userId: string) => Promise<void>;
   updatePresence: () => Promise<void>;
   resolveName: (user: any) => string;
+  incrementInterest: (skills: string[], amount: number) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -164,6 +165,42 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', currentUser.id);
     } catch (e) {
       // Silent fail
+    }
+  }, [currentUser]);
+
+  const incrementInterest = useCallback(async (skills: string[], amount: number) => {
+    if (!supabase || !currentUser?.id) return;
+    
+    const currentSettings = currentUser.notification_settings || {};
+    const currentInterests = currentSettings.interests || {};
+    
+    const newInterests = { ...currentInterests };
+    skills.forEach(skill => {
+      const cleanSkill = skill.trim();
+      if (cleanSkill) {
+        newInterests[cleanSkill] = (newInterests[cleanSkill] || 0) + amount;
+      }
+    });
+    
+    const newSettings = {
+      ...currentSettings,
+      interests: newInterests
+    };
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_settings: newSettings })
+        .eq('id', currentUser.id);
+        
+      if (!error) {
+        setCurrentUser((prev: any) => ({
+          ...prev,
+          notification_settings: newSettings
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to update interests:", e);
     }
   }, [currentUser]);
 
@@ -498,6 +535,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
         if (error && error.code !== '23505') throw error;
+        // Increment interest score on like
+        if (project?.skills) {
+          incrementInterest(project.skills, 3);
+        }
       }
       await refreshProjects();
     } catch (error) {
@@ -505,13 +546,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       processingLikes.current.delete(projectId);
     }
-  }, [currentUser?.id, projects, refreshProjects]);
+  }, [currentUser?.id, projects, refreshProjects, incrementInterest]);
 
   const addComment = useCallback(async (projectId: string, text: string) => {
     if (!supabase || !currentUser?.id) {
       toast.error("Please sign in to comment");
       return;
     }
+    const project = projects.find(p => p.id === projectId);
     try {
       const { error } = await supabase.from('comments').insert({
         project_id: projectId,
@@ -521,10 +563,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
       await refreshProjects();
       toast.success("Comment added!");
+      // Increment interest score on comment
+      if (project?.skills) {
+        incrementInterest(project.skills, 3);
+      }
     } catch (error) {
       toast.error("Failed to add comment");
     }
-  }, [currentUser?.id, refreshProjects]);
+  }, [currentUser?.id, projects, refreshProjects, incrementInterest]);
 
   // Robust Auth Initialization & State Monitoring (Runs once on mount)
   useEffect(() => {
@@ -740,7 +786,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       logout, toggleLike, addComment,
       refreshProjects, refreshNotifications, refreshChats,
       markAsRead, deleteChat, leaveGroup, dismissGroup, removeMemberFromGroup,
-      updatePresence, resolveName
+      updatePresence, resolveName, incrementInterest
     }}>
       {children}
     </AppContext.Provider>

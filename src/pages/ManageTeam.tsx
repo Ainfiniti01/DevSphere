@@ -168,9 +168,16 @@ const ManageTeam = () => {
                     </div>
                     
                     {req.reason && (
-                      <div className="bg-accent/30 p-5 rounded-2xl mb-6 border border-border/50">
+                      <div className="bg-accent/30 p-5 rounded-2xl mb-4 border border-border/50">
                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Application Message</p>
                         <p className="text-sm italic text-foreground/80 leading-relaxed">"{req.reason}"</p>
+                      </div>
+                    )}
+
+                    {req.skills && (
+                      <div className="bg-accent/30 p-5 rounded-2xl mb-6 border border-border/50">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Inputted Skills / Contribution</p>
+                        <p className="text-sm text-foreground/80 leading-relaxed">{req.skills}</p>
                       </div>
                     )}
 

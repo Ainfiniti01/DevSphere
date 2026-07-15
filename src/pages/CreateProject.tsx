@@ -275,6 +275,81 @@ const CreateProject = () => {
     toast.info("Documentation removed");
   };
 
+  const notifyMatchingUsers = async (newProject: any) => {
+    try {
+      const { data: allProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, name, skills, notification_settings')
+        .neq('id', currentUser.id);
+
+      if (profilesError || !allProfiles) return;
+
+      const notificationsToInsert = [];
+
+      for (const profile of allProfiles) {
+        const profileSkills = profile.skills || [];
+        const settings = profile.notification_settings || {};
+        const interests = settings.interests || {};
+
+        let score = 0;
+        const matchingSkills: string[] = [];
+
+        // 1. Profile-based matching (Skills listed in profile)
+        newProject.skills_required.forEach((skill: string) => {
+          if (profileSkills.some((ps: string) => ps.toLowerCase() === skill.toLowerCase())) {
+            score += 5; // Profile skill match is a strong signal
+            matchingSkills.push(skill);
+          }
+        });
+
+        // 2. Interest-based matching (Evolving interest profile)
+        newProject.skills_required.forEach((skill: string) => {
+          const interestScore = interests[skill] || 0;
+          if (interestScore > 0) {
+            score += interestScore;
+            if (!matchingSkills.includes(skill)) {
+              matchingSkills.push(skill);
+            }
+          }
+        });
+
+        // Configurable threshold (e.g., 5)
+        if (score >= 5 && matchingSkills.length > 0) {
+          // Generate personalized message
+          let content = `A new project matching your interests was just published: ${newProject.title}`;
+          if (matchingSkills.length >= 2) {
+            content = `A new ${matchingSkills.slice(0, 2).join(' + ')} project matching your skills is looking for collaborators: ${newProject.title}`;
+          } else if (matchingSkills.length === 1) {
+            content = `A new project requiring your ${matchingSkills[0]} skills was just published: ${newProject.title}`;
+          }
+
+          notificationsToInsert.push({
+            user_id: profile.id,
+            actor_id: currentUser.id,
+            type: 'resume',
+            content: content,
+            project_id: newProject.id,
+            metadata: { score, matchingSkills }
+          });
+        }
+      }
+
+      // Insert notifications in batches to prevent fatigue and rate limits
+      if (notificationsToInsert.length > 0) {
+        // Limit to top 10 most relevant users to prevent notification fatigue/spam
+        const sortedNotifications = notificationsToInsert
+          .sort((a, b) => (b.metadata.score) - (a.metadata.score))
+          .slice(0, 10);
+
+        await supabase.from('notifications').insert(
+          sortedNotifications.map(({ metadata, ...rest }) => rest)
+        );
+      }
+    } catch (err) {
+      console.error("Failed to send smart discovery notifications:", err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser || !supabase) {
@@ -325,6 +400,11 @@ const CreateProject = () => {
         content: editId ? `Updated project: ${formData.title}` : `Launched new project: ${formData.title}`,
         project_id: result.data.id
       });
+
+      // Trigger smart discovery notifications for other matching users
+      if (!editId) {
+        await notifyMatchingUsers(result.data);
+      }
 
       // Clear draft on successful submit
       localStorage.removeItem(draftKey);

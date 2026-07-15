@@ -21,7 +21,7 @@ import AIManager from '@/components/AIManager';
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { projects, requests, currentUser, toggleLike, refreshProjects } = useApp();
+  const { projects, requests, currentUser, toggleLike, refreshProjects, incrementInterest } = useApp();
   
   const project = projects.find(p => p.id === id);
   
@@ -54,7 +54,11 @@ const ProjectDetail = () => {
 
   useEffect(() => {
     fetchComments();
-  }, [id]);
+    // Increment interest score on project view
+    if (project?.skills) {
+      incrementInterest(project.skills, 2);
+    }
+  }, [id, project?.skills, incrementInterest]);
 
   const latestRequest = useMemo(() => {
     return requests
@@ -147,6 +151,10 @@ const ProjectDetail = () => {
       if (error) throw error;
 
       toast.success("Application sent to founder!");
+      // Increment interest score on apply
+      if (project?.skills) {
+        incrementInterest(project.skills, 5);
+      }
       await refreshProjects();
       setIsDialogOpen(false);
     } catch (error: any) {
@@ -332,7 +340,7 @@ const ProjectDetail = () => {
                       className="w-full h-16 bg-primary text-xl font-black rounded-2xl gap-3 shadow-xl shadow-primary/20" 
                       onClick={() => navigate(`/chat/${project.id}?group=true`)}
                     >
-                      <MessageSquare size={24} /> Open Group Chat
+                      <MessageSquare size={24} /> View Group
                     </Button>
                   ) : project.status === 'PAUSED' ? (
                     <div className="p-6 bg-muted rounded-3xl text-center">
