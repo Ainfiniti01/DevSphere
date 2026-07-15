@@ -117,10 +117,10 @@ Traditional AI assistants respond to isolated prompts. DevSphere instead assembl
 | :---: | :---: |
 | ![Home Page](assets/images/home.png) | ![AI Manager Page](assets/images/AI.png) |
 
-### 🔍 Explore Projects & 👥 Team Management
+### 🔍 Create Page & 👥 TProfile Page
 | Explore Projects | Team Management |
 | :---: | :---: |
-| ![Explore Page](assets/images/icon.png) | ![Manage Team Page](assets/images/icon.png) |
+| ![Create Page](assets/images/icon.png) | ![Profile Page](assets/images/icon.png) |
 
 ## 🎥 Demo
 
