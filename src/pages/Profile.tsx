@@ -18,7 +18,6 @@ const Profile = () => {
   const { currentUser, projects } = useApp();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -71,7 +70,9 @@ const Profile = () => {
 
   const isOwnProfile = currentUser?.id === profile.id;
   const userProjects = projects.filter(p => p.creator_id === profile.id);
-  const joinedProjects = projects.filter(p => p.members?.includes(profile.id));
+  
+  // Collaborations include projects they own OR projects they are active members of
+  const joinedProjects = projects.filter(p => p.creator_id === profile.id || p.members?.includes(profile.id));
 
   const formatUrl = (url: string) => {
     if (!url) return "";
@@ -217,8 +218,13 @@ const Profile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {joinedProjects.map(p => <ProjectCard key={p.id} project={p} />)}
                   {joinedProjects.length === 0 && (
-                    <div className="col-span-full p-12 bg-accent/10 border border-dashed border-border rounded-[2.5rem] text-center">
-                      <p className="text-muted-foreground font-medium">No collaborations yet.</p>
+                    <div className="col-span-full p-12 bg-accent/10 border border-dashed border-border rounded-[2.5rem] text-center flex flex-col items-center justify-center">
+                      <p className="text-muted-foreground font-medium mb-4">
+                        You haven't joined any projects yet. Explore DevSphere and collaborate with other developers.
+                      </p>
+                      <Button onClick={() => navigate('/explore')} className="rounded-2xl px-6 h-11 font-bold">
+                        Explore Projects
+                      </Button>
                     </div>
                   )}
                 </div>
