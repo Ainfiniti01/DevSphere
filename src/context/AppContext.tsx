@@ -226,7 +226,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) throw error;
 
-      const transformed = data.map(p => ({
+      // Enforce visibility at the query level: paused projects are only visible to their owner
+      const visibleProjects = data.filter(p => p.status !== 'PAUSED' || p.creator_id === activeUser?.id);
+
+      const transformed = visibleProjects.map(p => ({
         ...p,
         likes: p.likes?.length || 0,
         commentCount: p.comments?.length || 0,
