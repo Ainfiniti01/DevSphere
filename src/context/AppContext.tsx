@@ -83,7 +83,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase) return null;
     
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Timeout fetching profile")), 2000)
+      setTimeout(() => reject(new Error("Timeout fetching profile")), 10000)
     );
 
     try {
@@ -596,17 +596,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     let isMounted = true;
-
-    // Trigger self-healing database repair immediately on mount
-    fetch('https://xzmewvnjjljzigkcrezf.supabase.co/functions/v1/project-manager', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId: 'repair', message: 'repair' })
-    }).then(() => {
-      console.log("[AppContext] Self-healing database repair triggered");
-    }).catch(err => {
-      console.error("[AppContext] Failed to trigger self-healing:", err);
-    });
 
     const handleUserSession = async (session: any) => {
       console.log("[AppContext] handleUserSession called with session:", session);
