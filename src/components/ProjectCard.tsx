@@ -98,10 +98,15 @@ const ProjectCard = ({ project }: { project: any }) => {
         )}
         onClick={handleCardClick}
       >
-        <div className="absolute top-4 left-4 z-10">
+        <div className="absolute top-4 left-4 z-10 flex gap-2">
           <span className="px-2.5 py-1 bg-primary/90 text-white text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-white/20 shadow-lg backdrop-blur-sm">
             {project.stage}
           </span>
+          {project.myMembershipStatus === 'active' && (
+            <span className="px-2.5 py-1 bg-emerald-600/90 text-white text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-white/20 shadow-lg backdrop-blur-sm">
+              {project.myRole || 'Member'}
+            </span>
+          )}
         </div>
 
         {hasMedia ? (

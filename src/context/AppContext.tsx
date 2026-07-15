@@ -220,7 +220,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
           comments(id),
-          project_members(user_id, status, user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
+          project_members(user_id, status, role, user:profiles!project_members_user_id_fkey(id, name, avatar_url, title, display_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -236,7 +236,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         timestamp: p.created_at,
         members: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user_id) || [],
         memberProfiles: p.project_members?.filter((m: any) => m.status === 'active').map((m: any) => m.user) || [],
-        myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none'
+        myMembershipStatus: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.status || 'none',
+        myRole: p.project_members?.find((m: any) => m.user_id === activeUser?.id)?.role || 'Member'
       }));
 
       setProjects(transformed);

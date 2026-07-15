@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,16 +9,16 @@ import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, L
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
+import EmptyState from '@/components/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 const Profile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, projects } = useApp();
+  const { currentUser, projects, chats } = useApp();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -47,6 +47,24 @@ const Profile = () => {
     fetchProfile();
   }, [id, currentUser]);
 
+  const isOwnProfile = currentUser?.id === profile?.id;
+  const userProjects = useMemo(() => projects.filter(p => p.creator_id === profile?.id), [projects, profile?.id]);
+
+  const joinedProjects = useMemo(() => {
+    if (!profile?.id) return [];
+    if (isOwnProfile) {
+      // For own profile, use active group chats to guarantee 100% real-time accuracy and bypass RLS
+      const activeGroupChatProjectIds = chats
+        .filter(c => c.isGroup && !c.isOwner)
+        .map(c => c.targetId);
+      
+      return projects.filter(p => activeGroupChatProjectIds.includes(p.id));
+    } else {
+      // Fallback for other profiles
+      return projects.filter(p => p.members?.includes(profile.id) && p.creator_id !== profile.id);
+    }
+  }, [projects, chats, isOwnProfile, profile?.id]);
+
   if (loading) {
     return (
       <AppLayout title="Profile">
@@ -68,10 +86,6 @@ const Profile = () => {
       </AppLayout>
     );
   }
-
-  const isOwnProfile = currentUser?.id === profile.id;
-  const userProjects = projects.filter(p => p.creator_id === profile.id);
-  const joinedProjects = projects.filter(p => p.members?.includes(profile.id));
 
   const formatUrl = (url: string) => {
     if (!url) return "";
@@ -217,8 +231,14 @@ const Profile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {joinedProjects.map(p => <ProjectCard key={p.id} project={p} />)}
                   {joinedProjects.length === 0 && (
-                    <div className="col-span-full p-12 bg-accent/10 border border-dashed border-border rounded-[2.5rem] text-center">
-                      <p className="text-muted-foreground font-medium">No collaborations yet.</p>
+                    <div className="col-span-full">
+                      <EmptyState 
+                        icon={LayoutGrid}
+                        title="No active collaborations"
+                        description="You haven't joined any projects yet. Explore DevSphere and collaborate with other developers."
+                        actionLabel="Explore Projects"
+                        actionPath="/explore"
+                      />
                     </div>
                   )}
                 </div>
