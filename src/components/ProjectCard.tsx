@@ -72,6 +72,10 @@ const ProjectCard = ({ project }: { project: any }) => {
     }
   };
 
+  const handleCardClick = () => {
+    navigate(`/project/${project.id}`);
+  };
+
   const hasMedia = project.thumbnail && project.thumbnail !== '';
 
   return (
@@ -92,7 +96,7 @@ const ProjectCard = ({ project }: { project: any }) => {
           "relative aspect-video cursor-pointer group overflow-hidden flex flex-col items-center justify-center",
           !hasMedia ? "bg-gradient-to-br from-primary/10 via-violet-500/5 to-background border-y border-border/50" : "bg-muted"
         )}
-        onClick={() => navigate(`/project/${project.id}`)}
+        onClick={handleCardClick}
       >
         <div className="absolute top-4 left-4 z-10">
           <span className="px-2.5 py-1 bg-primary/90 text-white text-[10px] font-extrabold rounded-full uppercase tracking-widest border border-white/20 shadow-lg backdrop-blur-sm">
@@ -119,12 +123,19 @@ const ProjectCard = ({ project }: { project: any }) => {
         )}
       </div>
 
-      <CardContent className="p-4">
+      <CardContent className="p-4 cursor-pointer" onClick={handleCardClick}>
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
           {project.description}
         </p>
-        <div className="flex flex-wrap gap-1.5">
-          {project.skills?.map((skill: string) => <SkillBadge key={skill} skill={skill} />)}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {project.skills?.slice(0, 3).map((skill: string) => (
+            <SkillBadge key={skill} skill={skill} />
+          ))}
+          {project.skills && project.skills.length > 3 && (
+            <span className="px-2 py-1 bg-secondary text-secondary-foreground text-[10px] font-semibold rounded-full border border-border">
+              +{project.skills.length - 3} more
+            </span>
+          )}
         </div>
       </CardContent>
 
