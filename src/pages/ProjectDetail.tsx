@@ -366,6 +366,12 @@ const ProjectDetail = () => {
                   {isOwner ? (
                     <div className="flex flex-col gap-3">
                       <Button 
+                        className="w-full h-16 bg-primary text-xl font-black rounded-2xl gap-3 shadow-xl shadow-primary/20" 
+                        onClick={() => navigate(`/manage-team/${project.id}`)}
+                      >
+                        <Users size={24} /> Manage Project
+                      </Button>
+                      <Button 
                         variant="outline" 
                         className="h-14 rounded-2xl gap-3 font-black text-lg border-primary/20 hover:bg-primary/5" 
                         onClick={() => navigate(`/create?edit=${project.id}`)}
@@ -379,13 +385,6 @@ const ProjectDetail = () => {
                         disabled={isSubmitting}
                       >
                         {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (project.status === 'ACTIVE' ? <><Pause size={20} /> Pause Project</> : <><Play size={20} /> Resume Project</>)}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="h-14 rounded-2xl gap-3 font-black text-lg" 
-                        onClick={() => navigate(`/manage-team/${project.id}`)}
-                      >
-                        <Users size={20} /> Manage Team
                       </Button>
                     </div>
                   ) : isMember ? (
@@ -401,10 +400,12 @@ const ProjectDetail = () => {
                       <p className="font-bold text-muted-foreground">Project is currently paused</p>
                     </div>
                   ) : requestStatus === 'pending' ? (
-                    <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl text-center">
-                      <Loader2 className="mx-auto mb-2 text-primary animate-spin" size={32} />
-                      <p className="font-bold text-primary">Application Pending</p>
-                    </div>
+                    <Button 
+                      disabled 
+                      className="w-full h-16 bg-primary/50 text-xl font-black rounded-2xl gap-3 cursor-not-allowed"
+                    >
+                      <Loader2 className="animate-spin" size={24} /> Request Pending
+                    </Button>
                   ) : (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                       <DialogTrigger asChild>

@@ -164,6 +164,9 @@ const ManageTeam = () => {
                           <ChevronRight size={18} className="text-muted-foreground" />
                         </h4>
                         <p className="text-sm text-primary font-bold truncate">{req.user?.title || 'Developer'}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Applied on {new Date(req.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
                       </div>
                     </div>
                     
@@ -282,7 +285,7 @@ const ManageTeam = () => {
                   <h4 className="text-lg font-black text-destructive flex items-center gap-2">
                     <Trash2 size={20} /> Group Chat
                   </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Dismissing the group permanently removes all members and message history. This action is irreversible.</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Dismissing the group permanently removes all messages and message history. This action is irreversible.</p>
                 </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
