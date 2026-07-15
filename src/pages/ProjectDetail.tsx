@@ -23,7 +23,7 @@ const ProjectDetail = () => {
   const navigate = useNavigate();
   const { projects, requests, currentUser, toggleLike, refreshProjects, incrementInterest } = useApp();
   
-  const project = projects.find(p => p.id === id);
+  const project = useMemo(() => projects.find(p => p.id === id), [projects, id]);
   
   const [joinReason, setJoinReason] = useState('');
   const [joinContribution, setJoinContribution] = useState('');
@@ -52,13 +52,67 @@ const ProjectDetail = () => {
     }
   };
 
+  // 1. Fetch comments once on mount or when ID changes
   useEffect(() => {
     fetchComments();
-    // Increment interest score on project view
-    if (project?.skills) {
+  }, [id]);
+
+  // 2. Increment interest score exactly once per project view (when ID changes)
+  useEffect(() => {
+    if (project?.skills && project.skills.length > 0) {
       incrementInterest(project.skills, 2);
     }
-  }, [id, project?.skills, incrementInterest]);
+  }, [id]);
+
+  // 3. Realtime subscription for comments
+  useEffect(() => {
+    if (!id || !supabase) return;
+
+    const channel = supabase
+      .channel(`project_comments_${id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'comments',
+        filter: `project_id=eq.${id}`
+      }, () => {
+        fetchComments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  // 4. Realtime subscription for membership status and join requests
+  useEffect(() => {
+    if (!id || !supabase) return;
+
+    const channel = supabase
+      .channel(`project_membership_${id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'project_members',
+        filter: `project_id=eq.${id}`
+      }, () => {
+        refreshProjects();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'join_requests',
+        filter: `project_id=eq.${id}`
+      }, () => {
+        refreshProjects();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, refreshProjects]);
 
   const latestRequest = useMemo(() => {
     return requests
@@ -151,7 +205,6 @@ const ProjectDetail = () => {
       if (error) throw error;
 
       toast.success("Application sent to founder!");
-      // Increment interest score on apply
       if (project?.skills) {
         incrementInterest(project.skills, 5);
       }

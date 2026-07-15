@@ -61,6 +61,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshTimeout = useRef<any>(null);
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
+  const lastLoadedUserId = useRef<string | null>(null);
+
+  // Keep a stable ref to currentUser to prevent callback recreation loops
+  const currentUserRef = useRef<any>(null);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   const completeOnboarding = useCallback(() => {
     setHasSeenOnboarding(true);
@@ -75,7 +82,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
     
-    // Create a promise that rejects after 2 seconds to prevent hanging
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error("Timeout fetching profile")), 2000)
     );
@@ -121,14 +127,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
       return await Promise.race([upsertPromise, timeoutPromise]);
     } catch (error: any) {
-      console.error("[AppContext] Error ensuring profile record exists:", {
-        message: error?.message,
-        details: error?.details,
-        hint: error?.hint,
-        code: error?.code,
-        error
-      });
-      // Fallback to basic auth user info so we don't block the app
+      console.error("[AppContext] Error ensuring profile record exists:", error);
       return {
         id: userId,
         name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
@@ -138,13 +137,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const updatePresence = useCallback(async () => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     try {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
-      let newStreak = currentUser.activity_streak || 0;
-      const lastStreakDate = currentUser.last_streak_date;
+      let newStreak = activeUser.activity_streak || 0;
+      const lastStreakDate = activeUser.last_streak_date;
 
       if (!lastStreakDate || lastStreakDate < today) {
         if (lastStreakDate === new Date(now.getTime() - 86400000).toISOString().split('T')[0]) {
@@ -162,16 +162,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           activity_streak: newStreak,
           last_streak_date: today
         })
-        .eq('id', currentUser.id);
+        .eq('id', activeUser.id);
     } catch (e) {
       // Silent fail
     }
-  }, [currentUser]);
+  }, []);
 
   const incrementInterest = useCallback(async (skills: string[], amount: number) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     
-    const currentSettings = currentUser.notification_settings || {};
+    const currentSettings = activeUser.notification_settings || {};
     const currentInterests = currentSettings.interests || {};
     
     const newInterests = { ...currentInterests };
@@ -191,22 +192,25 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase
         .from('profiles')
         .update({ notification_settings: newSettings })
-        .eq('id', currentUser.id);
+        .eq('id', activeUser.id);
         
       if (!error) {
-        setCurrentUser((prev: any) => ({
-          ...prev,
-          notification_settings: newSettings
-        }));
+        setCurrentUser((prev: any) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            notification_settings: newSettings
+          };
+        });
       }
     } catch (e) {
       console.error("Failed to update interests:", e);
     }
-  }, [currentUser]);
+  }, []);
 
   const refreshProjects = useCallback(async (userOverride?: any) => {
     if (!supabase) return;
-    const activeUser = userOverride || currentUser;
+    const activeUser = userOverride || currentUserRef.current;
 
     try {
       const { data, error } = await supabase
@@ -263,16 +267,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error("Refresh projects error:", error.message);
     }
-  }, [currentUser]);
+  }, []);
 
   const refreshNotifications = useCallback(async () => {
-    if (!supabase || !currentUser?.id || isRefreshing.current.notifications) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id || isRefreshing.current.notifications) return;
     isRefreshing.current.notifications = true;
     try {
       const { data, error } = await supabase
         .from('notifications')
         .select('*, actor:profiles!notifications_actor_id_fkey(name, avatar_url, display_name)')
-        .eq('user_id', currentUser.id)
+        .eq('user_id', activeUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -284,10 +289,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       isRefreshing.current.notifications = false;
     }
-  }, [currentUser?.id]);
+  }, []);
 
   const refreshChats = useCallback(async () => {
-    if (!supabase || !currentUser?.id || isRefreshing.current.chats) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id || isRefreshing.current.chats) return;
     isRefreshing.current.chats = true;
     try {
       let hiddenChatIds = new Set<string>();
@@ -295,7 +301,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: hiddenData } = await supabase
           .from('hidden_chats')
           .select('chat_id')
-          .eq('user_id', currentUser.id);
+          .eq('user_id', activeUser.id);
         
         if (hiddenData) {
           hiddenChatIds = new Set(hiddenData.map(h => h.chat_id));
@@ -313,7 +319,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             project:projects (title, thumbnail_url, creator_id)
           )
         `)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', activeUser.id);
 
       if (memberError) throw memberError;
 
@@ -335,7 +341,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: readData } = await supabase
         .from('chat_reads')
         .select('*')
-        .eq('user_id', currentUser.id);
+        .eq('user_id', activeUser.id);
       
       const readMap = new Map(readData?.map(r => [r.chat_id, new Date(r.last_read_at).getTime()]) || []);
 
@@ -346,7 +352,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!chat || hiddenChatIds.has(chat.id)) continue;
 
         const isGroup = chat.type === 'group';
-        const isOwner = isGroup && chat.project?.creator_id === currentUser.id;
+        const isOwner = isGroup && chat.project?.creator_id === activeUser.id;
         let chatName = isGroup ? chat.project?.title : 'Loading...';
         let chatAvatar = isGroup ? chat.project?.thumbnail_url : null;
         let targetId = isGroup ? chat.project_id : null;
@@ -356,7 +362,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             .from('chat_members')
             .select('user:profiles(*)')
             .eq('chat_id', chat.id)
-            .neq('user_id', currentUser.id)
+            .neq('user_id', activeUser.id)
             .maybeSingle();
           
           if (otherMember?.user) {
@@ -385,7 +391,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         if (!chat) return;
 
         const lastRead = readMap.get(msg.chat_id) || 0;
-        const isUnread = msg.sender_id !== currentUser.id && new Date(msg.created_at).getTime() > lastRead;
+        const isUnread = msg.sender_id !== activeUser.id && new Date(msg.created_at).getTime() > lastRead;
 
         if (chat.lastTimestamp === 0) {
           chat.lastMsg = msg.content;
@@ -408,14 +414,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       isRefreshing.current.chats = false;
     }
-  }, [currentUser?.id, resolveName]);
+  }, [resolveName]);
 
   const markAsRead = useCallback(async (chatId: string, isGroup: boolean) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     try {
       const now = new Date().toISOString();
       await supabase.from('chat_reads').upsert({
-        user_id: currentUser.id,
+        user_id: activeUser.id,
         chat_id: chatId,
         last_read_at: now
       }, { onConflict: 'user_id,chat_id' });
@@ -425,13 +432,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("markAsRead failed:", error);
     }
-  }, [currentUser?.id]);
+  }, []);
 
   const deleteChat = useCallback(async (chatId: string) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     try {
       const { error } = await supabase.from('hidden_chats').upsert({
-        user_id: currentUser.id,
+        user_id: activeUser.id,
         chat_id: chatId
       }, { onConflict: 'user_id,chat_id' });
 
@@ -441,10 +449,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       toast.error("Failed to remove chat");
     }
-  }, [currentUser?.id, refreshChats]);
+  }, [refreshChats]);
 
   const leaveGroup = useCallback(async (chatId: string) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     const chat = chats.find(c => c.id === chatId);
     if (chat?.isOwner) {
       toast.error("Transfer admin role before leaving the group.");
@@ -453,13 +462,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { error } = await supabase.rpc('leave_project', {
         p_project_id: chat.targetId,
-        p_user_id: currentUser.id
+        p_user_id: activeUser.id
       });
 
       if (error) throw error;
 
       await supabase.from('hidden_chats').upsert({
-        user_id: currentUser.id,
+        user_id: activeUser.id,
         chat_id: chatId
       }, { onConflict: 'user_id,chat_id' });
 
@@ -471,14 +480,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       toast.error("Failed to exit group");
     }
-  }, [currentUser?.id, refreshChats, refreshProjects, chats]);
+  }, [refreshChats, refreshProjects, chats]);
 
   const dismissGroup = useCallback(async (chatId: string) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     try {
       const { error } = await supabase.rpc('dismiss_group_chat', {
         p_chat_id: chatId,
-        p_admin_id: currentUser.id
+        p_admin_id: activeUser.id
       });
 
       if (error) throw error;
@@ -487,16 +497,17 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       toast.error(error.message || "Failed to dismiss group");
     }
-  }, [currentUser?.id, refreshChats]);
+  }, [refreshChats]);
 
   const removeMemberFromGroup = useCallback(async (chatId: string, userId: string) => {
-    if (!supabase || !currentUser?.id) return;
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) return;
     const chat = chats.find(c => c.id === chatId);
     try {
       const { error } = await supabase.rpc('remove_project_member', {
         p_project_id: chat.targetId,
         p_target_user_id: userId,
-        p_admin_id: currentUser.id
+        p_admin_id: activeUser.id
       });
 
       if (error) throw error;
@@ -508,7 +519,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       toast.error(error.message || "Failed to remove member");
     }
-  }, [currentUser?.id, refreshChats, refreshProjects, chats]);
+  }, [refreshChats, refreshProjects, chats]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -518,7 +529,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const toggleLike = useCallback(async (projectId: string) => {
-    if (!supabase || !currentUser?.id) {
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) {
       toast.error("Please sign in to like projects");
       return;
     }
@@ -530,12 +542,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       if (isLiked) {
-        const { error } = await supabase.from('likes').delete().match({ project_id: projectId, user_id: currentUser.id });
+        const { error } = await supabase.from('likes').delete().match({ project_id: projectId, user_id: activeUser.id });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: currentUser.id });
+        const { error } = await supabase.from('likes').insert({ project_id: projectId, user_id: activeUser.id });
         if (error && error.code !== '23505') throw error;
-        // Increment interest score on like
         if (project?.skills) {
           incrementInterest(project.skills, 3);
         }
@@ -546,10 +557,11 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       processingLikes.current.delete(projectId);
     }
-  }, [currentUser?.id, projects, refreshProjects, incrementInterest]);
+  }, [projects, refreshProjects, incrementInterest]);
 
   const addComment = useCallback(async (projectId: string, text: string) => {
-    if (!supabase || !currentUser?.id) {
+    const activeUser = currentUserRef.current;
+    if (!supabase || !activeUser?.id) {
       toast.error("Please sign in to comment");
       return;
     }
@@ -557,20 +569,19 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { error } = await supabase.from('comments').insert({
         project_id: projectId,
-        user_id: currentUser.id,
+        user_id: activeUser.id,
         content: text
       });
       if (error) throw error;
       await refreshProjects();
       toast.success("Comment added!");
-      // Increment interest score on comment
       if (project?.skills) {
         incrementInterest(project.skills, 3);
       }
     } catch (error) {
       toast.error("Failed to add comment");
     }
-  }, [currentUser?.id, projects, refreshProjects, incrementInterest]);
+  }, [projects, refreshProjects, incrementInterest]);
 
   // Robust Auth Initialization & State Monitoring (Runs once on mount)
   useEffect(() => {
@@ -621,7 +632,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     console.log("[AppContext] Getting initial session...");
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       console.log("[AppContext] getSession resolved. Session:", session, "Error:", error);
       if (error) {
@@ -636,7 +646,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (isMounted) setAuthLoading(false);
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[AppContext] Auth state change event:", event);
       if (event === 'SIGNED_OUT') {
@@ -655,10 +664,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [ensureProfile]);
 
-  // Separate Effect to handle data fetching when currentUser changes (Prevents infinite loops)
+  // Restrict full data reloads to actual user ID changes to prevent infinite loops
   useEffect(() => {
     if (currentUser) {
-      console.log("[AppContext] currentUser changed, loading user data in background");
+      if (lastLoadedUserId.current === currentUser.id) {
+        return;
+      }
+      lastLoadedUserId.current = currentUser.id;
+      console.log("[AppContext] currentUser ID changed, loading user data in background");
       Promise.allSettled([
         refreshProjects(currentUser),
         refreshNotifications(),
@@ -667,12 +680,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("[AppContext] Background user data loaded successfully");
       });
     } else {
-      console.log("[AppContext] currentUser is null, clearing user data");
-      refreshProjects(null);
-      setNotifications([]);
-      setChats([]);
-      setUnreadChatsCount(0);
-      setUnreadNotificationsCount(0);
+      if (lastLoadedUserId.current !== null) {
+        lastLoadedUserId.current = null;
+        console.log("[AppContext] currentUser is null, clearing user data");
+        refreshProjects(null);
+        setNotifications([]);
+        setChats([]);
+        setUnreadChatsCount(0);
+        setUnreadNotificationsCount(0);
+      }
     }
   }, [currentUser, refreshProjects, refreshNotifications, refreshChats]);
 
