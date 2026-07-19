@@ -128,7 +128,7 @@ Live Demo:
 https://dev-sphere-kappa.vercel.app/
 
 Demo Video:
-https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://youtube.com/shorts/MDLwNpZrr4E?si=fXwyDhuSdeQCFevd
 
 ---
 
