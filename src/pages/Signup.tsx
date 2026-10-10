@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import appIcon from '../../assets/images/icon.jpeg';
 
 type RegistrationStep = "account" | "verification" | "profile";
 
@@ -249,18 +250,24 @@ const Signup = () => {
   return (
     <main className="min-h-screen bg-muted/30 px-4 py-8 text-foreground sm:px-6 sm:py-12">
       <div className="mx-auto w-full max-w-xl">
-        <div className="mb-8 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/auth")}
-            className="text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
-          >
-            DevSphere
-          </button>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Step {stepNumber} of 2
-          </p>
-        </div>
+      
+<div className="mb-8 flex items-center justify-between gap-4">
+  <div className="flex items-center gap-3">
+    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary shadow-lg">
+      <img
+        src={appIcon}
+        alt="DevSphere"
+        className="h-full w-full object-cover"
+      />
+    </div>
+
+    <h1 className="text-2xl font-bold">DevSphere</h1>
+  </div>
+
+  <p className="shrink-0 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+    Step {stepNumber} of 2
+  </p>
+</div>
 
         <div className="mb-6 flex gap-2" aria-label="Registration progress">
           <div className="h-1.5 flex-1 rounded-full bg-primary" />
