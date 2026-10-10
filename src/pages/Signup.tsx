@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, Gift, Link as LinkIcon, MapPin, Briefcase, User } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Gift, Link as LinkIcon, MapPin, Briefcase, User, Github, Chrome } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -51,8 +51,43 @@ const Signup = () => {
     }
   }, [searchParams]);
 
+  const handleOAuth = async (provider: 'google' | 'github') => {
+  if (!supabase) {
+    toast.error("Server connection not established.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+  } catch (error: any) {
+    toast.error(error.message || "Unable to start authentication.");
+    setLoading(false);
+  }
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPasswordValid) {
+  toast.error("Please meet all password requirements.");
+  return;
+}
+
+if (formData.password !== confirmPassword) {
+  toast.error("Your passwords do not match.");
+  return;
+}
     if (!supabase) return;
 
     setLoading(true);
@@ -100,6 +135,33 @@ const Signup = () => {
     }
   };
 
+  const passwordChecks = [
+  {
+    label: "At least one uppercase letter (A-Z)",
+    valid: /[A-Z]/.test(formData.password),
+  },
+  {
+    label: "At least one lowercase letter (a-z)",
+    valid: /[a-z]/.test(formData.password),
+  },
+  {
+    label: "At least one symbol (!@#$...)",
+    valid: /[^A-Za-z0-9]/.test(formData.password),
+  },
+  {
+    label: "At least one digit (0-9)",
+    valid: /[0-9]/.test(formData.password),
+  },
+];
+
+const isPasswordValid = passwordChecks.every((check) => check.valid);
+
+const [confirmPassword, setConfirmPassword] = useState("");
+
+const passwordsMatch =
+  confirmPassword.length > 0 &&
+  formData.password === confirmPassword;
+
   return (
     <div className="min-h-screen bg-background text-foreground max-w-md mx-auto flex flex-col px-6 py-10">
       <div className="mb-8 text-center">
@@ -112,9 +174,42 @@ const Signup = () => {
         )}
       </div>
 
+      <div className="space-y-4 mb-8">
+  <div className="grid grid-cols-2 gap-3">
+    <Button
+      type="button"
+      variant="outline"
+      disabled={loading}
+      className="h-12 gap-2 rounded-xl"
+      onClick={() => handleOAuth('google')}
+    >
+      <Chrome size={20} />
+      Google
+    </Button>
+
+    <Button
+      type="button"
+      variant="outline"
+      disabled={loading}
+      className="h-12 gap-2 rounded-xl"
+      onClick={() => handleOAuth('github')}
+    >
+      <Github size={20} />
+      GitHub
+    </Button>
+  </div>
+
+  <div className="relative flex items-center">
+    <div className="flex-grow border-t border-border" />
+    <span className="px-3 text-xs uppercase text-muted-foreground">
+      Or sign up with email
+    </span>
+    <div className="flex-grow border-t border-border" />
+  </div>
+</div>
+
       <form onSubmit={handleSubmit} className="space-y-6 flex-1 pb-10">
         <div className="space-y-4">
-          <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Account</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>First Name</Label>
@@ -130,14 +225,99 @@ const Signup = () => {
             <Input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="john@example.com" className="rounded-xl h-12 bg-accent/10" />
           </div>
           <div className="space-y-1.5">
-            <Label>Password</Label>
-            <div className="relative">
-              <Input type={showPassword ? "text" : "password"} required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="rounded-xl h-12 pr-10 bg-accent/10" />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+  <Label>Password</Label>
+
+  <div className="relative">
+    <Input
+      type={showPassword ? "text" : "password"}
+      required
+      value={formData.password}
+      onChange={(e) =>
+        setFormData({ ...formData, password: e.target.value })
+      }
+      className="rounded-xl h-12 pr-10 bg-accent/10"
+      autoComplete="new-password"
+    />
+
+    <button
+      type="button"
+      onClick={() => setShowPassword(!showPassword)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+      aria-label={showPassword ? "Hide password" : "Show password"}
+    >
+      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+    </button>
+  </div>
+
+  {/* Live password requirements */}
+{formData.password.length > 0 && (
+  <div className="space-y-2 pt-2">
+    {passwordChecks.map((check) => (
+      <div
+        key={check.label}
+        className={`flex items-center gap-2 text-xs transition-colors ${
+          check.valid ? "text-green-500" : "text-muted-foreground"
+        }`}
+      >
+        <span
+          className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] ${
+            check.valid
+              ? "border-green-500 bg-green-500 text-white"
+              : "border-muted-foreground/40"
+          }`}
+        >
+          {check.valid ? "✓" : ""}
+        </span>
+
+        <span>{check.label}</span>
+      </div>
+    ))}
+  </div>
+)}
+</div>
+
+<div className="space-y-1.5">
+  <Label>Confirm Password</Label>
+
+  <div className="relative">
+    <Input
+      type={showPassword ? "text" : "password"}
+      required
+      value={confirmPassword}
+      onChange={(e) => setConfirmPassword(e.target.value)}
+      className={`rounded-xl h-12 pr-10 bg-accent/10 ${
+        confirmPassword.length > 0
+          ? passwordsMatch
+            ? "border-green-500 focus-visible:ring-green-500"
+            : "border-red-500 focus-visible:ring-red-500"
+          : ""
+      }`}
+      autoComplete="new-password"
+      placeholder="Re-enter your password"
+    />
+
+    <button
+      type="button"
+      onClick={() => setShowPassword(!showPassword)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+      aria-label={showPassword ? "Hide password" : "Show password"}
+    >
+      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+    </button>
+  </div>
+
+  {confirmPassword.length > 0 && (
+    <p
+      className={`text-xs ${
+        passwordsMatch ? "text-green-500" : "text-red-500"
+      }`}
+    >
+      {passwordsMatch
+        ? "✓ Passwords match"
+        : "✗ Passwords do not match"}
+    </p>
+  )}
+</div>
         </div>
 
         <div className="space-y-4">
