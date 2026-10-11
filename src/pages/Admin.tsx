@@ -104,7 +104,7 @@ const Admin = () => {
       setUsers((current) =>
         current.map((user) =>
           user.id === userId
-            ? { ...user, role: updated?.role || newRole, is_admin: updated?.is_admin ?? newRole === 'admin' || newRole === 'super_admin' }
+            ? { ...user, role: updated?.role || newRole, is_admin: updated?.is_admin ?? (newRole === 'admin' || newRole === 'super_admin') }
             : user,
         ),
       );
