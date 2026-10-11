@@ -81,6 +81,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const processedEventIds = useRef<Set<string>>(new Set());
   const lastLoadedUserId = useRef<string | null>(null);
   const profileLoadRef = useRef<{ userId: string; promise: Promise<any> } | null>(null);
+  const initialSessionHandledRef = useRef(false);
   const lastPresenceAttemptAt = useRef(0);
 
   // Keep a stable ref to currentUser to prevent callback recreation loops
@@ -631,6 +632,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     let isMounted = true;
+    initialSessionHandledRef.current = false;
 
     const loadProfile = (userId: string, authUser: any) => {
       const existingRequest = profileLoadRef.current;
@@ -686,7 +688,37 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setCurrentUser(null);
+          setProfileLoading(false);
+          setProfileError(null);
+          setAuthLoading(false);
+        }
+      } else if (event === 'INITIAL_SESSION') {
+        if (initialSessionHandledRef.current) return;
+        initialSessionHandledRef.current = true;
+        window.setTimeout(() => {
+          void handleUserSession(session);
+        }, 0);
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        window.setTimeout(() => {
+          void handleUserSession(session);
+        }, 0);
+      }
+    });
+
+    const sessionTimeout = window.setTimeout(() => {
+      if (isMounted) {
+        console.error('[AppContext] Auth initialization timed out while reading the Supabase session.');
+        setProfileLoading(false);
+        setAuthLoading(false);
+      }
+    }, 10000);
+
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      window.clearTimeout(sessionTimeout);
       if (error) {
         console.error('[AppContext] Get session error:', error);
         if (isMounted) {
@@ -695,8 +727,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
         return;
       }
-      handleUserSession(session);
+      if (!initialSessionHandledRef.current) {
+        initialSessionHandledRef.current = true;
+        handleUserSession(session);
+      }
     }).catch((error) => {
+      window.clearTimeout(sessionTimeout);
       console.error('[AppContext] getSession request failed:', error);
       if (isMounted) {
         setProfileLoading(false);
@@ -704,21 +740,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        if (isMounted) {
-          setCurrentUser(null);
-          setProfileLoading(false);
-          setProfileError(null);
-          setAuthLoading(false);
-        }
-      } else if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
-        await handleUserSession(session);
-      }
-    });
-
     return () => {
       isMounted = false;
+      window.clearTimeout(sessionTimeout);
       subscription.unsubscribe();
     };
   }, [ensureProfile, profileRetryNonce]);
