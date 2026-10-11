@@ -3,39 +3,37 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
+import type { AppRole } from '@/context/AppContext';
 import LoadingScreen from './LoadingScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  allowedRoles?: AppRole[];
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { currentUser, authLoading, hasSeenOnboarding } = useApp();
+const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
+  const { currentUser, authLoading, hasSeenOnboarding, role } = useApp();
   const navigate = useNavigate();
+  const hasRequiredRole = !allowedRoles || allowedRoles.includes(role);
 
   useEffect(() => {
     if (!authLoading) {
       if (!currentUser) {
-        // If not logged in, check if they've seen onboarding
-        if (!hasSeenOnboarding) {
-          navigate('/welcome', { replace: true });
-        } else {
-          navigate('/auth', { replace: true });
-        }
+        navigate(hasSeenOnboarding ? '/auth' : '/welcome', { replace: true });
+      } else if (!hasRequiredRole) {
+        navigate('/', { replace: true });
       }
     }
-  }, [currentUser, authLoading, hasSeenOnboarding, navigate]);
+  }, [currentUser, authLoading, hasSeenOnboarding, hasRequiredRole, navigate]);
 
   if (authLoading) {
     return <LoadingScreen />;
   }
 
-  // If we have a user, render the children
-  if (currentUser) {
+  if (currentUser && hasRequiredRole) {
     return <>{children}</>;
   }
 
-  // Otherwise, render nothing while the redirect happens
   return null;
 };
 

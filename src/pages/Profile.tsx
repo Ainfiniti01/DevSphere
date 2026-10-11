@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp, Github, Linkedin, Twitter, BadgeCheck } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp, Github, Linkedin, Twitter, BadgeCheck, ShieldCheck } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 const Profile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser, projects, chats } = useApp();
+  const { currentUser, projects, chats, isAdmin, isModerator } = useApp();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -116,9 +116,15 @@ const Profile = () => {
               </div>
             </div>
             
-            <div className="flex gap-3 justify-center md:pb-4">
+            <div className="flex flex-wrap gap-3 justify-center md:pb-4">
               {isOwnProfile ? (
                 <>
+                  {(isAdmin || isModerator) && (
+                    <Button variant="outline" size="lg" className="rounded-2xl border-primary/30 font-bold gap-2 text-primary" onClick={() => navigate('/admin')}>
+                      <ShieldCheck size={20} />
+                      <span className="hidden sm:inline">{isAdmin ? 'Admin Dashboard' : 'Moderation'}</span>
+                    </Button>
+                  )}
                   <Button variant="outline" size="lg" className="rounded-2xl border-border font-bold gap-2" onClick={() => navigate('/settings')}>
                     <Settings size={20} />
                     <span className="hidden sm:inline">Settings</span>

@@ -5,9 +5,15 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { notificationService } from '@/utils/NotificationService';
 
+export type AppRole = 'member' | 'moderator' | 'admin' | 'super_admin';
+
 interface AppContextType {
   currentUser: any;
   setCurrentUser: (user: any) => void;
+  role: AppRole;
+  isAdmin: boolean;
+  isModerator: boolean;
+  isSuperAdmin: boolean;
   authLoading: boolean;
   hasSeenOnboarding: boolean;
   completeOnboarding: () => void;
@@ -42,6 +48,12 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const role: AppRole = ['member', 'moderator', 'admin', 'super_admin'].includes(currentUser?.role)
+    ? currentUser.role
+    : 'member';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = isSuperAdmin || role === 'admin';
+  const isModerator = isAdmin || role === 'moderator';
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('devsphere_onboarding_complete') === 'true';
@@ -773,6 +785,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             refreshChats();
           }, 200);
         })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${currentUser.id}` }, async () => {
+          const { data: updatedProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+          if (updatedProfile) {
+            setCurrentUser((previous: any) => previous ? { ...previous, ...updatedProfile } : previous);
+          }
+        })
         .subscribe();
 
       return () => {
@@ -783,8 +805,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser?.id, refreshNotifications, refreshChats, refreshProjects]);
 
   return (
-    <AppContext.Provider value={{ 
-      currentUser, setCurrentUser, authLoading,
+    <AppContext.Provider value={{
+      currentUser, setCurrentUser, role, isAdmin, isModerator, isSuperAdmin, authLoading,
       hasSeenOnboarding, completeOnboarding,
       projects, setProjects, 
       requests, setRequests,

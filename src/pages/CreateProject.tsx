@@ -43,8 +43,8 @@ const CreateProject = () => {
   const userProjects = projects.filter(p => p.creator_id === currentUser?.id);
   const activeProjects = userProjects.filter(p => p.status === 'ACTIVE');
   
-  // Premium/Admin Bypass
-  const isPremium = currentUser?.is_premium_override || currentUser?.is_admin;
+  // Subscription access stays separate from administrative roles.
+  const isPremium = currentUser?.is_premium_override;
   const isAtTotalLimit = !isPremium && userProjects.length >= 5 && !editId;
   const isAtActiveLimit = !isPremium && activeProjects.length >= 3 && !editId;
 
