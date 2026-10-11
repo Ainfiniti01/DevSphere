@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Plus, Users, MessageSquare, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { Search, Plus, Users, MessageSquare, RefreshCw, Trash2, Loader2, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ListSkeleton } from '@/components/SkeletonLoader';
+import ContentActionMenu from '@/components/ContentActionMenu';
+import ReportDialog, { type ReportContentType } from '@/components/ReportDialog';
 import EmptyState from '@/components/EmptyState';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +35,7 @@ const Messages = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setSearchUser] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ contentType: ReportContentType; chatId: string; label: string } | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -171,8 +174,17 @@ const Messages = () => {
                 <ListSkeleton count={8} />
               ) : filteredChats.length > 0 ? (
                 filteredChats.map(chat => (
-                  <div 
-                    key={chat.id} 
+                  <ContentActionMenu
+                    key={chat.id}
+                    ariaLabel={`${chat.isGroup ? 'Group' : 'Conversation'} actions`}
+                    actions={[{
+                      label: chat.isGroup ? 'Report group' : 'Report conversation',
+                      icon: <Flag size={16} />,
+                      destructive: true,
+                      onSelect: () => setReportTarget({ contentType: chat.isGroup ? 'group' : 'conversation', chatId: chat.id, label: chat.name || (chat.isGroup ? 'this group' : 'this conversation') }),
+                    }]}
+                  >
+                  <div
                     className="flex items-center gap-4 p-4 hover:bg-accent/30 rounded-2xl cursor-pointer transition-all group relative"
                     onClick={() => navigate(`/chat/${chat.targetId}${chat.isGroup ? '?group=true' : ''}`)}
                   >
@@ -206,12 +218,12 @@ const Messages = () => {
                       </div>
                     </div>
 
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -241,6 +253,7 @@ const Messages = () => {
                       </AlertDialog>
                     </div>
                   </div>
+                  </ContentActionMenu>
                 ))
               ) : (
                 <EmptyState 
@@ -266,6 +279,13 @@ const Messages = () => {
           </div>
         </div>
       </div>
+      <ReportDialog
+        open={!!reportTarget}
+        onOpenChange={(open) => !open && setReportTarget(null)}
+        contentType={reportTarget?.contentType || 'conversation'}
+        chatId={reportTarget?.chatId}
+        targetLabel={reportTarget?.label || 'this conversation'}
+      />
     </AppLayout>
   );
 };

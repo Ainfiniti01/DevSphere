@@ -34,7 +34,7 @@ type ManagedUser = {
 
 type AdminReport = {
   id: string;
-  content_type: 'project' | 'comment' | 'user';
+  content_type: 'project' | 'comment' | 'user' | 'message' | 'conversation' | 'group';
   reason: string;
   details: string | null;
   status: 'pending' | 'under_review' | 'escalated' | 'resolved' | 'dismissed';
@@ -53,6 +53,13 @@ type AdminReport = {
   assigned_name: string | null;
   resolution_reason: string | null;
   action_taken: string | null;
+  reported_chat_id: string | null;
+  reported_message_id: string | null;
+  reported_message_content: string | null;
+  reported_message_created_at: string | null;
+  reported_chat_type: string | null;
+  reported_group_id: string | null;
+  reported_group_title: string | null;
   total_count: number;
 };
 
@@ -304,7 +311,7 @@ const Admin = () => {
           <TabsContent value="reports" className="space-y-5">
             <Card className="border-0 shadow-sm dark:bg-slate-900">
               <CardHeader className="gap-4 border-b border-slate-100 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
-                <div><CardTitle className="flex items-center gap-2"><Flag size={19} /> Moderation queue</CardTitle><p className="mt-1 text-sm text-slate-500">Review projects and comments reported by the community.</p></div>
+                <div><CardTitle className="flex items-center gap-2"><Flag size={19} /> Moderation queue</CardTitle><p className="mt-1 text-sm text-slate-500">Review platform content, accounts, messages, and conversations reported by the community.</p></div>
                 <div className="flex flex-wrap gap-2">
                   <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={reportSearch} onChange={(event) => { setReportPage(1); setReportSearch(event.target.value); }} placeholder="Search reports" className="w-48 rounded-xl pl-9" /></div>
                   <Select value={reportStatus} onValueChange={(value) => { setReportPage(1); setReportStatus(value); }}><SelectTrigger className="w-36 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="pending">Pending</SelectItem><SelectItem value="under_review">Under review</SelectItem><SelectItem value="escalated">Escalated</SelectItem><SelectItem value="resolved">Resolved</SelectItem><SelectItem value="dismissed">Dismissed</SelectItem></SelectContent></Select>
@@ -320,7 +327,10 @@ const Admin = () => {
                         <p className="font-bold">{report.reason}</p>
                         <p className="text-sm text-slate-500">Reported by {report.reporter_name || 'a developer'}{report.reported_user_name ? ` · About ${report.reported_user_name}` : ''}</p>
                         {report.reported_project_title && <a href={`/project/${report.reported_project_id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">{report.reported_project_title} <ExternalLink size={13} /></a>}
+                        {report.reported_group_title && <a href={`/project/${report.reported_group_id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">Group: {report.reported_group_title} <ExternalLink size={13} /></a>}
                         {report.reported_comment_content && <p className="rounded-xl bg-slate-50 p-3 text-sm italic text-slate-600 dark:bg-slate-950 dark:text-slate-300">“{report.reported_comment_content}”</p>}
+                        {report.reported_message_content && <p className="rounded-xl bg-slate-50 p-3 text-sm italic text-slate-600 dark:bg-slate-950 dark:text-slate-300">Message context: “{report.reported_message_content}”</p>}
+                        {report.content_type === 'conversation' && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">Direct conversation report. Only the reported conversation target is available to authorized reviewers.</p>}
                         {report.details && <p className="text-sm text-slate-600 dark:text-slate-300">{report.details}</p>}
                         <p className="text-xs text-slate-400">{report.assigned_name ? `Assigned to ${report.assigned_name}` : 'Unassigned'} · {new Date(report.created_at).toLocaleString()}</p>
                       </div>
@@ -330,7 +340,7 @@ const Admin = () => {
                           {report.status === 'pending' && <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'under_review')} className="rounded-xl">Review</Button>}
                           <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'dismiss')} className="rounded-xl">Dismiss</Button>
                           {report.status !== 'escalated' && <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'escalate')} className="rounded-xl">Escalate</Button>}
-                          <Button size="sm" onClick={() => openActionDialog(report, 'remove_content')} className="rounded-xl">Remove content</Button>
+                          {report.content_type !== 'conversation' && report.content_type !== 'user' && <Button size="sm" onClick={() => openActionDialog(report, 'remove_content')} className="rounded-xl">Remove content</Button>}
                           {isAdmin && <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'resolve')} className="rounded-xl">Resolve</Button>}
                           {isAdmin && report.reported_user_id && <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'warn')} className="rounded-xl">Warn user</Button>}
                           {isAdmin && report.reported_user_id && <Button size="sm" variant="outline" onClick={() => openActionDialog(report, 'restrict')} className="rounded-xl">Restrict account</Button>}

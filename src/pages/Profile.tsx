@@ -5,11 +5,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp, Github, Linkedin, Twitter, BadgeCheck, ShieldCheck } from 'lucide-react';
+import { Settings, Share2, MapPin, Link as LinkIcon, Rocket, User, LayoutGrid, Loader2, ChevronDown, ChevronUp, Github, Linkedin, Twitter, BadgeCheck, ShieldCheck, Flag } from 'lucide-react';
 import SkillBadge from '@/components/SkillBadge';
 import { useApp } from '@/context/AppContext';
 import ProjectCard from '@/components/ProjectCard';
 import EmptyState from '@/components/EmptyState';
+import ReportDialog from '@/components/ReportDialog';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ const Profile = () => {
   const { currentUser, projects, chats, isAdmin, isModerator } = useApp();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -129,14 +131,24 @@ const Profile = () => {
                     <Settings size={20} />
                     <span className="hidden sm:inline">Settings</span>
                   </Button>
+                  <Button variant="outline" size="lg" className="rounded-2xl border-border font-bold gap-2" onClick={() => navigate('/my-reports')}>
+                    <Flag size={18} />
+                    <span className="hidden sm:inline">My Reports</span>
+                  </Button>
                   <Button variant="default" size="lg" className="rounded-2xl font-bold gap-2 shadow-lg shadow-primary/20" onClick={() => navigate('/edit-profile')}>
                     Edit Profile
                   </Button>
                 </>
               ) : (
-                <Button size="lg" className="rounded-2xl font-black text-lg px-10 shadow-xl shadow-primary/20" onClick={() => navigate(`/chat/${profile.id}`)}>
-                  Message
-                </Button>
+                <>
+                  <Button size="lg" className="rounded-2xl font-black text-lg px-10 shadow-xl shadow-primary/20" onClick={() => navigate(`/chat/${profile.id}`)}>
+                    Message
+                  </Button>
+                  <Button variant="outline" size="lg" className="rounded-2xl font-bold gap-2" onClick={() => setReportOpen(true)}>
+                    <Flag size={18} />
+                    <span className="hidden sm:inline">Report</span>
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -253,6 +265,13 @@ const Profile = () => {
           </div>
         </div>
       </div>
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        contentType="user"
+        reportedUserId={profile.id}
+        targetLabel={profile.name || 'this user'}
+      />
     </AppLayout>
   );
 };

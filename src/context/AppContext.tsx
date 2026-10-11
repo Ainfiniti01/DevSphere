@@ -374,6 +374,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         .from('messages')
         .select('*, sender:profiles!messages_sender_id_fkey(name, avatar_url, display_name)')
         .in('chat_id', chatIds)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (msgError) throw msgError;

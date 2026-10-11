@@ -11,12 +11,17 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
+export type ReportContentType = 'project' | 'comment' | 'user' | 'message' | 'conversation' | 'group';
+
 type ReportDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  contentType: 'project' | 'comment';
+  contentType: ReportContentType;
   projectId?: string;
   commentId?: string;
+  reportedUserId?: string;
+  chatId?: string;
+  messageId?: string;
   targetLabel: string;
 };
 
@@ -26,10 +31,21 @@ const reasons = [
   { value: 'inappropriate', label: 'Inappropriate content' },
   { value: 'misinformation', label: 'Misinformation' },
   { value: 'copyright', label: 'Copyright concern' },
+  { value: 'privacy', label: 'Privacy or personal information' },
+  { value: 'scam', label: 'Scam or fraud' },
   { value: 'other', label: 'Other policy concern' },
 ];
 
-const ReportDialog = ({ open, onOpenChange, contentType, projectId, commentId, targetLabel }: ReportDialogProps) => {
+const targetNames: Record<ReportContentType, string> = {
+  project: 'project',
+  comment: 'comment',
+  user: 'user',
+  message: 'message',
+  conversation: 'conversation',
+  group: 'group',
+};
+
+const ReportDialog = ({ open, onOpenChange, contentType, projectId, commentId, reportedUserId, chatId, messageId, targetLabel }: ReportDialogProps) => {
   const { currentUser } = useApp();
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -64,6 +80,9 @@ const ReportDialog = ({ open, onOpenChange, contentType, projectId, commentId, t
         p_content_type: contentType,
         p_project_id: projectId || null,
         p_comment_id: commentId || null,
+        p_reported_user_id: reportedUserId || null,
+        p_chat_id: chatId || null,
+        p_message_id: messageId || null,
         p_reason: reason,
         p_details: details.trim() || null,
       });
@@ -81,7 +100,7 @@ const ReportDialog = ({ open, onOpenChange, contentType, projectId, commentId, t
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="rounded-3xl border-border bg-background sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Flag size={19} className="text-destructive" /> Report {contentType}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Flag size={19} className="text-destructive" /> Report {targetNames[contentType]}</DialogTitle>
           <DialogDescription>
             Help the DevSphere team review <span className="font-semibold text-foreground">{targetLabel}</span>. Reports are reviewed by authorized moderators and administrators.
           </DialogDescription>
@@ -103,7 +122,7 @@ const ReportDialog = ({ open, onOpenChange, contentType, projectId, commentId, t
               value={details}
               onChange={(event) => setDetails(event.target.value)}
               placeholder="Add context that will help the moderation team review this report."
-              className="min-h-28 rounded-xl resize-none"
+              className="min-h-28 resize-none rounded-xl"
               maxLength={2000}
             />
             <p className="text-right text-xs text-muted-foreground">{details.length}/2000</p>

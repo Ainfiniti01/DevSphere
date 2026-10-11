@@ -69,6 +69,7 @@ const AppContent = () => {
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['moderator', 'admin', 'super_admin']}><Admin /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
+      <Route path="/my-reports" element={<ProtectedRoute><MyReports /></ProtectedRoute>} />
 
       {/* Publicly Accessible Routes */}
       <Route path="/explore" element={<Explore />} />

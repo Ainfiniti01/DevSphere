@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getProjectUrl } from '@/lib/appOrigin';
 import ReportDialog from '@/components/ReportDialog';
+import ContentActionMenu from '@/components/ContentActionMenu';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
@@ -77,6 +78,15 @@ const ProjectCard = ({ project }: { project: any }) => {
 
   return (
     <>
+      <ContentActionMenu
+        ariaLabel="Project actions"
+        actions={currentUser?.id !== project.creator_id ? [{
+          label: 'Report project',
+          icon: <Flag size={16} />,
+          destructive: true,
+          onSelect: () => setReportTarget({ contentType: 'project', id: project.id, label: project.title }),
+        }] : []}
+      >
       <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
         <Avatar className="h-10 w-10 border border-border">
@@ -173,7 +183,17 @@ const ProjectCard = ({ project }: { project: any }) => {
                   comments.map((c: any) => {
                     const isFounder = c.user_id === project.creator_id;
                     return (
-                      <div key={c.id} className="flex gap-3">
+                      <ContentActionMenu
+                        key={c.id}
+                        ariaLabel="Comment actions"
+                        actions={currentUser?.id !== c.user_id ? [{
+                          label: 'Report comment',
+                          icon: <Flag size={16} />,
+                          destructive: true,
+                          onSelect: () => setReportTarget({ contentType: 'comment', id: c.id, label: 'this comment', projectId: project.id }),
+                        }] : []}
+                      >
+                      <div className="flex gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={c.user?.avatar_url} />
                           <AvatarFallback>{c.user?.name?.[0] || 'U'}</AvatarFallback>
@@ -205,6 +225,7 @@ const ProjectCard = ({ project }: { project: any }) => {
                           <p className="text-sm">{c.content}</p>
                         </div>
                       </div>
+                      </ContentActionMenu>
                     );
                   })
                 ) : (
@@ -248,6 +269,7 @@ const ProjectCard = ({ project }: { project: any }) => {
         </div>
       </CardFooter>
       </Card>
+      </ContentActionMenu>
       <ReportDialog
         open={!!reportTarget}
         onOpenChange={(open) => !open && setReportTarget(null)}

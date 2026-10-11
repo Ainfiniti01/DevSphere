@@ -4,9 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, CheckCheck, Loader2 } from 'lucide-react';
+import { ChevronLeft, Send, Paperclip, User, Users, MessageSquare, X, Check, CheckCheck, Loader2, Flag, Copy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
+import ContentActionMenu from '@/components/ContentActionMenu';
+import ReportDialog, { type ReportContentType } from '@/components/ReportDialog';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import AppLayout from '@/components/layout/AppLayout';
@@ -25,6 +27,7 @@ const ChatScreen = () => {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ contentType: ReportContentType; label: string; messageId?: string; chatId?: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
 
@@ -92,13 +95,14 @@ const ChatScreen = () => {
 
         if (resolvedChatId) {
           setChatId(resolvedChatId);
-          
+
           const { data: msgs } = await supabase
             .from('messages')
             .select('*, sender:profiles!messages_sender_id_fkey(id, name, avatar_url, display_name)')
             .eq('chat_id', resolvedChatId)
+            .eq('is_deleted', false)
             .order('created_at', { ascending: true });
-          
+
           setMessages(msgs || []);
 
           const { data: reads } = await supabase
@@ -133,13 +137,17 @@ const ChatScreen = () => {
 
     const channel = supabase
       .channel(`chat_room_${chatId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'messages',
         filter: `chat_id=eq.${chatId}`
       }, async (payload) => {
         const newMsg = payload.new;
+        if (newMsg.is_deleted) {
+          setMessages((previous) => previous.filter((message) => message.id !== newMsg.id));
+          return;
+        }
         
         let senderInfo = null;
         if (newMsg.sender_id === currentUser.id) {
@@ -274,6 +282,19 @@ const ChatScreen = () => {
               {isGroup ? 'Group Collaboration' : (isOnline(chatPartner?.last_seen) ? 'Active Now' : 'Offline')}
             </p>
           </div>
+          {chatId && (
+            <ContentActionMenu
+              ariaLabel="Conversation actions"
+              actions={[{
+                label: isGroup ? 'Report group' : 'Report conversation',
+                icon: <Flag size={16} />,
+                destructive: true,
+                onSelect: () => setReportTarget({ contentType: isGroup ? 'group' : 'conversation', chatId, label: isGroup ? (chatPartner?.title || 'this group') : 'this conversation' }),
+              }]}
+            >
+              <span className="sr-only">Conversation actions</span>
+            </ContentActionMenu>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-accent/5">
@@ -308,23 +329,43 @@ const ChatScreen = () => {
                       {resolveName(m.sender)}
                     </span>
                   )}
-                  <div className={`p-4 pb-8 rounded-3xl text-sm shadow-sm relative min-w-[100px] break-all whitespace-pre-wrap overflow-hidden ${
-                    isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
-                  }`}>
-                    {m.content}
-                    <div className="absolute bottom-2 right-3 flex items-center gap-1.5 opacity-70">
-                      <span className="text-[9px] font-bold">
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {isMe && (
-                        isSeen ? (
-                          <CheckCheck size={14} className="text-blue-400" />
-                        ) : (
-                          <Check size={14} className="text-white/70" />
-                        )
-                      )}
+                  <ContentActionMenu
+                    ariaLabel="Message actions"
+                    actions={[
+                      {
+                        label: 'Copy message',
+                        icon: <Copy size={16} />,
+                        onSelect: async () => {
+                          await navigator.clipboard.writeText(m.content);
+                          toast.success('Message copied.');
+                        },
+                      },
+                      ...(!isMe ? [{
+                        label: 'Report message',
+                        icon: <Flag size={16} />,
+                        destructive: true,
+                        onSelect: () => setReportTarget({ contentType: 'message', messageId: m.id, chatId: chatId || undefined, label: `a message from ${resolveName(m.sender)}` }),
+                      }] : []),
+                    ]}
+                  >
+                    <div className={`p-4 pb-8 rounded-3xl text-sm shadow-sm relative min-w-[100px] break-all whitespace-pre-wrap overflow-hidden ${
+                      isMe ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card text-foreground border border-border rounded-tl-none'
+                    }`}>
+                      {m.content}
+                      <div className="absolute bottom-2 right-3 flex items-center gap-1.5 opacity-70">
+                        <span className="text-[9px] font-bold">
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {isMe && (
+                          isSeen ? (
+                            <CheckCheck size={14} className="text-blue-400" />
+                          ) : (
+                            <Check size={14} className="text-white/70" />
+                          )
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </ContentActionMenu>
                 </div>
               </div>
             );
@@ -374,6 +415,14 @@ const ChatScreen = () => {
           </div>
         </DialogContent>
       </Dialog>
+      <ReportDialog
+        open={!!reportTarget}
+        onOpenChange={(open) => !open && setReportTarget(null)}
+        contentType={reportTarget?.contentType || 'message'}
+        chatId={reportTarget?.chatId}
+        messageId={reportTarget?.messageId}
+        targetLabel={reportTarget?.label || 'this content'}
+      />
     </AppLayout>
   );
 };

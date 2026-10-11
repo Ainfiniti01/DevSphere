@@ -19,6 +19,7 @@ import { getProjectUrl } from '@/lib/appOrigin';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import AIManager from '@/components/AIManager';
 import ReportDialog from '@/components/ReportDialog';
+import ContentActionMenu from '@/components/ContentActionMenu';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -570,7 +571,17 @@ const ProjectDetail = () => {
                     <div className="flex justify-center py-4"><Loader2 className="animate-spin text-primary" /></div>
                   ) : comments.length > 0 ? (
                     comments.map((c) => (
-                      <div key={c.id} className="flex gap-3">
+                      <ContentActionMenu
+                        key={c.id}
+                        ariaLabel="Comment actions"
+                        actions={currentUser?.id !== c.user_id ? [{
+                          label: 'Report comment',
+                          icon: <Flag size={16} />,
+                          destructive: true,
+                          onSelect: () => setReportTarget({ contentType: 'comment', id: c.id, label: 'this comment', projectId: project.id }),
+                        }] : []}
+                      >
+                      <div className="flex gap-3">
                         <Avatar className="h-8 w-8 shrink-0">
                           <AvatarImage src={c.user?.avatar_url} />
                           <AvatarFallback>{c.user?.name?.[0]}</AvatarFallback>
@@ -590,6 +601,7 @@ const ProjectDetail = () => {
                           <p className="text-xs leading-relaxed">{c.content}</p>
                         </div>
                       </div>
+                      </ContentActionMenu>
                     ))
                   ) : (
                     <p className="text-center text-xs text-muted-foreground py-4">No comments yet. Start the conversation!</p>
