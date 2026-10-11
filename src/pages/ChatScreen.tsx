@@ -234,7 +234,7 @@ const ChatScreen = () => {
 
   if (loading) {
     return (
-      <AppLayout title="Chat">
+      <AppLayout title="Chat" showHeader={false}>
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <Loader2 className="animate-spin text-primary" size={32} />
           <p className="text-sm text-muted-foreground mt-4">Loading conversation...</p>
@@ -245,11 +245,15 @@ const ChatScreen = () => {
 
   return (
     <AppLayout 
-      title={isGroup ? chatPartner?.title : resolveName(chatPartner)} 
+      title={isGroup ? chatPartner?.title : resolveName(chatPartner)}
       showBack
+      showHeader={false}
     >
       <div className="flex flex-col h-[calc(100vh-140px)] lg:h-[calc(100vh-100px)] bg-background max-w-5xl mx-auto overflow-hidden lg:border lg:border-border lg:rounded-[2.5rem] lg:shadow-xl lg:mb-8">
         <header className="px-6 py-4 border-b border-border flex items-center gap-4 bg-card/50 backdrop-blur-md sticky top-0 z-10">
+          <button onClick={() => navigate('/messages')} className="rounded-xl p-2 transition-colors hover:bg-accent" aria-label="Back to messages">
+            <ChevronLeft size={22} />
+          </button>
           <div className="relative cursor-pointer" onClick={() => setPreviewAvatar(isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url)}>
             <Avatar className="h-12 w-12 border-2 border-primary/20">
               <AvatarImage src={isGroup ? chatPartner?.thumbnail_url : chatPartner?.avatar_url} />

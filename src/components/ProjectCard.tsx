@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Share2, MessageCircle, Send, User, Loader2, BadgeCheck } from 'lucide-react';
+import { Heart, Share2, MessageCircle, Send, User, Loader2, BadgeCheck, Flag } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getProjectUrl } from '@/lib/appOrigin';
+import ReportDialog from '@/components/ReportDialog';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const ProjectCard = ({ project }: { project: any }) => {
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ contentType: 'project' | 'comment'; id: string; label: string; projectId?: string } | null>(null);
 
   const fetchComments = async () => {
     if (!supabase) return;
@@ -31,6 +33,7 @@ const ProjectCard = ({ project }: { project: any }) => {
         .from('comments')
         .select('id, content, created_at, user_id, user:profiles(id, name, avatar_url, display_name)')
         .eq('project_id', project.id)
+        .eq('is_removed', false)
         .order('created_at', { ascending: false }); // Newest at the top
       
       if (error) throw error;
@@ -73,7 +76,8 @@ const ProjectCard = ({ project }: { project: any }) => {
   const hasMedia = project.thumbnail && project.thumbnail !== '';
 
   return (
-    <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
+    <>
+      <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow mb-4">
       <CardHeader className="p-4 flex-row items-center gap-3 space-y-0">
         <Avatar className="h-10 w-10 border border-border">
           <AvatarImage src={project.creator?.avatar_url} />
@@ -184,7 +188,19 @@ const ProjectCard = ({ project }: { project: any }) => {
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                              {currentUser?.id !== c.user_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReportTarget({ contentType: 'comment', id: c.id, label: 'this comment', projectId: project.id })}
+                                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                  aria-label="Report comment"
+                                >
+                                  <Flag size={12} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <p className="text-sm">{c.content}</p>
                         </div>
@@ -212,11 +228,35 @@ const ProjectCard = ({ project }: { project: any }) => {
             </DrawerContent>
           </Drawer>
         </div>
-        <button onClick={handleShare} className="text-muted-foreground hover:text-foreground transition-colors p-2">
-          <Share2 size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          {currentUser?.id !== project.creator_id && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setReportTarget({ contentType: 'project', id: project.id, label: project.title });
+              }}
+              className="text-muted-foreground transition-colors hover:text-destructive p-2"
+              aria-label="Report project"
+            >
+              <Flag size={18} />
+            </button>
+          )}
+          <button onClick={handleShare} className="text-muted-foreground hover:text-foreground transition-colors p-2">
+            <Share2 size={20} />
+          </button>
+        </div>
       </CardFooter>
-    </Card>
+      </Card>
+      <ReportDialog
+        open={!!reportTarget}
+        onOpenChange={(open) => !open && setReportTarget(null)}
+        contentType={reportTarget?.contentType || 'project'}
+        projectId={reportTarget?.contentType === 'project' ? reportTarget.id : reportTarget?.projectId}
+        commentId={reportTarget?.contentType === 'comment' ? reportTarget.id : undefined}
+        targetLabel={reportTarget?.label || 'this content'}
+      />
+    </>
   );
 };
 

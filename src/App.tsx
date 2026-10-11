@@ -31,6 +31,7 @@ import ManageTeam from "./pages/ManageTeam";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import Referrals from "./pages/Referrals";
+import MyReports from "./pages/MyReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

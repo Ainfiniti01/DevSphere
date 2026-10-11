@@ -12,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit, FileText } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit, FileText, Flag } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { getProjectUrl } from '@/lib/appOrigin';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import AIManager from '@/components/AIManager';
+import ReportDialog from '@/components/ReportDialog';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -38,6 +39,7 @@ const ProjectDetail = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ contentType: 'project' | 'comment'; id: string; label: string; projectId?: string } | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -61,7 +63,7 @@ const ProjectDetail = () => {
         const { data, error } = await supabase
           .from('projects')
           .select(`
-            id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id, documentation, documentation_filename,
+            id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, is_removed, project_url, creator_id, documentation, documentation_filename,
             creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
             likes(user_id),
             comments(id),
@@ -71,7 +73,7 @@ const ProjectDetail = () => {
           .maybeSingle();
 
         if (error) throw error;
-        if (!data || (data.status === 'PAUSED' && data.creator_id !== currentUser.id)) {
+        if (!data || data.is_removed || (data.status === 'PAUSED' && data.creator_id !== currentUser.id)) {
           throw new Error('This project is unavailable or has been deleted.');
         }
 
@@ -116,6 +118,7 @@ const ProjectDetail = () => {
         .from('comments')
         .select('id, content, created_at, user_id, user:profiles(id, name, avatar_url, display_name)')
         .eq('project_id', id)
+        .eq('is_removed', false)
         .order('created_at', { ascending: false }); // Newest at the top
       
       if (error) throw error;
@@ -345,6 +348,12 @@ const ProjectDetail = () => {
                     <Heart size={20} className={project.isLiked ? "fill-red-500 text-red-500" : ""} />
                     <span>{project.likes}</span>
                   </Button>
+                  {!isOwner && (
+                    <Button variant="outline" size="lg" className="rounded-2xl gap-2 font-bold text-destructive hover:text-destructive" onClick={() => setReportTarget({ contentType: 'project', id: project.id, label: project.title })}>
+                      <Flag size={18} />
+                      <span>Report</span>
+                    </Button>
+                  )}
                   <Button variant="outline" size="lg" className="rounded-2xl gap-2 font-bold" onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(getProjectUrl(project.id));
@@ -569,7 +578,14 @@ const ProjectDetail = () => {
                         <div className="flex-1 bg-accent/20 p-3 rounded-2xl">
                           <div className="flex justify-between items-center mb-1">
                             <h5 className="text-xs font-bold">{c.user?.name}</h5>
-                            <span className="text-[9px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                              {currentUser?.id !== c.user_id && (
+                                <button type="button" onClick={() => setReportTarget({ contentType: 'comment', id: c.id, label: 'this comment', projectId: project.id })} className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label="Report comment">
+                                  <Flag size={12} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <p className="text-xs leading-relaxed">{c.content}</p>
                         </div>
@@ -583,6 +599,14 @@ const ProjectDetail = () => {
             </div>
           </div>
         </div>
+        <ReportDialog
+          open={!!reportTarget}
+          onOpenChange={(open) => !open && setReportTarget(null)}
+          contentType={reportTarget?.contentType || 'project'}
+          projectId={reportTarget?.contentType === 'project' ? reportTarget.id : reportTarget?.projectId}
+          commentId={reportTarget?.contentType === 'comment' ? reportTarget.id : undefined}
+          targetLabel={reportTarget?.label || 'this content'}
+        />
       </div>
     </AppLayout>
   );

@@ -252,7 +252,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase
         .from('projects')
         .select(`
-          id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id, documentation, documentation_filename,
+          id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, is_removed, project_url, creator_id, documentation, documentation_filename,
           creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
           likes(user_id),
           comments(id),
@@ -263,7 +263,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       // Enforce visibility at the query level: paused projects are only visible to their owner
-      const visibleProjects = data.filter(p => p.status !== 'PAUSED' || p.creator_id === activeUser?.id);
+      const visibleProjects = data.filter(p => !p.is_removed && (p.status !== 'PAUSED' || p.creator_id === activeUser?.id));
 
       const transformed = visibleProjects.map(p => ({
         ...p,

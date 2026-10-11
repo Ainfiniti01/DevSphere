@@ -10,14 +10,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const AppLayout = ({ 
   children, 
-  showNav = true, 
-  title, 
-  showBack = false 
-}: { 
-  children: React.ReactNode, 
-  showNav?: boolean, 
+  showNav = true,
+  title,
+  showBack = false,
+  showHeader = true
+}: {
+  children: React.ReactNode,
+  showNav?: boolean,
   title?: string,
-  showBack?: boolean
+  showBack?: boolean,
+  showHeader?: boolean
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,6 +102,7 @@ const AppLayout = ({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile/Tablet Header */}
+        {showHeader && (
         <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between lg:hidden">
           <div className="flex items-center gap-2">
             {showBack && (
@@ -120,9 +123,10 @@ const AppLayout = ({
             </button>
           </div>
         </header>
+        )}
 
         {/* Desktop Header (Title only) */}
-        {title && (
+        {showHeader && title && (
           <header className="hidden lg:flex items-center justify-between px-8 py-6 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-40">
             <div className="flex items-center gap-4">
               {showBack && (
