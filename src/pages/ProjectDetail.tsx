@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { useApp } from '@/context/AppContext';
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,22 @@ import { toast } from "sonner";
 import { ChevronLeft, MessageSquare, Users, Share2, Rocket, Loader2, Heart, Send, User, Pause, Play, ExternalLink, ChevronDown, ChevronUp, BadgeCheck, Sparkles, Edit, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { getProjectUrl } from '@/lib/appOrigin';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import AIManager from '@/components/AIManager';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { projects, requests, currentUser, toggleLike, refreshProjects, incrementInterest } = useApp();
-  
-  const project = useMemo(() => projects.find(p => p.id === id), [projects, id]);
-  
+
+  const projectFromContext = useMemo(() => projects.find(p => p.id === id), [projects, id]);
+  const [directProject, setDirectProject] = useState<any>(null);
+  const [projectLoading, setProjectLoading] = useState(true);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const project = projectFromContext || directProject;
+
   const [joinReason, setJoinReason] = useState('');
   const [joinContribution, setJoinContribution] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -32,6 +38,75 @@ const ProjectDetail = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!id) {
+      setProjectError('This project link is not valid.');
+      setProjectLoading(false);
+      return;
+    }
+
+    if (!currentUser) {
+      const returnPath = `${location.pathname}${location.search}${location.hash}`;
+      navigate(`/auth?returnTo=${encodeURIComponent(returnPath)}`, { replace: true });
+      return;
+    }
+
+    let mounted = true;
+    const loadProject = async () => {
+      setProjectLoading(true);
+      setProjectError(null);
+      setDirectProject(null);
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select(`
+            id, title, problem, solution, description, stage, skills_required, thumbnail_url, created_at, status, project_url, creator_id, documentation, documentation_filename,
+            creator:profiles!projects_creator_id_fkey(id, name, avatar_url, title, display_name),
+            likes(user_id),
+            comments(id),
+            project_members(user_id, status, role)
+          `)
+          .eq('id', id)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data || (data.status === 'PAUSED' && data.creator_id !== currentUser.id)) {
+          throw new Error('This project is unavailable or has been deleted.');
+        }
+
+        const resolvedProject = {
+          ...data,
+          likes: data.likes?.length || 0,
+          commentCount: data.comments?.length || 0,
+          isLiked: data.likes?.some((like: any) => like.user_id === currentUser.id),
+          skills: data.skills_required || [],
+          thumbnail: data.thumbnail_url,
+          timestamp: data.created_at,
+          members: data.project_members?.filter((member: any) => member.status === 'active').map((member: any) => member.user_id) || [],
+          myMembershipStatus: data.project_members?.find((member: any) => member.user_id === currentUser.id)?.status || 'none',
+          myRole: data.project_members?.find((member: any) => member.user_id === currentUser.id)?.role || 'Member',
+        };
+
+        if (mounted) setDirectProject(resolvedProject);
+      } catch (error: any) {
+        if (error?.status === 401 || error?.code === 'PGRST301' || /jwt|token expired/i.test(error?.message || '')) {
+          await supabase.auth.signOut();
+          const returnPath = `${location.pathname}${location.search}${location.hash}`;
+          if (mounted) navigate(`/auth?returnTo=${encodeURIComponent(returnPath)}`, { replace: true });
+          return;
+        }
+        if (mounted) setProjectError(error?.message || 'Unable to load this project.');
+      } finally {
+        if (mounted) setProjectLoading(false);
+      }
+    };
+
+    loadProject();
+    return () => {
+      mounted = false;
+    };
+  }, [id, currentUser?.id, location.hash, location.pathname, location.search, navigate]);
 
   const fetchComments = async () => {
     if (!supabase || !id) return;
@@ -122,7 +197,25 @@ const ProjectDetail = () => {
 
   const requestStatus = latestRequest ? latestRequest.status : 'none';
 
-  if (!project) return <AppLayout title="Error" showBack><div className="p-8 text-center">Project Not Found</div></AppLayout>;
+  if (projectLoading) {
+    return (
+      <AppLayout title="Project Details" showBack>
+        <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-primary" size={32} /></div>
+      </AppLayout>
+    );
+  }
+
+  if (!project) {
+    return (
+      <AppLayout title="Project unavailable" showBack>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+          <h2 className="text-2xl font-black">Project unavailable</h2>
+          <p className="mt-3 max-w-md text-muted-foreground">{projectError || 'This project may have been deleted or is no longer available.'}</p>
+          <Button onClick={() => navigate('/')} className="mt-8 rounded-2xl px-8">Return Home</Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const isOwner = currentUser?.id === project.creator_id;
   const isMember = project.myMembershipStatus === 'active';
@@ -252,9 +345,14 @@ const ProjectDetail = () => {
                     <Heart size={20} className={project.isLiked ? "fill-red-500 text-red-500" : ""} />
                     <span>{project.likes}</span>
                   </Button>
-                  <Button variant="outline" size="lg" className="rounded-2xl gap-2 font-bold" onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("Link copied!");
+                  <Button variant="outline" size="lg" className="rounded-2xl gap-2 font-bold" onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(getProjectUrl(project.id));
+                      toast.success("Link copied!");
+                    } catch (error) {
+                      console.error("Failed to copy project link:", error);
+                      toast.error("Unable to copy the project link. Please try again.");
+                    }
                   }}>
                     <Share2 size={20} />
                     <span>Share</span>

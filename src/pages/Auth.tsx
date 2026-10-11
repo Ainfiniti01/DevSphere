@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +9,14 @@ import { Github, Chrome, AlertCircle, ArrowLeft, Loader2, Eye, EyeOff } from 'lu
 import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 import { useApp } from '@/context/AppContext';
+import { getSafeReturnPath } from '@/lib/authRedirect';
 import appIcon from '../../assets/images/icon.jpeg';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, authLoading } = useApp();
+  const returnTo = getSafeReturnPath(new URLSearchParams(location.search).get('returnTo'), '/');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,14 +24,14 @@ const Auth = () => {
   const [isResetMode, setIsResetMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const REDIRECT_URL = window.location.origin;
+  const REDIRECT_URL = `${window.location.origin}/auth?returnTo=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
     // Only redirect if we are absolutely sure the user is logged in and auth is not loading
     if (!authLoading && currentUser) {
-      navigate('/', { replace: true });
+      navigate(returnTo, { replace: true });
     }
-  }, [currentUser, authLoading, navigate]);
+  }, [currentUser, authLoading, navigate, returnTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +82,7 @@ const Auth = () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${REDIRECT_URL}/reset-password`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
@@ -212,8 +215,8 @@ const Auth = () => {
       
       {!isResetMode && (
         <p className="text-center text-sm text-muted-foreground mt-8">
-          Don't have an account? <span onClick={() => navigate('/signup')} className="text-primary font-semibold cursor-pointer hover:underline">Sign up</span>
-        </p>
+        Don't have an account? <span onClick={() => navigate(`/signup?returnTo=${encodeURIComponent(returnTo)}`)} className="text-primary font-semibold cursor-pointer hover:underline">Sign up</span>
+      </p>
       )}
     </div>
   );

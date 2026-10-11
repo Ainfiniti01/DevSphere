@@ -10,10 +10,13 @@ export type AppRole = 'member' | 'moderator' | 'admin' | 'super_admin';
 interface AppContextType {
   currentUser: any;
   setCurrentUser: (user: any) => void;
-  role: AppRole;
+  role: AppRole | null;
   isAdmin: boolean;
   isModerator: boolean;
   isSuperAdmin: boolean;
+  profileLoading: boolean;
+  profileError: string | null;
+  retryProfile: () => void;
   authLoading: boolean;
   hasSeenOnboarding: boolean;
   completeOnboarding: () => void;
@@ -48,9 +51,12 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const role: AppRole = ['member', 'moderator', 'admin', 'super_admin'].includes(currentUser?.role)
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileRetryNonce, setProfileRetryNonce] = useState(0);
+  const role: AppRole | null = ['member', 'moderator', 'admin', 'super_admin'].includes(currentUser?.role)
     ? currentUser.role
-    : 'member';
+    : null;
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = isSuperAdmin || role === 'admin';
   const isModerator = isAdmin || role === 'moderator';
@@ -74,6 +80,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const lastActivity = useRef<number>(Date.now());
   const processedEventIds = useRef<Set<string>>(new Set());
   const lastLoadedUserId = useRef<string | null>(null);
+  const profileLoadRef = useRef<{ userId: string; promise: Promise<any> } | null>(null);
+  const lastPresenceAttemptAt = useRef(0);
 
   // Keep a stable ref to currentUser to prevent callback recreation loops
   const currentUserRef = useRef<any>(null);
@@ -93,64 +101,75 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const ensureProfile = useCallback(async (userId: string, authUser: any) => {
     if (!supabase) return null;
-    
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Timeout fetching profile")), 10000)
-    );
+
+    const fetchProfile = async (signal: AbortSignal) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+        .abortSignal(signal);
+
+      if (error) throw error;
+      return data;
+    };
+
+    const runWithTimeout = async <T,>(request: (signal: AbortSignal) => Promise<T>) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+      try {
+        return await request(controller.signal);
+      } catch (error: any) {
+        if (error?.name === 'AbortError') {
+          throw new Error('Profile request timed out before Supabase responded.');
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    };
 
     try {
-      console.log("[AppContext] ensureProfile: Fetching existing profile for", userId);
-      const fetchPromise = (async () => {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .limit(1);
-        
-        if (error) throw error;
-        return data && data.length > 0 ? data[0] : null;
-      })();
+      console.log('[AppContext] ensureProfile: fetching profile', { userId });
+      const existing = await runWithTimeout(fetchProfile);
+      if (existing) return existing;
 
-      const existing = await Promise.race([fetchPromise, timeoutPromise]) as any;
-      
-      if (existing) {
-        console.log("[AppContext] ensureProfile: Found existing profile");
-        return existing;
-      }
-
-      console.log("[AppContext] ensureProfile: Profile not found, creating new profile");
       const newProfile = {
         id: userId,
         name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
         avatar_url: authUser.user_metadata?.avatar_url || null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
-      
-      const upsertPromise = (async () => {
-        const { data, error: upsertError } = await supabase
+
+      return await runWithTimeout(async (signal) => {
+        const { data, error } = await supabase
           .from('profiles')
           .upsert(newProfile, { onConflict: 'id' })
-          .select()
-          .limit(1);
-        
-        if (upsertError) throw upsertError;
-        return data && data.length > 0 ? data[0] : null;
-      })();
-
-      return await Promise.race([upsertPromise, timeoutPromise]);
+          .select('*')
+          .maybeSingle()
+          .abortSignal(signal);
+        if (error) throw error;
+        return data;
+      });
     } catch (error: any) {
-      console.error("[AppContext] Error ensuring profile record exists:", error);
-      return {
-        id: userId,
-        name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'New Developer',
-        avatar_url: authUser.user_metadata?.avatar_url || null
-      };
+      console.error('[AppContext] Error loading profile:', error?.message || error, error);
+      throw error;
     }
+  }, []);
+
+  const retryProfile = useCallback(() => {
+    profileLoadRef.current = null;
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileRetryNonce((value) => value + 1);
   }, []);
 
   const updatePresence = useCallback(async () => {
     const activeUser = currentUserRef.current;
-    if (!supabase || !activeUser?.id) return;
+    const nowMs = Date.now();
+    if (!supabase || !activeUser?.id || nowMs - lastPresenceAttemptAt.current < 5 * 60 * 1000) return;
+    lastPresenceAttemptAt.current = nowMs;
+
     try {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
@@ -166,17 +185,21 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      await supabase
+      const { error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           last_seen: now.toISOString(),
           last_active_at: now.toISOString(),
           activity_streak: newStreak,
-          last_streak_date: today
+          last_streak_date: today,
         })
         .eq('id', activeUser.id);
-    } catch (e) {
-      // Silent fail
+
+      if (error) {
+        console.error('[AppContext] Presence update failed:', error.message, error);
+      }
+    } catch (error: any) {
+      console.error('[AppContext] Presence update request failed:', error?.message || error, error);
     }
   }, []);
 
@@ -599,66 +622,97 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [projects, refreshProjects, incrementInterest]);
 
-  // Robust Auth Initialization & State Monitoring (Runs once on mount)
+  // Robust Auth Initialization & State Monitoring
   useEffect(() => {
     if (!supabase) {
-      console.log("[AppContext] Supabase client not initialized");
       setAuthLoading(false);
+      setProfileLoading(false);
       return;
     }
 
     let isMounted = true;
 
+    const loadProfile = (userId: string, authUser: any) => {
+      const existingRequest = profileLoadRef.current;
+      if (existingRequest?.userId === userId) return existingRequest.promise;
+
+      const request = ensureProfile(userId, authUser);
+      profileLoadRef.current = { userId, promise: request };
+      request.then(
+        () => {
+          if (profileLoadRef.current?.promise === request) profileLoadRef.current = null;
+        },
+        () => {
+          if (profileLoadRef.current?.promise === request) profileLoadRef.current = null;
+        },
+      );
+      return request;
+    };
+
     const handleUserSession = async (session: any) => {
-      console.log("[AppContext] handleUserSession called with session:", session);
       if (!session?.user) {
         if (isMounted) {
-          console.log("[AppContext] No user session found, setting authLoading to false");
           setCurrentUser(null);
+          setProfileLoading(false);
+          setProfileError(null);
           setAuthLoading(false);
         }
         return;
+      }
+
+      if (isMounted) {
+        setProfileLoading(true);
+        setProfileError(null);
+        setCurrentUser((previous: any) => previous?.id === session.user.id ? { ...previous, ...session.user } : session.user);
       }
 
       try {
-        console.log("[AppContext] User session found, ensuring profile for:", session.user.id);
-        const profile = await ensureProfile(session.user.id, session.user);
-        const user = profile ? { ...session.user, ...profile } : session.user;
-        
+        const profile = await loadProfile(session.user.id, session.user);
+        if (!profile) throw new Error('Profile record was not returned by Supabase.');
         if (isMounted) {
-          console.log("[AppContext] Profile ensured, setting current user");
-          setCurrentUser(user);
+          setCurrentUser({ ...session.user, ...profile });
+          setProfileLoading(false);
+          setProfileError(null);
           setAuthLoading(false);
         }
-      } catch (err) {
-        console.error("[AppContext] Error handling user session:", err);
-        if (isMounted) setAuthLoading(false);
+      } catch (error: any) {
+        console.error('[AppContext] Profile loading failed:', error?.message || error, error);
+        if (isMounted) {
+          setCurrentUser(session.user);
+          setProfileLoading(false);
+          setProfileError(error?.message || 'Unable to load your profile.');
+          setAuthLoading(false);
+        }
       }
     };
 
-    console.log("[AppContext] Getting initial session...");
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log("[AppContext] getSession resolved. Session:", session, "Error:", error);
       if (error) {
-        console.error("[AppContext] Get session error:", error);
-        supabase.auth.signOut();
-        if (isMounted) setAuthLoading(false);
+        console.error('[AppContext] Get session error:', error);
+        if (isMounted) {
+          setProfileLoading(false);
+          setAuthLoading(false);
+        }
         return;
       }
       handleUserSession(session);
-    }).catch((err) => {
-      console.error("[AppContext] getSession rejected:", err);
-      if (isMounted) setAuthLoading(false);
+    }).catch((error) => {
+      console.error('[AppContext] getSession request failed:', error);
+      if (isMounted) {
+        setProfileLoading(false);
+        setAuthLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[AppContext] Auth state change event:", event);
       if (event === 'SIGNED_OUT') {
         if (isMounted) {
           setCurrentUser(null);
+          setProfileLoading(false);
+          setProfileError(null);
           setAuthLoading(false);
         }
-      } else if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+      } else if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
         await handleUserSession(session);
       }
     });
@@ -667,7 +721,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [ensureProfile]);
+  }, [ensureProfile, profileRetryNonce]);
 
   // Restrict full data reloads to actual user ID changes to prevent infinite loops
   useEffect(() => {
@@ -698,12 +752,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentUser, refreshProjects, refreshNotifications, refreshChats]);
 
   useEffect(() => {
-    if (currentUser?.id) {
+    if (currentUser?.id && !profileLoading && !profileError) {
       updatePresence();
       const interval = setInterval(updatePresence, 30000);
       return () => clearInterval(interval);
     }
-  }, [currentUser?.id, updatePresence]);
+  }, [currentUser?.id, profileLoading, profileError, updatePresence]);
 
   // Auto-Logout Logic
   useEffect(() => {
@@ -806,7 +860,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AppContext.Provider value={{
-      currentUser, setCurrentUser, role, isAdmin, isModerator, isSuperAdmin, authLoading,
+      currentUser, setCurrentUser, role, isAdmin, isModerator, isSuperAdmin,
+      profileLoading, profileError, retryProfile, authLoading,
       hasSeenOnboarding, completeOnboarding,
       projects, setProjects, 
       requests, setRequests,

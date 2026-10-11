@@ -47,17 +47,14 @@ const roleStyles: Record<AppRole, string> = {
 
 const Admin = () => {
   const navigate = useNavigate();
-  const { currentUser, isAdmin, isModerator, isSuperAdmin } = useApp();
+  const { currentUser, role, isAdmin, isModerator, isSuperAdmin } = useApp();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!currentUser || !isModerator) {
-      navigate('/', { replace: true });
-      return;
-    }
+    if (!currentUser || !isModerator) return;
 
     let mounted = true;
     const loadDashboard = async () => {
@@ -87,7 +84,7 @@ const Admin = () => {
     return () => {
       mounted = false;
     };
-  }, [currentUser, isAdmin, isModerator, navigate]);
+  }, [currentUser?.id, isAdmin, isModerator, navigate]);
 
   const handleRoleChange = async (userId: string, newRole: AppRole) => {
     if (!isSuperAdmin || userId === currentUser?.id) return;
@@ -104,7 +101,7 @@ const Admin = () => {
       setUsers((current) =>
         current.map((user) =>
           user.id === userId
-            ? { ...user, role: updated?.role || newRole, is_admin: updated?.is_admin ?? (newRole === 'admin' || newRole === 'super_admin') }
+            ? { ...user, role: updated?.role || newRole }
             : user,
         ),
       );
@@ -142,9 +139,9 @@ const Admin = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Badge className={`${roleStyles[currentUser.role as AppRole] || roleStyles.member} border-0 px-3 py-1.5`}>
+            <Badge className={`${roleStyles[role || 'member']} border-0 px-3 py-1.5`}>
               {isSuperAdmin && <Crown size={14} className="mr-1.5" />}
-              {roleLabels[currentUser.role as AppRole] || 'Member'}
+              {roleLabels[role || 'member']}
             </Badge>
             <button onClick={() => navigate('/profile')} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800">
               Back to profile

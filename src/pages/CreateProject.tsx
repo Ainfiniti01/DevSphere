@@ -18,7 +18,7 @@ const CreateProject = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
-  const { projects, refreshProjects, currentUser, refreshNotifications } = useApp();
+  const { projects, refreshProjects, currentUser, refreshNotifications, isAdmin } = useApp();
   
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -48,7 +48,7 @@ const CreateProject = () => {
   const isAtTotalLimit = !isPremium && userProjects.length >= 5 && !editId;
   const isAtActiveLimit = !isPremium && activeProjects.length >= 3 && !editId;
 
-  const canEditTitle = !editId || currentUser?.is_admin || currentUser?.name === 'Abdulazeez Adam.A';
+  const canEditTitle = !editId || isAdmin || currentUser?.name === 'Abdulazeez Adam.A';
 
   // Draft Persistence Key
   const draftKey = `devsphere_draft_project_${editId || 'new'}`;

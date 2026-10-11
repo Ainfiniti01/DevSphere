@@ -29,7 +29,7 @@ const SUGGESTIONS = [
 ];
 
 const AIManager = ({ projectId }: AIManagerProps) => {
-  const { currentUser, projects, requests } = useApp();
+  const { currentUser, projects, requests, isAdmin } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,13 +40,13 @@ const AIManager = ({ projectId }: AIManagerProps) => {
 
   const userRole = React.useMemo(() => {
     if (!project || !currentUser) return 'visitor';
-    if (currentUser.is_admin) return 'admin';
+    if (isAdmin) return 'admin';
     if (project.creator_id === currentUser.id) return 'owner';
     if (project.myMembershipStatus === 'active') return 'member';
     const req = requests.find(r => r.project_id === projectId && r.user_id === currentUser.id);
     if (req?.status === 'pending') return 'applicant';
     return 'visitor';
-  }, [project, currentUser, requests, projectId]);
+  }, [project, currentUser, isAdmin, requests, projectId]);
 
   const isVisitor = userRole === 'visitor' || userRole === 'applicant';
   const membershipStatus = project?.myMembershipStatus || 'none';

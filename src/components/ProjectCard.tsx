@@ -13,6 +13,7 @@ import { useApp } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { getProjectUrl } from '@/lib/appOrigin';
 
 const ProjectCard = ({ project }: { project: any }) => {
   const navigate = useNavigate();
@@ -55,20 +56,13 @@ const ProjectCard = ({ project }: { project: any }) => {
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/project/${project.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: project.title,
-          text: project.description,
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      navigator.clipboard.writeText(shareUrl);
+    const shareUrl = getProjectUrl(project.id);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
       toast.success("Link copied to clipboard!");
+    } catch (error: any) {
+      console.error("Failed to copy project link:", error);
+      toast.error("Unable to copy the project link. Please try again.");
     }
   };
 

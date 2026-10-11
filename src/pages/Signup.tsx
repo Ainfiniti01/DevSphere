@@ -24,6 +24,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
+import { getSafeReturnPath } from "@/lib/authRedirect";
 import { toast } from "sonner";
 import appIcon from '../../assets/images/icon.jpeg';
 
@@ -32,6 +33,7 @@ type RegistrationStep = "account" | "verification" | "profile";
 const Signup = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const returnTo = getSafeReturnPath(searchParams.get('returnTo'), '/');
   const [step, setStep] = useState<RegistrationStep>("account");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -81,7 +83,7 @@ const Signup = () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: `${window.location.origin}/auth?returnTo=${encodeURIComponent(returnTo)}` },
     });
 
     if (error) {
@@ -134,7 +136,7 @@ const Signup = () => {
         password: formData.password,
         options: {
           data: { full_name: fullName },
-          redirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}/auth?returnTo=${encodeURIComponent(returnTo)}`,
         },
       });
 
@@ -184,6 +186,7 @@ const Signup = () => {
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: formData.email.trim(),
+        options: { emailRedirectTo: `${window.location.origin}/auth?returnTo=${encodeURIComponent(returnTo)}` },
       });
       if (error) throw error;
       toast.success("A new confirmation code is on its way.");
@@ -237,7 +240,7 @@ const Signup = () => {
       toast.success(
         includeOptionalFields ? "Your profile is ready to discover." : "You can complete your profile anytime.",
       );
-      navigate("/");
+      navigate(returnTo, { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Unable to save your profile.");
     } finally {
@@ -612,7 +615,7 @@ const Signup = () => {
 
         {step === "account" && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account? <button type="button" onClick={() => navigate("/auth")} className="font-semibold text-primary hover:underline">Log in</button>
+            Already have an account? <button type="button" onClick={() => navigate(`/auth?returnTo=${encodeURIComponent(returnTo)}`)} className="font-semibold text-primary hover:underline">Log in</button>
           </p>
         )}
       </div>
